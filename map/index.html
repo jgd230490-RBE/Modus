@@ -3110,6 +3110,10 @@
         if (typeof applyLabels === 'function') applyLabels();     // 28 Oct 2026 (task 0a): a label layer just (re)made
         if (typeof restyleHeatEdge === 'function') restyleHeatEdge();     // 12 Nov 2026 (A-F2b): a casing just (re)made on a dark ground
         applyLegLook();                                                   // 24 Nov 2026: the legs' look (a month on or off, a dark ground)
+        // 24 Nov 2026 (card 5): the amber edge over the lines, the usual road's grey pair and the busy-hours roads follow
+        if (typeof placeDiversionEdge === 'function') placeDiversionEdge();
+        if (typeof restyleUsualRoad === 'function') restyleUsualRoad();
+        if (typeof placeBusyRoads === 'function') { placeBusyRoads(); restyleBusyRoads(); }
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
         // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
@@ -6895,7 +6899,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','div-usual-x','div-usual','div-usual-casing','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyFilters();            // §9: and the cards drop back to the network count
@@ -7073,11 +7077,13 @@
     function ensureSelectionLayers(){
         if(!map.getSource('selected-route')) map.addSource('selected-route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
         // 5 Nov 2026 (task 0d-2, Q15 = P2): a picked route's busy-hours road, thin blue with a white edge, under the pick
-        if(!map.getSource('busy-route')) map.addSource('busy-route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+        // 24 Nov 2026 (card 5): made from what is drawn now (BUSY), so a basemap switch keeps the month's busy-hours roads
+        if(!map.getSource('busy-route')) map.addSource('busy-route',{type:'geojson',data:BUSY.fc});
         if(!map.getLayer('busy-casing')) map.addLayer({id:'busy-casing',type:'line',source:'busy-route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':5.5,'line-offset':SEL_OFFSET}}, labelAnchor());
         if(!map.getLayer('busy-core')) map.addLayer({id:'busy-core',type:'line',source:'busy-route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':BUSY_ROAD_COLOR,'line-width':2.6,'line-offset':SEL_OFFSET}}, labelAnchor());
-        if(!map.getSource('busy-hours-at')) map.addSource('busy-hours-at',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-        if(!map.getLayer('busy-hours-at')) map.addLayer({id:'busy-hours-at',type:'symbol',source:'busy-hours-at',layout:{'symbol-placement':'point','text-field':['get','hours'],'text-size':12,'text-font':['literal',BADGE_FONT],'text-anchor':'right','text-offset':[-0.8,0],'text-allow-overlap':true},paint:{'text-color':'#1D4ED8','text-halo-color':'#ffffff','text-halo-width':2}});
+        if(!map.getSource('busy-hours-at')) map.addSource('busy-hours-at',{type:'geojson',data:BUSY.at});
+        // NARROWED 24 Nov 2026 (card 5): the hours in ink (busyInk), never the stock blue
+        if(!map.getLayer('busy-hours-at')) map.addLayer({id:'busy-hours-at',type:'symbol',source:'busy-hours-at',layout:{'symbol-placement':'point','text-field':['get','hours'],'text-size':12,'text-font':['literal',BADGE_FONT],'text-anchor':'right','text-offset':[-0.8,0],'text-allow-overlap':true},paint:{'text-color':busyInk().ink,'text-halo-color':busyInk().halo,'text-halo-width':2}});
         if(!map.getLayer('sel-glow')) map.addLayer({id:'sel-glow',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':CONFIG.COLORS.brand,'line-width':14,'line-opacity':0.28,'line-blur':3,'line-offset':SEL_OFFSET}}, labelAnchor());
         if(!map.getLayer('sel-casing')) map.addLayer({id:'sel-casing',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':SEL_CASING_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
         if(!map.getLayer('sel-core')) map.addLayer({id:'sel-core',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['match',['get','type'],'Inbound Highway','#059669','Outbound Highway','#f59e0b',CONFIG.COLORS.brand],'line-width':SEL_CORE_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
@@ -7104,19 +7110,88 @@
     }
     // 5 Nov 2026 (task 0d-2, Q15 = P2): the picked route's busy-hours roads ('BusyHours' features), drawn while it is
     // picked, with a pill of its hours beside the loaded leg; nothing for a route without one
-    const BUSY_ROAD_COLOR = CONFIG.COLORS.forecast;     // the plan blue, thinner (the forecast layers keep their own)
+    // BENT 24 Nov 2026 (John's "Yes, as recommended" to notes\public-map-lines-mockup-1124, card 5, Q9): a busy-hours road is
+    // ALSO drawn whenever its route is on the month's forecast and the overlay lets it through (the leg ticks, the sidebar
+    // filters), with no click; a picked route's own is drawn as before, month or not. A dated diversion wins on its days
+    // (PR #220): a leg diverted this month shows its diversion, never its busy-hours road. Thin sign blue on a white
+    // casing, its hours in ink beside the loaded leg's road (else the empty leg's); nothing amber.
+    const BUSY_ROAD_COLOR = CONFIG.COLORS.brand;     // the sign blue (was the forecast blue)
+    const BUSY = { picked: null, sig: null, shown: [], fc: { type: 'FeatureCollection', features: [] }, at: { type: 'FeatureCollection', features: [] } };
+    function busyInk(){
+        const dark = typeof netDark === 'function' && netDark();
+        return { ink: dark ? '#F4F4F5' : '#1F2024', halo: dark ? '#1F2024' : '#ffffff' };
+    }
     function busyFeatures(rl){
         return (a1_data.features||[]).filter(f=>f.properties&&f.properties.type==='BusyHours'&&f.geometry
             &&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);
     }
+    //: the leg a busy-hours road belongs to, as the map draws it now (its type, is_forecast, div_when this month)
+    const BUSY_LEG = { loaded: 'Inbound Highway', 'return': 'Outbound Highway' };
+    function busyLegProps(){
+        const own = {};
+        (a1_data.features || []).forEach(f => { const p = f.properties || {};
+            if (p.type === 'Inbound Highway' || p.type === 'Outbound Highway') own[p.route_id + '|' + p.type] = p; });
+        return own;
+    }
+    //: the month's busy-hours roads: a route on the forecast that the overlay lets through, its leg not diverted this month
+    //: a council view quiets the routes to one thin grey line: the month's busy-hours roads go with them (a picked
+    //: route's stays, as its own highlight does)
+    function busyOnMonth(own){
+        if (typeof TL === 'undefined' || !TL.on) return [];
+        if (typeof councilFocus === 'function' && councilFocus()) return [];
+        const pass = divOverlayPasses();
+        return (a1_data.features || []).filter(f => { const p = f.properties || {};
+            if (p.type !== 'BusyHours' || !f.geometry) return false;
+            const lp = own[p.route_id + '|' + BUSY_LEG[p.leg]];
+            return !!lp && !lp.div_when && pass.ok(lp); });
+    }
+    function fillBusyRoads(){
+        if (typeof map === 'undefined' || !map.getSource) return;
+        const own = busyLegProps(), seen = new Set(), feats = [];
+        const add = f => { const p = f.properties, k = p.route_id + '|' + p.leg + '|' + p.from + '|' + p.to;
+            if (seen.has(k)) return; seen.add(k); feats.push(f); };
+        if (BUSY.picked) busyFeatures(BUSY.picked).filter(f => { const lp = own[f.properties.route_id + '|' + BUSY_LEG[f.properties.leg]]; return !(lp && lp.div_when); }).forEach(add);
+        busyOnMonth(own).forEach(add);
+        const sig = [...seen].sort().join(',');
+        if (sig === BUSY.sig) return;
+        BUSY.sig = sig; BUSY.shown = feats;
+        BUSY.fc = { type: 'FeatureCollection', features: feats };
+        // its hours beside the middle of the loaded leg's road (the empty leg's when only that one is drawn), a text with a
+        // halo (no DOM marker on this map); one a route and hours
+        const byR = {};
+        feats.forEach(f => { const p = f.properties, k = p.route_id + '|' + p.from + '|' + p.to;
+            if ((f.geometry.coordinates || []).length > 1 && (!byR[k] || p.leg === 'loaded')) byR[k] = f; });
+        const pts = Object.keys(byR).sort().map(k => { const f = byR[k];
+            return { type: 'Feature', properties: { hours: f.properties.from + '–' + f.properties.to },
+                     geometry: { type: 'Point', coordinates: f.geometry.coordinates[Math.floor(f.geometry.coordinates.length / 2)] } }; });
+        BUSY.at = { type: 'FeatureCollection', features: pts };
+        const src = map.getSource('busy-route'); if (src) src.setData(BUSY.fc);
+        const at = map.getSource('busy-hours-at'); if (at) at.setData(BUSY.at);
+        if (feats.length) placeBusyRoads();
+        if (typeof renderFlowLegend === 'function') renderFlowLegend();
+    }
     function showBusyRoad(rl){
-        const feats = rl ? busyFeatures(rl) : [];
-        const src = map.getSource('busy-route'); if (src) src.setData({ type: 'FeatureCollection', features: feats });
-        // its hours beside the middle of the loaded leg's road, a text with a white halo (no DOM marker on this map)
-        const pts = feats.filter(f => f.properties.leg === 'loaded' && (f.geometry.coordinates || []).length > 1).map(f => ({
-            type: 'Feature', properties: { hours: f.properties.from + '–' + f.properties.to },
-            geometry: { type: 'Point', coordinates: f.geometry.coordinates[Math.floor(f.geometry.coordinates.length / 2)] } }));
-        const at = map.getSource('busy-hours-at'); if (at) at.setData({ type: 'FeatureCollection', features: pts });
+        BUSY.picked = rl || null;
+        fillBusyRoads();
+    }
+    //: a busy-hours road goes over the forecast lines, the shared sections and the amber edge (a pick's own order,
+    //: selectRoute, is kept: its moves put the pick on top); its hours text over the lines
+    function placeBusyRoads(){
+        if (typeof map === 'undefined' || !map.getLayer || !map.getLayer('busy-core')) return;
+        let ids; try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
+        let at = -1; ['forecast-layer', 'road-load-line', 'forecast-flow', 'diversion-edge'].forEach(l => { at = Math.max(at, ids.indexOf(l)); });
+        if (at < 0) return;
+        if (ids.indexOf('busy-casing') < at || ids.indexOf('busy-core') < at) {
+            const next = ids[at + 1];
+            ['busy-casing', 'busy-core'].forEach(l => { try { if (next) map.moveLayer(l, next); else map.moveLayer(l); } catch (e) {} });
+            try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
+        }
+        if (map.getLayer('busy-hours-at') && ids.indexOf('busy-hours-at') < ids.indexOf('busy-core')) { try { map.moveLayer('busy-hours-at', labelAnchor()); } catch (e) {} }
+    }
+    function restyleBusyRoads(){
+        if (typeof map === 'undefined' || !map.getLayer || !map.getLayer('busy-hours-at')) return;
+        const k = busyInk();
+        try { map.setPaintProperty('busy-hours-at', 'text-color', k.ink); map.setPaintProperty('busy-hours-at', 'text-halo-color', k.halo); } catch (e) {}
     }
 
     function showDrawerTab(tab){
@@ -7686,6 +7761,8 @@
     // features carry no is_forecast / type / route_id, so this filter would hide every lane; drawFlow() cuts the lanes
     // by the same three tests instead.
     const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','diversion-edge'];   // 29 Oct 2026: + the amber edge
+    // (24 Nov 2026, card 5: the usual road and the busy-hours roads follow the same filter in their own fill, updateUsualRoad
+    // and fillBusyRoads, because each is a union across routes; applyForecastFilter re-fills them)
     function forecastLayerFilter(){
         const legs = [];
         const inCb = document.getElementById('layer-inbound'), outCb = document.getElementById('layer-outbound');
@@ -7705,6 +7782,10 @@
         FORECAST_OVERLAY_LAYERS.forEach(l => { if(map.getLayer(l)) map.setFilter(l, f); });
         if (map.getLayer('forecast-flow')) drawFlow();     // 16 Oct (D115): the lanes are re-summed over the routes let through
         if (typeof refreshMapModeFilters === 'function') refreshMapModeFilters();   // 12 Oct: Road load / Carbon too
+        // 24 Nov 2026 (card 5): the usual road, the edge's widths (the shared sections just re-cut) and the busy-hours roads
+        if (typeof updateUsualRoad === 'function') updateUsualRoad();
+        if (typeof divEdgeGaps === 'function') divEdgeGaps();
+        if (typeof fillBusyRoads === 'function') fillBusyRoads();
     }
     function ensureForecastLayers(){
         if(map.getLayer('forecast-layer')) return;
@@ -8112,7 +8193,8 @@
     // grey (where the lorries run), with no casing, no flow dashes, no labels and no cap badges; the heat map is off
     // (the two never share the blues). Unticking both boxes puts everything back.
     const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;
-    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];
+    // NARROWED 24 Nov 2026 (card 5): + the usual road of a diverted route (DIV_USUAL_LAYERS), hidden in a council view
+    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge', 'div-usual-casing', 'div-usual', 'div-usual-x'];
     function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }
     function setForecastLabelsVisible(on){
         if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
@@ -8135,8 +8217,10 @@
         }
         COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', caseW);
-        // the amber diversion edge takes the casing's place, at the casing's width (29 Oct), so it follows the band too
-        if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);
+        // NARROWED 24 Nov 2026 (card 5): the amber diversion edge is two rails OUTSIDE the line it runs along, the gap the
+        // widest line drawn there (divEdgeGaps), so it shows at every band and over a shared section; its own width is fixed
+        if (typeof divEdgeGaps === 'function') divEdgeGaps();
+        if (typeof fillBusyRoads === 'function') fillBusyRoads();     // a council view drops the month's busy roads
         // the flow's lanes (1.6 px a lane, 1.75 px off the middle) do not fit inside a 3 px line: on the first band they
         // are not drawn while a heat map is on (the moving dots replace the lanes in their own build)
         if (map.getLayer('forecast-flow')) map.setPaintProperty('forecast-flow', 'line-width', flowWidthExpr(heat && !focus));
@@ -8638,13 +8722,39 @@
             '<div class="ml-sub">' + when + '</div>' +
             stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_WIDTHS[i]) + t + '</div>').join('') +
             // 29 Oct 2026: one line, only in a month with a diversion on the map (variant B of the mockup)
-            ((typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
-                ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '');
+            // NARROWED 24 Nov 2026 (card 5): reworded, and two rows added, each only while its thing is on the map
+            divLegendRows();
+    }
+    //: 24 Nov 2026 (card 5): the way round, the usual road and the busy-hours roads, each row only while the map draws it
+    //: (the edge's and the usual road's pieces the overlay lets through; the busy-hours roads drawn now)
+    function divLegendRows(){
+        const pass = typeof divOverlayPasses === 'function' ? divOverlayPasses() : { ok: () => true };
+        const edge = typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.some(f => pass.ok(f.properties || {}));
+        const usual = typeof DIV_USUAL !== 'undefined' && DIV_USUAL.fc.features.length > 0;
+        const busy = typeof BUSY !== 'undefined' ? BUSY.shown : [];
+        const hrs = [...new Set(busy.map(f => f.properties.from + '|' + f.properties.to))];
+        return (edge ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'The way round a closure</div>' : '')
+            + (usual ? '<div class="ml-row" id="div-usual-legend">' + divUsualSample() + 'Usual road, not used this month</div>' : '')
+            + (busy.length ? '<div class="ml-row" id="busy-legend">' + busySample() + (hrs.length === 1
+                ? 'Used ' + rlEsc(hrs[0].split('|')[0]) + ' to ' + rlEsc(hrs[0].split('|')[1]) + ' only' : 'Used in busy hours only') + '</div>' : '');
     }
     function divEdgeSample(){   // 10 Nov 2026: the same scale as the five samples above it
+        // NARROWED 24 Nov 2026 (card 5): the line with its two amber rails outside it, as the map draws the way round
         return flowKeySvg(
-            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + DIV_EDGE.colour + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
-            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/>');
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + DIV_EDGE.colour + '" stroke-width="' + (FORECAST_LINE_WIDTH + 2 * DIV_EDGE.rail) + '" stroke-linecap="butt"/>' +
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="butt"/>');
+    }
+    function divUsualSample(){
+        return flowKeySvg(
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + DIV_USUAL.casing + '" stroke-width="' + DIV_USUAL.casingW + '" stroke-linecap="round"/>' +
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + DIV_USUAL.core + '" stroke-width="' + DIV_USUAL.coreW + '" stroke-linecap="round"/>' +
+            '<g fill="' + DIV_USUAL.x + '" font-size="' + (DIV_USUAL.xSize / FLOW_KEY_SCALE) + '" font-weight="700" text-anchor="middle">' +
+            '<text x="11" y="8.6">×</text><text x="21" y="8.6">×</text></g>');
+    }
+    function busySample(){
+        return flowKeySvg(
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round"/>' +
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + BUSY_ROAD_COLOR + '" stroke-width="2.6" stroke-linecap="round"/>');
     }
     // ===== end of the flow =====
 
@@ -8935,7 +9045,23 @@
     // those stretches (layer 'diversion-edge', between forecast-casing and forecast-layer, the casing's width), so the
     // route keeps its volume colour and lanes. Pieces carry the leg's type, route and is_forecast, so the forecast
     // overlay's own filter (leg ticks, sidebar filters) applies to them. A route's usual line is DIV.orig's.
-    const DIV_EDGE = { colour: '#F59E0B', near_m: 25, cache: new Map(), fc: { type: 'FeatureCollection', features: [] }, sig: '' };
+    // NARROWED 24 Nov 2026 (John's "Yes, as recommended" to notes\public-map-lines-mockup-1124, card 5, Q8): the amber is
+    // the ONLY amber on a route now, and it must show at every band's width (3 to 10 px, Direction 2) and where a shared
+    // section's line (road-load-line, added later, up to 10 px on a 12.4 px white casing) covers the route. Under the line
+    // at the casing's width it was 1.2 px a side, and gone under a shared section. So the edge is now TWO AMBER RAILS
+    // drawn OVER the lines ('line-gap-width' = the width of the widest line drawn there, 'line-width' = DIV_EDGE.rail a
+    // side): each piece is cut where that width changes and carries it as dv_gap (divEdgeGaps). Placed just above the
+    // forecast line, the shared sections and the lanes (placeDiversionEdge), under the flow's dots, a pick and the marks.
+    const DIV_EDGE = { colour: '#F59E0B', near_m: 25, rail: 3, cache: new Map(), fc: { type: 'FeatureCollection', features: [] }, sig: '',
+                       pieces: [], gapKey: '' };
+    // 24 Nov 2026 (card 5, Q8): the USUAL road of a leg diverted this month — the stretch of its own line (DIV.orig) that
+    // the diversion leaves, divOffPieces(usual, diversion), the mirror of the edge — drawn UNDER the forecast lines in pale
+    // grey on a white casing with "×" marks along it. One union of the pieces of the routes the overlay lets through (the
+    // leg ticks, the sidebar filters, is_forecast), so thirteen routes on one usual road draw one line and one row of
+    // crosses. The crosses are MARKS, not names: they stay under Labels Off and are not in LABEL_RULES. No popup, no tip.
+    const DIV_USUAL = { core: '#B4B6BA', casing: '#FFFFFF', x: '#6B6E74', coreDark: '#6E7177', casingDark: '#26282C', xDark: '#C9CBCF',
+                        coreW: 2.6, casingW: 5, xEvery: 70, xSize: 15, cache: new Map(), pieces: [], fc: { type: 'FeatureCollection', features: [] }, sig: '' };
+    const DIV_USUAL_LAYERS = ['div-usual-casing', 'div-usual', 'div-usual-x'];
 
     // ===== 29 Oct 2026 (task 3c): the holding areas — the route goes to H first, then chevrons to the gate ==============
     // A leg that calls off at a holding area carries holding_at_km (the public feed; null where the line does not pass
@@ -9014,8 +9140,10 @@
     function divOffPieces(divCoords, mainCoords){
         const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, NEAR = DIV_EDGE.near_m, CELL = 200;
         const segs = [], grid = new Map();
-        for (let i = 1; i < mainCoords.length; i++) {
-            const a = mainCoords[i - 1], b = mainCoords[i];
+        // 24 Nov 2026: mainCoords may also be a LIST of lines (the usual road's union, updateUsualRoad)
+        const mains = (mainCoords.length && Array.isArray(mainCoords[0]) && Array.isArray(mainCoords[0][0])) ? mainCoords : [mainCoords];
+        for (const ml of mains) for (let i = 1; i < ml.length; i++) {
+            const a = ml[i - 1], b = ml[i];
             const g = [a[0] * kx, a[1] * ky, b[0] * kx, b[1] * ky];
             const ix = segs.push(g) - 1;
             for (let x = Math.floor((Math.min(g[0], g[2]) - NEAR) / CELL); x <= Math.floor((Math.max(g[0], g[2]) + NEAR) / CELL); x++)
@@ -9046,7 +9174,7 @@
     }
     function updateDiversionEdge(data){
         const feats = ((data || (typeof a1_data !== 'undefined' && a1_data)) || {}).features || [];
-        const out = [];
+        const out = [], usual = [];
         feats.forEach(f => {
             const p = f.properties || {};
             if (!p.div_when || !(p.type === 'Inbound Highway' || p.type === 'Outbound Highway') || !f.geometry) return;
@@ -9054,25 +9182,198 @@
             if (!o) return;
             const div = f.geometry.coordinates, ck = key + '|' + div.length + '|' + o.coords.length;
             if (!DIV_EDGE.cache.has(ck)) DIV_EDGE.cache.set(ck, divOffPieces(div, o.coords));
+            if (!DIV_USUAL.cache.has(ck)) DIV_USUAL.cache.set(ck, divOffPieces(o.coords, div));   // 24 Nov 2026: the mirror
+            const props = { type: p.type, route_id: p.route_id, is_forecast: !!p.is_forecast, diverted: true };
             DIV_EDGE.cache.get(ck).forEach(run => out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run },
-                properties: { type: p.type, route_id: p.route_id, is_forecast: !!p.is_forecast, diverted: true } }));
+                properties: Object.assign({}, props) }));
+            DIV_USUAL.cache.get(ck).forEach(run => usual.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run },
+                properties: Object.assign({}, props, { usual: true }) }));
         });
+        DIV_USUAL.pieces = usual;
+        const usualMoved = updateUsualRoad(true);        // the key is drawn once below, for both
         // sent only when the pieces changed: renderMonthFrame runs on every timeline tick, and an empty month after an
         // empty month must not push a source to GL (its own setData guard's rule)
         const sig = out.map(x => x.properties.route_id + x.properties.type[0] + (x.properties.is_forecast ? 1 : 0) + ':' + x.geometry.coordinates.length).join(',');
-        if (sig === DIV_EDGE.sig) return;
+        if (sig === DIV_EDGE.sig) { divEdgeGaps(); if (usualMoved && typeof renderFlowLegend === 'function') renderFlowLegend(); return; }
         DIV_EDGE.sig = sig;
-        DIV_EDGE.fc = { type: 'FeatureCollection', features: out };
-        const src = map.getSource && map.getSource('diversion-edge-source');
-        if (src) src.setData(DIV_EDGE.fc);
+        DIV_EDGE.pieces = out;
+        DIV_EDGE.gapKey = null;
+        divEdgeGaps();
         if (typeof renderFlowLegend === 'function') renderFlowLegend();
     }
+    //: the routes and legs the forecast overlay lets through now (forecastLayerFilter's own three tests: is_forecast, the
+    //: leg ticks, the routes passing the sidebar filters), as a test on a piece's properties; no filter = everything
+    function divOverlayPasses(){
+        let f = null;
+        try { f = typeof forecastLayerFilter === 'function' ? forecastLayerFilter() : null; } catch (e) { f = null; }
+        const legs = f && f[2] && f[2][2] && f[2][2][1], rids = f && f[3] && f[3][2] && f[3][2][1];
+        if (!Array.isArray(legs) || !Array.isArray(rids)) return { key: '*', ok: p => !!p.is_forecast };
+        const L = new Set(legs), R = new Set(rids);
+        return { key: legs.join(',') + '|' + rids.join(','), ok: p => !!p.is_forecast && L.has(p.type) && R.has(p.route_id) };
+    }
+    //: the width (px) of the line an edge piece runs along: heat map Off one width, a council view its thin line, else the
+    //: widest band drawn within DIV_GAP_NEAR_M of each point — a forecast route's (f_avg on the Volume stops, f_co2 on the
+    //: carbon stops) or, under Volume, a shared section's (rl_mv on rlStops). The step is bandWidthExpr's own.
+    const DIV_GAP_NEAR_M = 12;
+    function divBandW(v, stops){ let i = 0; (stops || []).forEach(s => { if (Number(v) >= s) i++; }); return LINE_BAND_WIDTHS[Math.min(i, LINE_BAND_WIDTHS.length - 1)]; }
+    function divGapLines(mode){
+        const lines = [], pass = divOverlayPasses();
+        if (mode !== 'volume' && mode !== 'carbon') return lines;
+        const src = (typeof map !== 'undefined' && map.getSource) ? map.getSource('routes-source') : null;
+        const stops = mode === 'volume' ? ROUTE_VOLUME_STOPS : carbonScale(false).stops;
+        ((src && src._data && src._data.features) || []).forEach(f => {
+            const p = f.properties || {};
+            if (!f.geometry || f.geometry.type !== 'LineString' || !pass.ok(p)) return;
+            lines.push({ w: divBandW(mode === 'volume' ? p.f_avg : p.f_co2, stops), c: f.geometry.coordinates });
+        });
+        if (mode === 'volume' && map.getLayer('road-load-line')) {
+            const rl = map.getSource('road-load-source'), st = rlStops();
+            ((rl && rl._data && rl._data.features) || []).forEach(f => {
+                const g = f.geometry || {}, w = divBandW((f.properties || {}).rl_mv, st);
+                (g.type === 'MultiLineString' ? g.coordinates : g.type === 'LineString' ? [g.coordinates] : []).forEach(c => lines.push({ w, c }));
+            });
+        }
+        return lines;
+    }
+    //: cut each edge piece where the width under it changes and stamp the width on each part (dv_gap); sent only when the
+    //: month, the mode, the shared sections read or the filters changed
+    function divEdgeGaps(){
+        const focus = typeof councilFocus === 'function' && councilFocus();
+        const mode = focus ? 'council' : ((typeof heatMode === 'function' && heatMode()) || 'off');
+        const month = typeof mapModeMonth === 'function' ? mapModeMonth() : null;
+        const rlSrc = mode === 'volume' && typeof map !== 'undefined' && map.getSource && map.getLayer && map.getLayer('road-load-line') ? map.getSource('road-load-source') : null;
+        const rlN = rlSrc && rlSrc._data && rlSrc._data.features ? rlSrc._data.features.length : 0;
+        const pass = divOverlayPasses();
+        const rlMonth = rlSrc && typeof RL !== 'undefined' ? RL.month + ':' + (RL.cache[RL.month] ? 1 : 0) : '';
+        const key = mode + '|' + month + '|' + DIV_EDGE.sig + '|' + rlMonth + ':' + rlN + '|' + pass.key;
+        if (key === DIV_EDGE.gapKey) return;
+        DIV_EDGE.gapKey = key;
+        // nothing drawn and nothing to draw: no source push (renderMonthFrame runs on every tick)
+        if (!DIV_EDGE.pieces.length && !DIV_EDGE.fc.features.length) return;
+        const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, NEAR = DIV_GAP_NEAR_M, CELL = 100;
+        const flat = mode === 'council' ? (typeof COUNCIL_ROUTE_WIDTH !== 'undefined' ? COUNCIL_ROUTE_WIDTH : 2)
+                                        : (typeof FORECAST_LINE_WIDTH !== 'undefined' ? FORECAST_LINE_WIDTH : 5);
+        const lines = (mode === 'volume' || mode === 'carbon') && DIV_EDGE.pieces.length ? divGapLines(mode) : [];
+        const grid = new Map(), segs = [];
+        if (lines.length) {
+            let bx = [Infinity, Infinity, -Infinity, -Infinity];
+            DIV_EDGE.pieces.forEach(f => f.geometry.coordinates.forEach(c => { bx = [Math.min(bx[0], c[0]), Math.min(bx[1], c[1]), Math.max(bx[2], c[0]), Math.max(bx[3], c[1])]; }));
+            const pad = 0.001;
+            lines.forEach(l => { for (let i = 1; i < l.c.length; i++) {
+                const a = l.c[i - 1], b = l.c[i];
+                if (Math.max(a[0], b[0]) < bx[0] - pad || Math.min(a[0], b[0]) > bx[2] + pad || Math.max(a[1], b[1]) < bx[1] - pad || Math.min(a[1], b[1]) > bx[3] + pad) continue;
+                const g = [a[0] * kx, a[1] * ky, b[0] * kx, b[1] * ky, l.w], ix = segs.push(g) - 1;
+                for (let x = Math.floor((Math.min(g[0], g[2]) - NEAR) / CELL); x <= Math.floor((Math.max(g[0], g[2]) + NEAR) / CELL); x++)
+                    for (let y = Math.floor((Math.min(g[1], g[3]) - NEAR) / CELL); y <= Math.floor((Math.max(g[1], g[3]) + NEAR) / CELL); y++) {
+                        const k = x + ':' + y; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(ix);
+                    }
+            } });
+        }
+        const widest = (c) => {
+            const x = c[0] * kx, y = c[1] * ky, ids = grid.get(Math.floor(x / CELL) + ':' + Math.floor(y / CELL));
+            let w = 0;
+            (ids || []).forEach(i => { const g = segs[i]; if (g[4] <= w) return;
+                const dx = g[2] - g[0], dy = g[3] - g[1], l2 = dx * dx + dy * dy;
+                const t = l2 ? Math.max(0, Math.min(1, ((x - g[0]) * dx + (y - g[1]) * dy) / l2)) : 0;
+                const px = g[0] + t * dx - x, py = g[1] + t * dy - y;
+                if (px * px + py * py <= NEAR * NEAR) w = g[4]; });
+            return w || (lines.length ? LINE_BAND_WIDTHS[0] : flat);
+        };
+        const out = [];
+        DIV_EDGE.pieces.forEach(f => {
+            const c = f.geometry.coordinates;
+            if (!lines.length) { out.push({ type: 'Feature', geometry: f.geometry, properties: Object.assign({}, f.properties, { dv_gap: flat }) }); return; }
+            const pw = c.map(widest);
+            let run = [c[0]], w = null;
+            for (let i = 1; i < c.length; i++) {
+                const sw = Math.max(pw[i - 1], pw[i]);     // a segment takes the wider of its two ends: rails never cross a wider line
+                if (w !== null && sw !== w) { out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run }, properties: Object.assign({}, f.properties, { dv_gap: w }) }); run = [c[i - 1]]; }
+                w = sw; run.push(c[i]);
+            }
+            if (run.length >= 2) out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run }, properties: Object.assign({}, f.properties, { dv_gap: w == null ? flat : w }) });
+        });
+        DIV_EDGE.fc = { type: 'FeatureCollection', features: out };
+        const src = typeof map !== 'undefined' && map.getSource && map.getSource('diversion-edge-source');
+        if (src) src.setData(DIV_EDGE.fc);
+    }
+    //: the edge sits just above the highest of the forecast line, the shared sections and the lanes (whichever are on the
+    //: map), so the rails are drawn over a wide line and its white casing; the dots, a pick and the marks stay above it
+    function divEdgeAfter(ids){
+        let at = -1;
+        ['forecast-layer', 'road-load-line', 'forecast-flow'].forEach(l => { at = Math.max(at, ids.indexOf(l)); });
+        return at;
+    }
+    function placeDiversionEdge(){
+        if (typeof map === 'undefined' || !map.getLayer || !map.getLayer('diversion-edge')) return;
+        let ids; try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
+        const at = divEdgeAfter(ids), me = ids.indexOf('diversion-edge');
+        if (at < 0 || me === at + 1) return;
+        const next = ids[at + 1] === 'diversion-edge' ? ids[at + 2] : ids[at + 1];
+        try { if (next) map.moveLayer('diversion-edge', next); else map.moveLayer('diversion-edge'); } catch (e) {}
+    }
     function ensureDiversionEdge(){
+        if (typeof styleReady === 'function' && !styleReady()) return;
         if (!map.getSource('diversion-edge-source')) map.addSource('diversion-edge-source', { type: 'geojson', data: DIV_EDGE.fc });
         if (!map.getLayer('diversion-edge') && map.getLayer('forecast-layer'))
+            // round caps: each rail ends in its own small round end (a gap line caps each rail, not the line), so a piece meets
+            // the usual line without a square amber stub
             map.addLayer({ id: 'diversion-edge', type: 'line', source: 'diversion-edge-source', filter: forecastLayerFilter(),
                 layout: { 'line-cap': 'round', 'line-join': 'round' },
-                paint: { 'line-color': DIV_EDGE.colour, 'line-width': FORECAST_CASING_WIDTH, 'line-opacity': 0.95 } }, 'forecast-layer');
+                paint: { 'line-color': DIV_EDGE.colour, 'line-width': DIV_EDGE.rail,
+                         'line-gap-width': ['to-number', ['get', 'dv_gap'], FORECAST_LINE_WIDTH], 'line-opacity': 1 } }, 'forecast-layer');
+        placeDiversionEdge();
+        ensureUsualRoad();
+    }
+    //: the union of the usual-road pieces of the legs the overlay lets through: a piece adds only the part of it that is
+    //: not already drawn (divOffPieces against what is kept so far), so one road carries one line and one row of crosses
+    //: quiet = the caller draws the key itself; the answer says whether the usual road changed
+    function updateUsualRoad(quiet){
+        const pass = divOverlayPasses();
+        const sig = DIV_USUAL.pieces.map(x => x.properties.route_id + x.properties.type[0] + ':' + x.geometry.coordinates.length).join(',') + '#' + pass.key;
+        if (sig === DIV_USUAL.sig) return false;
+        DIV_USUAL.sig = sig;
+        if (!DIV_USUAL.pieces.length && !DIV_USUAL.fc.features.length) return false;     // nothing drawn, nothing to draw
+        const kept = [];
+        DIV_USUAL.pieces.filter(f => pass.ok(f.properties)).forEach(f => {
+            const c = f.geometry.coordinates;
+            const add = kept.length ? divOffPieces(c, kept.map(k => k.geometry.coordinates)) : [c];
+            add.forEach(run => kept.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run }, properties: { route_id: f.properties.route_id, usual: true } }));
+        });
+        DIV_USUAL.fc = { type: 'FeatureCollection', features: kept };
+        const src = typeof map !== 'undefined' && map.getSource && map.getSource('div-usual-source');
+        if (src) src.setData(DIV_USUAL.fc);
+        if (!quiet && typeof renderFlowLegend === 'function') renderFlowLegend();
+        return true;
+    }
+    function divUsualPaint(){
+        const dark = typeof netDark === 'function' && netDark();
+        return { core: dark ? DIV_USUAL.coreDark : DIV_USUAL.core, casing: dark ? DIV_USUAL.casingDark : DIV_USUAL.casing,
+                 x: dark ? DIV_USUAL.xDark : DIV_USUAL.x, halo: dark ? DIV_USUAL.casingDark : DIV_USUAL.casing };
+    }
+    function ensureUsualRoad(){
+        if (typeof styleReady === 'function' && !styleReady()) return;
+        if (!map.getLayer('forecast-casing')) return;
+        if (!map.getSource('div-usual-source')) map.addSource('div-usual-source', { type: 'geojson', data: DIV_USUAL.fc });
+        const p = divUsualPaint();
+        if (!map.getLayer('div-usual-casing')) map.addLayer({ id: 'div-usual-casing', type: 'line', source: 'div-usual-source',
+            layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': p.casing, 'line-width': DIV_USUAL.casingW } }, 'forecast-casing');
+        if (!map.getLayer('div-usual')) map.addLayer({ id: 'div-usual', type: 'line', source: 'div-usual-source',
+            layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': p.core, 'line-width': DIV_USUAL.coreW } }, 'forecast-casing');
+        // the crosses: marks, not names (not in LABEL_RULES, so Labels Off keeps them); the style's own font, as the
+        // holding chevrons (a named font one basemap lacks would drop every glyph there)
+        if (!map.getLayer('div-usual-x')) map.addLayer({ id: 'div-usual-x', type: 'symbol', source: 'div-usual-source',
+            layout: { 'symbol-placement': 'line', 'symbol-spacing': DIV_USUAL.xEvery, 'text-field': '×', 'text-size': DIV_USUAL.xSize,
+                      'text-keep-upright': false, 'text-allow-overlap': true, 'text-ignore-placement': true },
+            paint: { 'text-color': p.x, 'text-halo-color': p.halo, 'text-halo-width': 1.2 } }, 'forecast-casing');
+    }
+    //: the usual road's grey pair follows the ground (re-applied by raiseMarks, as the legs' look)
+    function restyleUsualRoad(){
+        if (typeof map === 'undefined' || !map.getLayer || !map.getLayer('div-usual')) return;
+        const p = divUsualPaint();
+        try {
+            map.setPaintProperty('div-usual-casing', 'line-color', p.casing); map.setPaintProperty('div-usual', 'line-color', p.core);
+            map.setPaintProperty('div-usual-x', 'text-color', p.x); map.setPaintProperty('div-usual-x', 'text-halo-color', p.halo);
+        } catch (e) {}
     }
     function renderMonthFrame(m){
         const src=map.getSource('routes-source'); if(!src||!TL.matrix) return;
@@ -9097,6 +9398,7 @@
         if(changed) src.setData(data);
         ensureForecastLayers(); ensureFlowLayer();
         updateDiversionEdge(data);      // 29 Oct 2026: the amber edge where a route goes round a closure this month
+        if (typeof fillBusyRoads === 'function') fillBusyRoads();   // 24 Nov 2026 (card 5, Q9): the month's busy-hours roads
         updateHoldingChevrons(data);    // 29 Oct 2026 (task 3c): the chevrons follow the month's lines
         // 15 Sep (the human): "the text vehicles needs to be replaced with deliveries or
         // trips". 🔴 Not a blind string swap — `unit` comes from the API and can be t or
@@ -9158,8 +9460,9 @@
                  d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
         // left the month's shared sections on the map
-        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','div-usual-x','div-usual','div-usual-casing','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         if (typeof updateDiversionEdge === 'function') updateDiversionEdge(src && src._data);   // 29 Oct 2026: no month, no edge
+        if (typeof fillBusyRoads === 'function') fillBusyRoads();   // 24 Nov 2026 (card 5): no month, a picked route's own only
         if (typeof updateHoldingChevrons === 'function') updateHoldingChevrons(src && src._data);   // 29 Oct 2026 (task 3c): every route again
         applyZoneMonth(null);   // no month on screen: show every active zone again
         applyFilters();         // KPI cards and the rail rule follow the timeline closing

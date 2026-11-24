@@ -2784,7 +2784,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && code.includes("const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];") && code.includes("const LINE_BAND_PAD = 2.4;")
      && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
      && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv|f_co2)'\]/.test(code)
-     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 3
+     // NARROWED 24 Nov 2026 (card 5): the diversion edge is two rails of its own width outside the line (DIV_EDGE.rail,
+     // 'line-gap-width' the line's), so the casing's width is named twice, not three times
+     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 2
+     && code.includes("'line-width': DIV_EDGE.rail,")
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
   ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // the drawer's half of review bug (d)
@@ -3418,8 +3421,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,700}raiseMarks\(\);/.test(blkCode)
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
   // NARROWED 29 Oct 2026 (the diversion edge): both lists also remove 'diversion-edge', after the labels
+  // NARROWED 24 Nov 2026 (card 5, the usual road): + 'div-usual-x', 'div-usual', 'div-usual-casing' after the edge
   ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','div-usual-x','div-usual','div-usual-casing','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
   ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
      (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
               const sl = a > 0 && b > a ? code.slice(a, b) : "";
@@ -3436,7 +3440,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // 12 Oct 2026 (night, the user: By council "would be good to see by itself")
   ok("⭐ council view: while a By council box is ticked the routes are thin pale grey with no casing, flow dashes or cap badges, and the route labels hide",
      blkCode.includes("const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;")
-     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
+     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge', 'div-usual-casing', 'div-usual', 'div-usual-x'];")   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 24 Nov 2026 (card 5): + the usual road
      && blkCode.includes("COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });")
      && blkCode.includes("function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }"));
   ok("⭐ council view: ticking a council box turns the heat map Off; picking Volume or Carbon unticks the council boxes (one picture at a time); both write the link",
@@ -4452,7 +4456,7 @@ function qrRead(mod) {
      (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
      && !/promoteId/.test(code));
   ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','div-usual-x','div-usual','div-usual-casing','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge; NARROWED 24 Nov 2026 (card 5): + the usual road's three layers
      && !/'area-fill','forecast/.test(code));
   // the deep link carries Road load and Carbon
   ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
@@ -7159,7 +7163,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   // ---- the light's dots
   ok("8d: the dots layer: white with a thin ink edge, radius by zoom, on its own source, quietened with the lanes in the council view and removed with them",
      /id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE,[\s\S]{0,400}'circle-stroke-color': '#1F2024'/.test(code)
-     && code.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")
+     && code.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge', 'div-usual-casing', 'div-usual', 'div-usual-x'];")   // NARROWED 24 Nov 2026 (card 5): + the usual road's three layers
      && (code.match(/'forecast-flow','forecast-flow-light','forecast-cap-badge'\]/g) || []).length === 2 && !/flowPulse\(|line-progress/.test(code));
   const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
   ok("8d: the user guide names Standard, Standard satellite and the Light row in a few words; the technical guide says the engine is 3.33.0",
@@ -7369,9 +7373,11 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   {
     const a = src.indexOf("const DIV_EDGE = {"), b = src.indexOf("function renderMonthFrame(m){");
     ok("⭐ edge: the amber edge code sits beside the diversion swap, before renderMonthFrame", a > 0 && b > a);
+    // NARROWED 24 Nov 2026 (card 5): the stub counts the EDGE's own source (the usual road has a source of its own now),
+    // and records the gap; the forecast casing exists so the usual road's layers can go under it
     let sent = 0; const added = [];
-    const map = { getSource: () => ({ setData: () => { sent++; } }), getLayer: (id) => id === 'forecast-layer', addSource: () => {},
-                  addLayer: (l, before) => added.push([l.id, before, l.paint['line-width'], l.paint['line-color']]) };
+    const map = { getSource: (id) => ({ setData: () => { if (id === 'diversion-edge-source') sent++; } }), getLayer: (id) => id === 'forecast-layer' || id === 'forecast-casing', addSource: () => {},
+                  addLayer: (l, before) => added.push([l.id, before, l.paint['line-width'], l.paint['line-color'], l.paint['line-gap-width'], l.layout && l.layout['line-cap']]) };
     let legend = 0;
     const E = new Function("map", "DIV", "forecastLayerFilter", "FORECAST_CASING_WIDTH", "FORECAST_LINE_WIDTH", "CONFIG", "renderFlowLegend",
       src.slice(a, b) + "\nreturn { DIV_EDGE, divOffPieces, updateDiversionEdge, ensureDiversionEdge };")(
@@ -7401,10 +7407,17 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     E2.updateDiversionEdge({ features: [] });
     ok("edge: a month with no diversion clears the edge once", sent === 2 && E2.DIV_EDGE.fc.features.length === 0);
     E2.ensureDiversionEdge();
-    ok("⭐ edge: the layer goes UNDER the route line (before 'forecast-layer'), at the casing's width, amber",
-       added.length === 1 && added[0][0] === 'diversion-edge' && added[0][1] === 'forecast-layer' && added[0][2] === 8.5 && added[0][3] === '#F59E0B');
+    // NARROWED 24 Nov 2026 (card 5): two amber rails OUTSIDE the line (line-gap-width = the line's own width, dv_gap), 3 px a
+    // side, added at the line and then lifted over the lines (placeDiversionEdge); the usual road's three layers go UNDER
+    // the forecast casing
+    const ed = added.find(x => x[0] === 'diversion-edge');
+    ok("⭐ edge: two amber rails outside the line (a gap the line's width), 3 px a side, round caps; the usual road under the forecast casing",
+       !!ed && ed[1] === 'forecast-layer' && ed[2] === 3 && ed[3] === '#F59E0B'
+       && JSON.stringify(ed[4]) === JSON.stringify(['to-number', ['get', 'dv_gap'], 6]) && ed[5] === 'round'
+       && ['div-usual-casing', 'div-usual', 'div-usual-x'].every(id => (added.find(x => x[0] === id) || [])[1] === 'forecast-casing'), added);
     ok("edge: the legend line, only in a month with a diversion, and the edge rides with the overlay (added, filtered, removed)",
-       src.includes("? '<div class=\"ml-row\" id=\"div-legend\">' + divEdgeSample() + 'Where a route goes round a closure</div>' : ''")
+       // NARROWED 24 Nov 2026 (card 5): reworded "The way round a closure", in divLegendRows
+       src.includes("(edge ? '<div class=\"ml-row\" id=\"div-legend\">' + divEdgeSample() + 'The way round a closure</div>' : '')")
        && src.includes("if (typeof ensureDiversionEdge === 'function') ensureDiversionEdge();")
        && src.includes("updateDiversionEdge(data);      // 29 Oct 2026"));
     ok("🔴 edge: no dotted line anywhere in it (the user's rule)", !/line-dasharray/.test(src.slice(a, b)));
@@ -7665,7 +7678,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
 // 5 Nov 2026 (task 0d-2, Q15 = P2, Q16): the busy-hours road on the public map
 ok("BUSY HOURS: a picked route's busy-hours road ('BusyHours' features) is drawn thin blue with a white edge under the pick, its hours as a text beside it (no DOM marker); cleared with the pick",
    code.includes("if(!map.getLayer('busy-casing')) map.addLayer({id:'busy-casing',type:'line',source:'busy-route'")
-   && code.includes("'line-color':BUSY_ROAD_COLOR,'line-width':2.6") && code.includes("const BUSY_ROAD_COLOR = CONFIG.COLORS.forecast;")
+   // NARROWED 24 Nov 2026 (card 5): the sign blue (CONFIG.COLORS.brand), drawn with no click in a month its route runs
+   && code.includes("'line-color':BUSY_ROAD_COLOR,'line-width':2.6") && code.includes("const BUSY_ROAD_COLOR = CONFIG.COLORS.brand;")
    && code.includes("type:'symbol',source:'busy-hours-at'") && code.includes("hours: f.properties.from + '–' + f.properties.to")
    // NARROWED 5 Nov 2026 (merged with main's Report a concern, whose pin IS a marker): no marker in the busy-hours code itself
    && code.includes("        showBusyRoad(rl);\n") && code.includes("        showBusyRoad(null);\n")
@@ -7675,8 +7689,10 @@ ok("BUSY HOURS: the route card says it in one line — 'Weekdays 16:00–19:00' 
    && code.includes("'another road, ' + fmtDist(Math.abs(d), 1) + ' ' + DU() + (d < 0 ? ' shorter.' : ' longer.')"));
 // NARROWED 5 Nov 2026 (the local Chrome check): two more reads of 'BusyHours', each to LEAVE it out — the picked route's own
 // highlight (it had drawn the busy road as the route) and the route info (it took the longest line, the busy road's, as the distance)
+// NARROWED 24 Nov 2026 (card 5, Q9): one more read, busyOnMonth (the month's busy-hours roads drawn with no click); still no
+// layer but the busy-hours road's own reads the type, and the flow and the busiest roads stay on the main road
 ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road — no layer but the pick's reads 'BusyHours'; the pick's highlight and the route info leave it out",
-   (code.match(/'BusyHours'/g) || []).length === 4
+   (code.match(/'BusyHours'/g) || []).length === 5 && code.includes("if (p.type !== 'BusyHours' || !f.geometry) return false;")
    && code.includes("&&f.properties.type!=='BusyHours'&&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);")
    && code.includes("if(!rid || f.properties.type==='BusyHours') return;"));
 

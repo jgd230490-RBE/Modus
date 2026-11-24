@@ -1435,7 +1435,8 @@ ok3("8 Nov: the big screen has six sections (#dashboard/6), the Dashboard's Site
     and "a sixth, <strong>Concerns</strong>" in _ug8)
 ok3("8 Nov: the map legend: legs solid (dotted only on a haul road), the diversion edge, the abnormal load, the holding area",
     "<td>Dotted green and amber lines</td>" not in _ug8 and "solid on public roads, dotted and thinner on a haul road" in _ug8
-    and "<td>Soft amber edge on a route</td>" in _ug8 and "<td>Raspberry line with rings</td>" in _ug8 and "<td>H and ›››</td>" in _ug8)
+    # NARROWED 24 Nov 2026 (the route lines rethink, card 5): the soft edge is two amber edges outside the line now
+    and "<td>Amber edges on both sides of a route</td>" in _ug8 and "<td>Raspberry line with rings</td>" in _ug8 and "<td>H and ›››</td>" in _ug8)
 ok3("8 Nov: §9.3's list is one list again (no </ul><li>, each item once), and Site speed / Site areas sits in §9.1",
     "</ul><li>" not in _ug8 and _ug8.count("<li><strong>Temporary haul road</strong>") == 1
     and _ug8.index("<strong>Site speed</strong> and <strong>Site areas</strong>") < _ug8.index('id="7-2-routes"')
