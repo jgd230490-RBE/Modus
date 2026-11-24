@@ -3421,8 +3421,8 @@ async function todayFitDom(){
        [...tv.el.querySelectorAll("tr.rd-details")].every(d => d.hidden) && tv.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
        && w.sessionStorage.getItem("modus_rows_today") === JSON.stringify(OPEN));
     ok("UI FIX 6 card 5 (the user: keep the progress bars): the two bars and their headings are still there, above the list",
-       tv.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
-       && (tv.el.querySelector(".h-2.rounded-full.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
+       tv.el.querySelectorAll(".h-2.rounded-sm.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
+       && (tv.el.querySelector(".h-2.rounded-sm.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
     // 2b. 22 Oct 2026 (UI fix 6, card 5, review): a scroll left over from "All sections" (40 px down) is reset before
     // measuring, so the count is the unscrolled one (without the reset the rows sit 40 px higher and four would "fit")
     { let st = 40; const lbx = list();
@@ -3460,7 +3460,7 @@ async function todayFitDom(){
       ok("UI FIX 6 card 4: in All sections every row is drawn closed (the desk opened the busiest), and both progress bars stay above the list",
          [...m.el.querySelectorAll("tr.rd-details")].every(d => d.hidden)
          && m.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
-         && m.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
+         && m.el.querySelectorAll(".h-2.rounded-sm.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
       m.done();
     }
     {

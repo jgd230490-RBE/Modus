@@ -87,7 +87,8 @@ ok("🔴 3 sign blue: Dark's is the light sign blue #8AB4F8 (16 % and 10 % tints
 ok("3 sign blue: the white bar's chosen segment is a sign blue tint with sign blue words (was an orange tint)",
    tokenIn(lightHdr, "hdr-on") === "rgba(11,78,162,.10)" && css.includes('html[data-theme="light"] .hdr-seg button.is-on{color:var(--navy);}'));
 ok("3 sign blue: the page's five blue utilities are the sign blue ramp, and Dark remaps them to the light sign blue (no orange)",
-   html.includes('950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}}}}};</script>')
+   // NARROWED 24 Nov 2026 (own look, B1 stage 1): the config now carries the one corner (borderRadius) after the colours
+   html.includes('950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}},borderRadius:{sm:"3px",DEFAULT:"6px",md:"6px",lg:"6px",xl:"6px","2xl":"6px"}}}};</script>')
    && css.includes('html[data-theme="dark"] .bg-blue-50{background-color:rgba(138,180,248,.12)}') && css.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}')
    && css.includes('html[data-theme="dark"] .text-blue-800{color:#A9C8FA}') && css.includes('html[data-theme="dark"] .border-blue-300{border-color:rgba(138,180,248,.45)}'));
 ok("⭐ 3 selection: the rail's chosen page, the wall bar's chosen button and the phone's chosen segment are the 10 % tint with sign blue words — none filled",

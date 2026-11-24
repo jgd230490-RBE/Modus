@@ -38,8 +38,9 @@ const lum = (hex) => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2)
 const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 
 // ---------------------------------------------------------------- finding 12: the one status chip
+// NARROWED 24 Nov 2026 (own look, B1 stage 1): the pill takes the one 6 px corner (stage 2 removes the pill)
 ok("⭐ 12: the status chip is a pill — rounded, padded, tinted per tone, the word in the tone's text colour",
-   /\.row-st\{[^}]*border-radius:999px;padding:2px 10px 2px 3px;background:var\(--st-none-bg\);\}/.test(css)
+   /\.row-st\{[^}]*border-radius:6px;padding:2px 10px 2px 3px;background:var\(--st-none-bg\);\}/.test(css)
    && css.includes(".row-st.rs-ok{background:var(--st-ok-bg);color:var(--ok-text);}")
    && css.includes(".row-st.rs-warn{background:var(--st-warn-bg);color:var(--warn-text);}")
    && css.includes(".row-st.rs-bad{background:var(--st-bad-bg);color:var(--bad-text);}"));

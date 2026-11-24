@@ -24,7 +24,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
 <!-- 23 Nov 2026 (the own look, Group A; notes/design-language-1123.md): Tailwind's slate ramp, re-defined in ONE place as
      neutral greys made from the ink (no blue-tinted grey): 50 the soft surface, 200 / 300 the two lines, 500 captions,
      600 second text, 800 the ink. Every text- / bg- / border- / divide-slate utility in this page reads it. -->
-<script>tailwind.config={theme:{extend:{colors:{slate:{50:"#F5F5F6",100:"#EDEEEF",200:"#E1E2E4",300:"#C6C8CC",400:"#8A8D93",500:"#62656B",600:"#44464B",700:"#34363A",800:"#1F2024",900:"#141518",950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}}}}};</script>
+<script>tailwind.config={theme:{extend:{colors:{slate:{50:"#F5F5F6",100:"#EDEEEF",200:"#E1E2E4",300:"#C6C8CC",400:"#8A8D93",500:"#62656B",600:"#44464B",700:"#34363A",800:"#1F2024",900:"#141518",950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}},borderRadius:{sm:"3px",DEFAULT:"6px",md:"6px",lg:"6px",xl:"6px","2xl":"6px"}}}};</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css" rel="stylesheet" integrity="sha384-S0a+eT2dLtsB1suB6ZJ/8IX+0d0Fvix9weJQ67L3E+jHOvn6SUKwYXVDyGdMuJtL" crossorigin="anonymous">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js" integrity="sha384-jdGuG3GDIph+ONsjITkxWmlUE2RR0At6jtOVirn6L/6dYy3WcAVDaBNI3X96rUT0" crossorigin="anonymous"></script>
@@ -202,36 +202,36 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   html[data-theme="light"] .hdr-seg button.is-on{color:var(--navy);}   /* 24 Nov 2026 (own look, stage 3): the white bar's chosen segment, a sign blue tint and words (was an orange tint) */
   /* the Appearance picker: a 32 px icon button, a small popover (5 Oct 2026) */
   .appearance{position:relative;display:inline-flex;align-items:center;}
-  .appearance-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
+  .appearance-btn{width:32px;height:32px;border-radius:6px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
   .appearance-btn:hover,.appearance-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
-  .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
+  .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:6px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
   .appearance-menu h6{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
-  .appearance-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
+  .appearance-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:6px;cursor:pointer;text-align:left;font:inherit;}
   .appearance-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on{background:rgba(138,180,248,.16);}
   .appearance-item .tick{opacity:0;color:#8AB4F8;} .appearance-item.is-on .tick{opacity:1;}
-  .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
-  .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
+  .swatch{display:inline-flex;width:34px;height:20px;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
+  .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:3px;background:var(--sw-dot);}
   /* H10 (8 Oct 2026): the in-app guide — a coach-mark card, demo tenant only. In-page, no library. */
   /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
      one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
-  .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
-  .guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 var(--f-text)}
+  .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:6px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
+  .guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 var(--f-text)}
   .guide-card[data-place="below"]::before{content:"";position:absolute;top:-6px;left:20px;border:6px solid transparent;border-top:0;border-bottom-color:rgba(32,33,36,.88)}
   .guide-card[data-place="above"]::before{content:"";position:absolute;bottom:-6px;left:20px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(32,33,36,.88)}
   .guide-card h4{margin:0 0 2px;font-size:13.5px;font-weight:600;color:#fff}
   .guide-card p{margin:0;color:rgba(255,255,255,.86)}
   .guide-card .guide-foot{display:flex;align-items:center;gap:2px;margin-top:8px}
   .guide-card .guide-step{font-size:12px;color:rgba(255,255,255,.55);margin-right:auto}
-  .guide-card .guide-foot button{font:inherit;font-size:13px;font-weight:500;border-radius:4px;padding:4px 8px;border:0;background:transparent;color:rgba(255,255,255,.75);cursor:pointer}
+  .guide-card .guide-foot button{font:inherit;font-size:13px;font-weight:500;border-radius:6px;padding:4px 8px;border:0;background:transparent;color:rgba(255,255,255,.75);cursor:pointer}
   .guide-card .guide-foot button:hover{background:rgba(255,255,255,.08)}
   .guide-card .guide-foot button.guide-next{color:#8AB4F8}
   .guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
   .guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
-  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44464B;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 var(--f-text)}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44464B;border:1px solid rgba(31,32,36,.12);border-radius:6px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 var(--f-text)}
   .guide-strip b{color:#1F2024;font-weight:600}
-  .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
+  .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:6px;cursor:pointer;white-space:nowrap}
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
-  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#62656B;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#62656B;background:none;border:0;padding:2px 6px;border-radius:6px;cursor:pointer}
   .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
   /* 18 Oct 2026 (UI audit decision 18): on a touch screen the strip's two buttons tap at 44 px through halos, the glyphs and the
      strip's height unchanged — "Take the tour" (93 × 24) 44 tall; the × (23 × 20) 44 × 44, reaching 9 px into the strip's 10 px
@@ -241,7 +241,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   @media (max-width:767px){.guide-dot{display:none}}   /* 18 Oct 2026 (decision 17): no dots on a phone — the effect draws none; this holds for the second between a resize and its next pass */
   @keyframes guide-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--navy) 45%,transparent)}70%{box-shadow:0 0 0 8px color-mix(in srgb,var(--navy) 0%,transparent)}100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--navy) 0%,transparent)}}
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--navy) 25%,transparent)}}
-  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 var(--f-text)}
+  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 var(--f-text)}
   .guide-tip b{color:#fff;font-weight:600}
   /* 11 Oct 2026 — the demo bar (the user: "There is a bar with FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL and a
      guide button on the public map. Lets have that on every page."). One 26 px strip under the header on every
@@ -255,14 +255,14 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .demo-bar.has-guide{padding:0 84px;}
   .demo-bar::before{content:"DEMO";content:"DEMO" / "";flex:none;margin-right:8px;padding:0 6px;border-radius:3px;background:var(--demo-tag-bg);color:var(--demo-tag-fg);line-height:18px;letter-spacing:.08em;}
   .demo-bar-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;}
-  .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:999px;background:var(--demo-btn-bg);box-shadow:inset 0 0 0 1px var(--demo-btn-ring);color:var(--demo-btn-fg);font:600 14px/21px var(--f-text);letter-spacing:0;cursor:pointer;}
+  .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:6px;background:var(--demo-btn-bg);box-shadow:inset 0 0 0 1px var(--demo-btn-ring);color:var(--demo-btn-fg);font:600 14px/21px var(--f-text);letter-spacing:0;cursor:pointer;}
   .demo-bar-guide:hover{background:var(--demo-btn-hover);}
   .demo-bar-guide:focus-visible{outline:2px solid var(--demo-fg);outline-offset:0;}
   /* 18 Oct 2026 (UI audit decision 9): the 21 px pill taps at 44 px through a halo; the bar keeps its height (it clips
      the halo to its own box, so a tap outside the bar never reaches the pill) */
   .demo-bar-guide::after{content:"";position:absolute;inset:-12px -8px;}
   @media (max-width:639px){ .demo-bar{letter-spacing:.03em;height:auto;min-height:26px;padding:4px 12px;line-height:1.3;} .demo-bar.has-guide{padding:4px 76px 4px 12px;} .demo-bar-text{white-space:normal;text-overflow:clip;text-align:center;} .demo-bar-guide{top:50%;transform:translateY(-50%);} }
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
   .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
@@ -274,7 +274,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rail-item.is-on{background:var(--navy-soft);color:var(--navy);font-weight:600;}   /* 24 Nov 2026 (own look, stage 3): the chosen page, a 10 % sign blue tint and its words (was a white chip with a ring) */
   .rail-search{display:flex;align-items:center;gap:6px;margin:0 8px 12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
   .rail-search input{border:0;outline:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);width:100%;min-width:0;}
-  .rail-search kbd{font:12px ui-monospace,Consolas,monospace;white-space:nowrap;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
+  .rail-search kbd{font:12px ui-monospace,Consolas,monospace;white-space:nowrap;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;}
   .rail-search:focus-within{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}   /* 17 Oct 2026 (UI audit #16): the input has outline:0, so the ring goes on the label that frames it — the same ring as .auth-input:focus */
   .nav-ic{width:18px;height:18px;flex:none;}
   .kicker{font:600 12px ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--action);margin-bottom:4px;}
@@ -307,7 +307,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;}
   .ctl{border:1px solid var(--grey);border-radius:6px;background:var(--surface);color:var(--ink);padding:7px 10px;font-size:14px;line-height:1.3;}
   .applied-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;min-height:28px;}
-  .fchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--grey);border-radius:999px;padding:3px 8px 3px 12px;font-size:13px;color:var(--ink);}
+  .fchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--grey);border-radius:6px;padding:3px 8px 3px 12px;font-size:13px;color:var(--ink);}
   .fchip button{color:var(--muted);font-weight:600;background:none;border:0;cursor:pointer;font:inherit;padding:0 2px;line-height:1;}
   .link-btn{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--ink);text-decoration:underline;cursor:pointer;}
   .btn-pri{display:inline-block;padding:7px 14px;border-radius:6px;background:var(--action);color:var(--action-fg);font-size:14px;font-weight:600;line-height:1.3;border:0;cursor:pointer;white-space:nowrap;}
@@ -332,9 +332,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      red a diamond (an octagon was tried: at 9 px it reads as a dot). Matched on the token the dot is painted with, so every chip-st in the app follows. */
   .chip-st i[style*="--gold"]{width:10px;height:9px;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%);}
   .chip-st i[style*="--red"]{width:10px;height:10px;border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}
-  .empty-ic{width:40px;height:40px;border-radius:50%;background:var(--surface-3);margin:0 auto 12px;}
+  .empty-ic{width:40px;height:40px;border-radius:6px;background:var(--surface-3);margin:0 auto 12px;}
   .empty-ic.error{background:rgba(220,38,38,.12);}
-  .skel{display:inline-block;height:14px;border-radius:4px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
+  .skel{display:inline-block;height:14px;border-radius:3px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
   @keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
   .row-menu{display:inline-block;position:relative;}
   .row-menu summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border-radius:6px;border:1px solid var(--grey);background:var(--surface);color:var(--muted);font-weight:700;}
@@ -343,7 +343,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 31 Oct 2026 (task 4c PR 3): a pinned picture's Move corners handles (on the map, over the photo: fixed colours) and the
      Pictures list's eye (CSS glyph, named by aria-label) */
   .slp-corner{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #1E3A8A;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:grab;}
-  .slp-corner::after{content:attr(data-n);position:absolute;left:20px;top:-4px;font:700 12px var(--f-text);color:#fff;background:#1E3A8A;border-radius:4px;padding:0 4px;}
+  .slp-corner::after{content:attr(data-n);position:absolute;left:20px;top:-4px;font:700 12px var(--f-text);color:#fff;background:#1E3A8A;border-radius:3px;padding:0 4px;}
   .slp-mover{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid #1E3A8A;cursor:move;display:grid;place-items:center;font-size:18px;color:#1E3A8A;box-shadow:0 1px 4px rgba(0,0,0,.35);}
   .slp-turner{width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1E3A8A;cursor:grab;display:grid;place-items:center;font-size:15px;color:#1E3A8A;}
   .slp-eye{width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center;color:var(--muted);flex:none;}
@@ -351,12 +351,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 5 Nov 2026: a site's layout full screen — the Locations grid over the whole window (z 70: under the i boxes and messages) */
   .sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:8px;gap:8px !important;background:var(--surface-3);align-content:stretch;}
   .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;} .sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}
-  .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
+  .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
   .sl-fold:hover{background:var(--surface-2);}
-  .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 var(--f-text);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
+  .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:6px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 var(--f-text);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
   .sl-demo-pill b{padding:0 5px;border-radius:3px;background:var(--demo-tag-bg);color:var(--demo-tag-fg);line-height:16px;letter-spacing:.08em;}
   .sl-demo-on-map{position:absolute;top:10px;left:10px;z-index:3;}
-  .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
+  .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:6px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
   /* 8 Nov 2026 (task 2.1-10): the Look-ahead's Supplier orders list — one row a supplier, PDF and XLSX at the right */
@@ -383,7 +383,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 9 Nov 2026 (UI critique finding 10, card 10): Configuration read-only for a reader. CfgFields is a fieldset (no frame);
      disabled for a reader, its controls are drawn as text: no box, no arrow, no placeholder, a tick a ✓ or –, no buttons */
   .cfg-fs{border:0;margin:0;padding:0;min-width:0;}
-  .cfg-ro-note{border:1px solid var(--line);background:var(--navy-soft);color:var(--ink);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 16px;}
+  .cfg-ro-note{border:1px solid var(--line);background:var(--navy-soft);color:var(--ink);border-radius:6px;padding:10px 14px;font-size:14px;margin:0 0 16px;}
   .cfg-ro input:not([type=checkbox]):not([type=radio]),.cfg-ro select,.cfg-ro textarea{border-color:transparent;background:transparent;box-shadow:none;color:var(--ink);-webkit-text-fill-color:var(--ink);opacity:1;cursor:default;-webkit-appearance:none;appearance:none;resize:none;}
   .cfg-ro input::placeholder,.cfg-ro textarea::placeholder{color:var(--muted);-webkit-text-fill-color:var(--muted);}
   .cfg-ro input::-webkit-calendar-picker-indicator{display:none;}
@@ -400,7 +400,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .field{margin-bottom:18px;}
   /* 11 Oct 2026 — the sign-in box in the finalised theme: the page's surface, warm line, labels above,
      an orange focus ring and the orange action button; the access code has a show / hide eye. */
-  .auth-card{width:100%;max-width:384px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:28px;box-shadow:0 1px 3px rgba(16,24,40,.06);}
+  .auth-card{width:100%;max-width:384px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:28px;box-shadow:0 1px 3px rgba(16,24,40,.06);}
   .auth-card h1{margin:0;font-size:20px;font-weight:600;color:var(--ink);}
   .auth-card .auth-sub{margin:4px 0 20px;font-size:14px;color:var(--muted);}
   .auth-card .field{margin-bottom:14px;}
@@ -435,7 +435,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      20 px, with Sign in 10 px above); a mouse keeps the tight row */
   @media (pointer:coarse){.auth-links button{padding:12px 0;}}
   .auth-msg{font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--action) 8%,transparent);border:1px solid color-mix(in srgb,var(--action) 30%,transparent);border-radius:6px;padding:9px 11px;margin-bottom:12px;color:var(--ink);}
-  .acct-btn{max-width:220px;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);font:inherit;font-size:13px;cursor:pointer;}
+  .acct-btn{max-width:220px;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;border:1px solid var(--hdr-border);background:var(--hdr-btn);color:var(--hdr-fg);font:inherit;font-size:13px;cursor:pointer;}
   .acct-btn:hover,.acct-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
   .acct-menu{min-width:280px;padding:10px 12px;}
   .acct-btn .acct-ini{display:none;} .acct-signout{display:none;}
@@ -451,7 +451,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .row-menu-field span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;white-space:normal;}
   .row-menu-field input{width:100%;font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--popover-line);background:rgba(255,255,255,.06);color:var(--popover-fg);}
   /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
-  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden;}
+  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden;}
   .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;}
   @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
   @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
@@ -459,7 +459,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 13 Oct 2026 (W3) — the info box. An "i" in an 18 px ring with a 24 px hit area (44 px on a touch
      screen, by the ::after, so the layout does not grow); the panel is the popover look; below 640 px
      it opens as a sheet from the bottom. Opens on click / tap / Enter / Space, never on hover. */
-  .ibtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin:0 0 0 5px;padding:0;border:1.5px solid currentColor;border-radius:999px;background:transparent;color:var(--muted);font:600 11px/1 Georgia,"Times New Roman",serif;font-style:italic;cursor:pointer;vertical-align:-3px;flex:none;}
+  .ibtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin:0 0 0 5px;padding:0;border:1.5px solid currentColor;border-radius:50%;background:transparent;color:var(--muted);font:600 11px/1 Georgia,"Times New Roman",serif;font-style:italic;cursor:pointer;vertical-align:-3px;flex:none;}
   .ibtn::after{content:"";position:absolute;inset:-3px;}
   @media (pointer:coarse){.ibtn::after{inset:-13px;}}
   /* 18 Oct 2026 (UI audit #24): inside a sortable column header the 44 px halo covered the sort arrow, so a tap near the
@@ -468,7 +468,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ibtn:hover{color:var(--ink);}
   .ibtn[aria-expanded="true"]{color:var(--navy);}
   .ibtn:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
-  .info-pop{position:fixed;z-index:80;max-width:340px;width:max-content;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.45;text-align:left;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;}
+  .info-pop{position:fixed;z-index:80;max-width:340px;width:max-content;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:6px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.45;text-align:left;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;}
   .info-pop:focus{outline:none;}
   .info-pop h6{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--popover-fg);text-transform:none;letter-spacing:0;padding-right:22px;}
   .info-pop p{margin:0 0 6px;}
@@ -479,13 +479,13 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .info-pop a{color:var(--popover-fg);text-decoration:underline;display:inline-block;margin-top:6px;margin-right:12px;font-size:13px;}
   .info-pop .info-x{position:absolute;top:6px;right:6px;width:28px;height:28px;border:0;background:transparent;color:var(--popover-muted);font-size:18px;line-height:1;cursor:pointer;border-radius:6px;}
   .info-pop .info-x:focus-visible{outline:2px solid var(--popover-fg);}
-  .info-pop.is-sheet{left:0 !important;right:0 !important;bottom:0 !important;top:auto !important;max-width:none;width:auto;border-radius:14px 14px 0 0;max-height:70vh;overflow:auto;padding:16px 16px 20px;}
+  .info-pop.is-sheet{left:0 !important;right:0 !important;bottom:0 !important;top:auto !important;max-width:none;width:auto;border-radius:6px 6px 0 0;max-height:70vh;overflow:auto;padding:16px 16px 20px;}
   .dash-wall .ibtn{display:none;}
   .dash-wall .rd-chev{display:none;}   /* 13 Oct 2026 (W6): a wall display is not clicked, like its info boxes */
   .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;}
   .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
   .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
-  .dash-more{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 16px;}
+  .dash-more{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0 16px;}
   .dash-more>summary{cursor:pointer;list-style:none;padding:12px 0;font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px;}
   .dash-more>summary::-webkit-details-marker{display:none;}
   .dash-more>summary::before{content:"›";display:inline-block;width:14px;color:var(--muted);transition:transform .15s;}
@@ -505,7 +505,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .chart-tools.is-inline{position:static;}
   /* 17 Nov 2026 (best option step 3): the route choices record on the Dashboard */
   .rc-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;}
-  .rc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line, #e1e2e4);border-radius:10px;overflow:hidden;background:var(--surface);}
+  .rc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line, #e1e2e4);border-radius:6px;overflow:hidden;background:var(--surface);}
   .rc-tile{padding:10px 14px;border-left:1px solid var(--line, #e1e2e4);min-width:0;}
   .rc-tile:first-child{border-left:0;}
   .rc-tile .rc-tk{display:block;font-size:13px;color:var(--muted);}
@@ -520,11 +520,11 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rc-table .rc-k{font-size:12px;color:var(--muted);}
   .rc-table .rc-col{font-size:13px;}
   .rc-table td.rc-none{text-align:left;color:var(--muted);font-size:13px;}
-  .rc-end{display:inline-block;margin-top:4px;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--surface-3);color:var(--ink-2, var(--ink));}
+  .rc-end{display:inline-block;margin-top:4px;font-size:12px;padding:1px 8px;border-radius:6px;background:var(--surface-3);color:var(--ink-2, var(--ink));}
   .rc-ended td{color:var(--muted);}
   .rc-empty{text-align:center;padding:14px 8px;font-size:13px;}
   .rc-empty b{display:block;font-size:14px;margin-bottom:4px;}
-  .rc-pcard{border:1px solid var(--line, #e1e2e4);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px;}
+  .rc-pcard{border:1px solid var(--line, #e1e2e4);border-radius:6px;padding:8px 10px;margin-top:8px;font-size:13px;}
   .rc-pcard b{display:block;}
   @media (max-width:767px){ .rc-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} .rc-tile:nth-child(3){border-left:0;} .rc-tile:nth-child(n+3){border-top:1px solid var(--line, #e1e2e4);} .rc-tile b{font-size:18px;} }
   .chart-tool{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;}
@@ -532,15 +532,15 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .chart-tool-copy::before{content:"\29C9";} .chart-tool-dl::before{content:"\2193";}
   /* 8 Nov 2026 (2.1-13): the week maps' key row */
   .cm-key > span{display:inline-flex;align-items:center;gap:6px;}
-  .cm-k{display:inline-block;flex:none;width:22px;border-radius:2px;}
+  .cm-k{display:inline-block;flex:none;width:22px;border-radius:3px;}
   .cm-k-out{height:4px;background:#059669;} .cm-k-back{height:3px;background:#f59e0b;} .cm-k-faded{height:2px;background:#9CA3AF;opacity:.7;}
   .cm-k-site{width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--ink);}
   .cm-k-gate{width:8px;height:8px;border-radius:0;background:var(--ink);}
-  .cm-k-load{font-style:normal;font-size:12px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
+  .cm-k-load{font-style:normal;font-size:12px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:0 4px;}
   .chart-card:has(.chart-tools) .chart-title, .ga-strip:has(.chart-tools) .ga-head, .clp-card:has(.chart-tools) .clp-sub{padding-right:72px;}
   .dash-wall .chart-tools, .sim-wall .chart-tools{display:none;}
   @media (max-width:767px){ .chart-tools{display:none;} }
-  .ws-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;max-width:min(560px,92vw);padding:10px 16px;border-radius:8px;background:var(--popover-bg);color:var(--popover-fg);font-size:14px;box-shadow:0 10px 28px rgba(0,0,0,.28);}
+  .ws-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;max-width:min(560px,92vw);padding:10px 16px;border-radius:6px;background:var(--popover-bg);color:var(--popover-fg);font-size:14px;box-shadow:0 10px 28px rgba(0,0,0,.28);}
   .fig-val{font-size:clamp(1.1rem,1.45vw,1.7rem);}   /* a KPI figure: nowrap, never truncated, sized by clamp() */
   .chart-card{display:flex;flex-direction:column;min-width:0;}
   .chart-card>.chart-box{flex:1 1 auto;}
@@ -612,7 +612,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .chart-head .ch-lbl{font-weight:600;color:var(--muted);font-size:clamp(14px,2vh,34px);margin-left:.45em;}
   .chart-head .ch-note{color:var(--muted);font-size:clamp(13px,1.6vh,28px);margin-top:.2em;}
   /* the rotation: a thin line that fills while a section is on show, and what comes next (no motion if reduced) */
-  .dash-rot{position:relative;display:inline-block;width:120px;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden;vertical-align:middle;}
+  .dash-rot{position:relative;display:inline-block;width:120px;height:4px;border-radius:3px;background:var(--surface-3);overflow:hidden;vertical-align:middle;}
   .dash-rot>i{position:absolute;inset:0 auto 0 0;width:0;background:var(--action);animation:dash-rot linear forwards;}
   @keyframes dash-rot{from{width:0}to{width:100%}}
   @media (prefers-reduced-motion:reduce){.dash-rot>i{animation:none;width:100%;opacity:.35;}}
@@ -644,12 +644,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .dash-filters select option{color:#1F2024;}
   .tbl tr.is-picked td{background:var(--chart-1-soft);}
   /* 11 Oct 2026 — the carbon target on the Dashboard, Forecasts and Submit forecast (tokens only, so every look follows) */
-  .ct-strip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;color:var(--ink);}
+  .ct-strip{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 16px;color:var(--ink);}
   .ct-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;}
   /* 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan panel — one row a lorry, its trips across the day */
   .lp-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0 4px}
   @media (min-width:900px){.lp-kpis{grid-template-columns:repeat(4,1fr)}}
-  .lp-kpi{border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .lp-kpi{border:1px solid var(--line);border-radius:6px;padding:8px 10px}
   .lp-kpi b{display:block;font-size:20px;line-height:1.2}
   .lp-kpi span{display:block;font-size:13px;color:var(--muted)}
   .lp-kpi.ok b{color:var(--ok-text)}
@@ -660,7 +660,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   @media (max-width:767px){.lp-row{grid-template-columns:1fr;gap:2px}.lp-row .lp-free{text-align:left}}
   .lp-nm{font-size:13px;font-weight:600}
   .lp-nm small{display:block;color:var(--muted);font-weight:500;font-size:12px}
-  .lp-track{position:relative;height:28px;background:var(--soft,#EDEEEF);border-radius:5px;overflow:hidden}
+  .lp-track{position:relative;height:28px;background:var(--soft,#EDEEEF);border-radius:6px;overflow:hidden}
   .lp-blk{position:absolute;top:2px;bottom:2px;border-radius:3px;font-size:12px;line-height:24px;color:#fff;overflow:hidden;white-space:nowrap;padding:0 4px;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.6);background:var(--navy)}
   .lp-blk.is-break{background:repeating-linear-gradient(135deg,#C6C8CC 0 4px,#E1E2E4 4px 8px);color:#34363A}
   /* 9 Nov 2026 (2.1-9b, card 9): a trip a planner can drag or move from its menu — a details whose summary is the block face */
@@ -686,7 +686,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .lp-track.is-over.is-no{box-shadow:inset 0 0 0 2px var(--bad-text)}
   .lp-refused{font-size:12px;color:var(--bad-text);font-weight:600;grid-column:2}
   .lp-day-over{box-shadow:inset 0 0 0 2px var(--ok-text)}
-  .lp-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--navy);background:var(--navy-soft);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:1px}
+  .lp-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--navy);background:var(--navy-soft);border-radius:6px;padding:0 7px;margin-left:6px;vertical-align:1px}
   .lp-free{font-size:13px;color:var(--muted);text-align:right}
   .lp-axis{display:grid;grid-template-columns:140px 1fr 150px;gap:10px;color:var(--muted);font-size:12px;padding:2px 0 6px}
   @media (max-width:767px){.lp-axis{display:none}}
@@ -731,11 +731,11 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--chart-1);}
   .ga-li-warn .ga-pbar i{background:var(--gold);}
   .ga-li-bad .ga-pbar i{background:var(--red);}
-  .ga-key-bar{width:16px;height:10px;border-radius:2px;background:var(--chart-1);}
+  .ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--chart-1);}
   .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
-  .ga-key-track{width:18px;height:12px;border-radius:2px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
-  .ga-key-red{width:16px;height:10px;border-radius:2px;background:var(--red);}
-  .ga-key-gold{width:16px;height:10px;border-radius:2px;background:var(--gold);}
+  .ga-key-track{width:18px;height:12px;border-radius:3px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
+  .ga-key-red{width:16px;height:10px;border-radius:3px;background:var(--red);}
+  .ga-key-gold{width:16px;height:10px;border-radius:3px;background:var(--gold);}
   /* 14 Oct 2026 (bundle G, W7): CLP monitoring — two columns from 1280 px, a wide card spans both */
   .clp-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
   @media (min-width:1280px){.clp-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.clp-card.clp-wide{grid-column:1 / -1;}}
@@ -751,7 +751,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   :root{--sim-lorry:#2563EB;--sim-mixer:#E8590C;}
   html[data-theme="dark"]{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;}
   .sim-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
-  .sim-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:13px;color:var(--muted);background:var(--surface);}
+  .sim-chip{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:2px 10px;font-size:13px;color:var(--muted);background:var(--surface);}
   .sim-chip-staff{color:var(--navy);background:var(--navy-soft);border-color:transparent;font-weight:600;}
   .sim-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
   /* 17 Oct 2026 (one screen): from 1024 px the map and its timeline on the left, the clock / Gates now / scenario beside
@@ -765,7 +765,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-tl-top{display:flex;align-items:center;justify-content:space-between;gap:8px;} .sim-tl-top .sim-tl-head{flex:1 1 auto;min-width:0;}
   .sim-tl-head{font-size:13px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sim-tl-head b{color:var(--ink);font-weight:600;}
-  .sim-fold{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:0 12px;background:var(--surface);}
+  .sim-fold{margin-top:10px;border:1px solid var(--line);border-radius:6px;padding:0 12px;background:var(--surface);}
   .sim-fold>summary{cursor:pointer;padding:10px 0;font-size:15px;font-weight:600;color:var(--ink);}
   .sim-fold[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px;}
   .sim-fold>.sim-scroll{margin-bottom:12px;}
@@ -788,7 +788,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-wall .sim-tl-hour,.sim-wall .sim-tl-marktext,.sim-wall .sim-tl-note{font-size:clamp(12px,1.25vh,20px);}
   .sim-wall .sim-tl-name,.sim-wall .sim-tl-ok{font-size:clamp(13px,1.4vh,22px);}
   .sim-map-wrap{position:relative;align-self:start;min-width:0;}
-  .sim-map{height:62vh;min-height:360px;max-height:720px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}   /* 29 Oct 2026 (the page): the app's map height (MAP_H) */
+  .sim-map{height:62vh;min-height:360px;max-height:720px;border:1px solid var(--line);border-radius:6px;overflow:hidden;}   /* 29 Oct 2026 (the page): the app's map height (MAP_H) */
   .sim-legend{position:absolute;left:10px;bottom:10px;background:#FFFFFF;border:1px solid #E1E2E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1F2024;z-index:2;}
   .sim-legend div{display:flex;align-items:center;gap:7px;margin:2px 0;}
   /* 29 Oct 2026 (the Simulation's own page, mockup notes/sim-page-mockup-1029): the key is a ROW under the map (the box stays on
@@ -825,9 +825,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-dot-wait{background:#FFFFFF;border:2px solid #DC2626;}
   /* 28 Oct 2026 (v2): on site — a lorry being served, an area, the wheel wash; the scale switch; a site's what-ifs */
   .sim-dot-serve{background:var(--ok-text);}
-  .sim-dot-area{background:rgba(29,78,216,.14);border:1.5px dashed #1D4ED8;border-radius:2px;}
+  .sim-dot-area{background:rgba(29,78,216,.14);border:1.5px dashed #1D4ED8;border-radius:3px;}
   .sim-dot-wash{background:#FFFFFF;border:2.5px solid #0E7490;}
-  .sim-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .sim-seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
   .sim-seg button{border:0;background:var(--surface);padding:4px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);min-height:28px;}
   .sim-seg button+button{border-left:1px solid var(--line);}
   .sim-seg button.on{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}   /* 29 Oct 2026: ink on the Dark look's light navy (the audit: white failed) */
@@ -850,7 +850,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-cmp td:first-child{max-width:190px;}
   .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
   @media (min-width:1024px){.sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}}   /* 10 Nov 2026 (finding 9): the Now card and the gates are no taller than the map, so nothing is left empty under it */
-  .sim-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface);color:var(--ink);}
+  .sim-card{border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--surface);color:var(--ink);}
   .sim-card-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
   .sim-clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink);}
   .sim-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
@@ -862,7 +862,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-now td{padding:3px 2px;border-top:1px solid var(--line);}
   .sim-now .num,.sim-table .num{text-align:right;}
   .sim-now tr.sim-q td{color:var(--red);font-weight:600;}
-  .sim-tag{display:inline-block;font-size:12px;font-weight:600;border-radius:4px;padding:0 6px;background:var(--surface-3);color:var(--ink);margin-left:4px;}
+  .sim-tag{display:inline-block;font-size:12px;font-weight:600;border-radius:3px;padding:0 6px;background:var(--surface-3);color:var(--ink);margin-left:4px;}
   .sim-ctl{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--ink);}
   .sim-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;}
   .sim-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;min-height:24px;}   /* 10 Nov 2026 (wave 4): a one-line tick is 24 px tall (with the rail folded at 1024 "Wheel wash on the way out" fit one line at 21 px; the audit's targets-24px) */
@@ -893,7 +893,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-hold-row{flex-wrap:wrap;row-gap:2px;}   /* 30 Oct 2026 (task 3c): the holding row wraps; its note is a line under it, never a flex item beside it */
   .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
   .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
-  .sim-tl{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden;cursor:pointer;margin-top:6px;}
+  .sim-tl{border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden;cursor:pointer;margin-top:6px;}
   .sim-tl svg{display:block;}
   .sim-tl-open{fill:rgba(5,150,105,.07);}
   .sim-tl-pour{fill:var(--sim-mixer);}
@@ -909,7 +909,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-tl-marktext{font-size:12px;font-weight:600;fill:var(--red);}
   .sim-tl-note{font-size:12px;fill:var(--muted);}
   .sim-tl-cursor{stroke:var(--ink);stroke-width:1.5;}
-  .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:8px;}
+  .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:6px;}
   .sim-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
   .kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}   /* 17 Oct 2026 (UI audit #15): a scrolling table a keyboard user can Tab to (tabindex 0, role region) */
   /* 23 Oct 2026 (UI fix 9, decision 16): a Data table row opens from the keyboard through a real button on its name (Locations,
@@ -932,25 +932,25 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .clp-thread > li{border-top:1px solid var(--line);padding:7px 0;}
   .clp-step{font-size:13px;color:var(--muted);}
   /* 31 Oct 2026 (task 4a, PR 3c): a client reviewer's comment carries its group's name */
-  .clp-org{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;margin-right:6px;border-radius:999px;background:var(--navy-soft);color:var(--navy);}
+  .clp-org{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;margin-right:6px;border-radius:6px;background:var(--navy-soft);color:var(--navy);}
   .clp-words{font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;}
   .clp-line{display:flex;gap:6px;align-items:baseline;font-size:13px;padding:3px 0;color:var(--ink);}
   .clp-line b{white-space:nowrap;}
   .clp-tasks td{vertical-align:top;}
   .pour-figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 10px;}
-  .pour-figs div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .pour-figs div{border:1px solid var(--line);border-radius:6px;padding:8px 10px;}
   .pour-figs b{display:block;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink);}
   .pour-figs span{font-size:13px;color:var(--muted);}
   .pour-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line);font-size:12px;}
   .pour-bar div{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;min-width:0;}
   .pour-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:6px;}
-  .pour-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+  .pour-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
   .pb-load{background:#44464B;} .pb-there{background:#2563EB;} .pb-chk{background:#62656B;} .pb-dis{background:#C2410C;}
   .pb-wash{background:#0F766E;} .pb-back{background:#1E40AF;}
-  .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:0 5px;margin-left:4px;background:#34363A;color:#fff;vertical-align:1px;}
+  .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:0 5px;margin-left:4px;background:#34363A;color:#fff;vertical-align:1px;}
   @media (max-width:900px){.pour-form,.pour-figs{grid-template-columns:repeat(2,minmax(0,1fr));}.pour-wide{grid-column:span 2;}}
   .ed-head:focus{outline:none;}
-  .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:2px;}
+  .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:3px;}
   .sim-hours{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
   .sim-table td:nth-child(7){min-width:118px;}   /* 29 Oct 2026: Open (from–to) on one line */
   .sim-table{width:100%;min-width:960px;border-collapse:collapse;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -962,7 +962,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-checks{margin-top:10px;font-size:14px;color:var(--ink);display:flex;flex-direction:column;gap:2px;}
   .sim-ok{color:var(--ok-text);font-weight:700;}
   .sim-plist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
-  .sim-pcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface);color:var(--ink);}
+  .sim-pcard{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--surface);color:var(--ink);}
   .sim-pc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:15px;}
   .sim-pc-dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:8px 0 0;}
   .sim-pc-dl dt{font-size:13px;color:var(--muted);}
@@ -974,7 +974,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .gw-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:8px;}
   @media (min-width:1024px){.gw-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media (min-width:1600px){.gw-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
-  .gw-gate{border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;}
+  .gw-gate{border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0;}
   /* 10 Nov 2026 (16 Oct item 33, mockup card 3): the gates as one list, a row opening its day chart */
   .gw-table{margin-top:8px;}
   .gw-table td{vertical-align:middle;}
@@ -997,7 +997,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .la-carry.is-short{color:var(--warn-text);font-weight:600;}
   .la-sub{display:block;font-size:12px;line-height:1.25;font-weight:400;color:var(--muted);}
   .gw-days{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;}
-  .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
+  .ga-key-none{width:16px;height:10px;border-radius:3px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
   .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
   .ga-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -1037,7 +1037,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rd-main{min-width:0;}
   .rd-sum{font-weight:600;color:var(--ink);white-space:normal;line-height:1.3;}
   .rd-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
-  .rd-chip{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);white-space:nowrap;}
+  .rd-chip{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);white-space:nowrap;}
   .rd-chev{position:relative;flex:none;width:22px;height:22px;margin-top:-1px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;transition:transform .15s;}
   .rd-chev::after{content:"";position:absolute;inset:-3px;}
   @media (pointer:coarse){.rd-chev::after{inset:-11px;}}
@@ -1064,7 +1064,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      too): a tinted pill, the word in sentence case in the tone's text colour, and the tone's own icon SHAPE (✓ circle, !
      square, ! circle, – circle, a hollow ring), so a status is never colour alone (D39). One shape and one colour a state. */
   .row-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;line-height:1.35;color:var(--ink);white-space:nowrap;
-    border-radius:999px;padding:2px 10px 2px 3px;background:var(--st-none-bg);}
+    border-radius:6px;padding:2px 10px 2px 3px;background:var(--st-none-bg);}
   .row-st i{flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:700;line-height:1;color:#fff;border-radius:50%;background:var(--chart-none);}
   .row-st.rs-ok{background:var(--st-ok-bg);color:var(--ok-text);} .row-st.rs-ok i{background:var(--ok-btn);color:var(--ok-btn-fg);}
   .row-st.rs-warn{background:var(--st-warn-bg);color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
@@ -1073,7 +1073,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
      John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
      head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
-  .bo-card{container-type:inline-size;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 10px;max-width:820px;}
+  .bo-card{container-type:inline-size;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:0 0 10px;max-width:820px;}
   .bo-eye{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
   .bo-ans{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:6px 0 2px;} .bo-ans b{font-size:20px;letter-spacing:-.01em;}
   .bo-why{font-size:13px;margin:0 0 8px;}
@@ -1122,7 +1122,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .clp-nowrap{white-space:nowrap;}
   .row-st .rs-more{font-weight:500;color:var(--muted);}
   .unit-sw{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
-  .unit-sw-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .unit-sw-seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
   .unit-sw-seg button{font:inherit;font-size:13px;font-weight:600;padding:4px 12px;min-height:30px;border:0;background:var(--surface);color:var(--muted);cursor:pointer;}
   .unit-sw-seg button+button{border-left:1px solid var(--line);}
   .unit-sw-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}
@@ -1135,7 +1135,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .rd-table caption{display:block;}
     .rd-table>thead{display:none;}
     .rd-table,.rd-table>tbody{display:block;}
-    .rd-table tr.rd-row,.rd-table tr.rd-card{display:flex;flex-direction:column;margin:10px 8px 0;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);}
+    .rd-table tr.rd-row,.rd-table tr.rd-card{display:flex;flex-direction:column;margin:10px 8px 0;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
     .rd-table tr.rd-row.is-open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
     .rd-table tr.rd-row>td,.rd-table tr.rd-card>td{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:auto;height:auto;padding:3px 0;border:0;white-space:normal;text-align:right;position:static;box-shadow:none;background:none !important;order:3;}
     .rd-table tr.rd-row>td.rd-primary{order:0;text-align:left;display:block;min-width:0 !important;padding-bottom:4px;}
@@ -1145,7 +1145,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .rd-table tr.rd-row>td.rd-actions{order:9;justify-content:flex-end;}
     .rd-table tr.rd-row>td[data-label]::before,.rd-table tr.rd-card>td[data-label]::before{content:attr(data-label);font-size:13px;font-weight:600;color:var(--muted);text-align:left;}
     .rd-table tr.rd-row>td:empty{display:none;}
-    .rd-table tr.rd-details{display:block;margin:0 8px;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;}
+    .rd-table tr.rd-details{display:block;margin:0 8px;border:1px solid var(--line);border-top:0;border-radius:0 0 6px 6px;overflow:hidden;}
     .rd-table tr.rd-details>td{display:block;}
     .rd-dl{padding:8px 12px 10px;grid-template-columns:1fr 1fr;gap:6px 14px;position:static;max-width:none;}
   }
@@ -1161,7 +1161,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .tab-cards>thead{display:none;}
     .tab-cards,.tab-cards>tbody{display:block;}
     .tab-cards>caption{display:block;}
-    .tab-cards>tbody>tr:not(.rd-details):not(.al-det-row):not(:has(>td[colspan])){position:relative;display:grid;grid-template-columns:repeat(var(--tc-n,4),minmax(0,1fr));gap:8px 16px;align-items:start;margin:10px 12px 0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);}
+    .tab-cards>tbody>tr:not(.rd-details):not(.al-det-row):not(:has(>td[colspan])){position:relative;display:grid;grid-template-columns:repeat(var(--tc-n,4),minmax(0,1fr));gap:8px 16px;align-items:start;margin:10px 12px 0;padding:10px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
     .tab-cards>tbody>tr[hidden]{display:none !important;}
     .tab-cards>tbody>tr.tc-has-tri{padding-left:46px !important;}   /* !important: the row rule's :not() chain outweighs a class */
     .tab-cards>tbody>tr>td.tc-tri>button{width:28px;height:28px;}
@@ -1177,9 +1177,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .tab-cards>tbody>tr>td.rd-actions.tc-wide{grid-column:1 / -1;}
     .tab-cards>tbody>tr>td.tc-tri{position:absolute;left:8px;top:8px;}
     .tab-cards>tbody>tr>td:empty,.tab-cards>tbody>tr>td.tc-hide,.tab-cards .tc-hide{display:none !important;}
-    .tab-cards>tbody>tr.rd-details,.tab-cards>tbody>tr.al-det-row,.tab-cards>tbody>tr:has(>td[colspan]){display:block;margin:0 12px;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;}
+    .tab-cards>tbody>tr.rd-details,.tab-cards>tbody>tr.al-det-row,.tab-cards>tbody>tr:has(>td[colspan]){display:block;margin:0 12px;border:1px solid var(--line);border-top:0;border-radius:0 0 6px 6px;overflow:hidden;}
     .tab-cards>tbody>tr.rd-details>td,.tab-cards>tbody>tr.al-det-row>td,.tab-cards>tbody>tr>td[colspan]{display:block;}
-    .tab-cards>tbody>tr:first-child:has(>td[colspan]){border-top:1px solid var(--line);border-radius:10px;margin-top:10px;}
+    .tab-cards>tbody>tr:first-child:has(>td[colspan]){border-top:1px solid var(--line);border-radius:6px;margin-top:10px;}
     .tab-cards>tbody>tr>td.tc-lead{order:0;}
     .tab-cards>tbody>tr>td.tc-span2{grid-column:span 2;}
     .tab-cards>tbody>tr>td.tc-span3{grid-column:span 3;}
@@ -1214,7 +1214,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .tbl.cfg-veh{display:block;min-width:0;}
     .tbl.cfg-veh>thead{display:none;}
     .tbl.cfg-veh>tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:4px 16px 16px;}
-    .tbl.cfg-veh>tbody>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;align-content:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);}
+    .tbl.cfg-veh>tbody>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;align-content:start;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);}
     .tbl.cfg-veh>tbody>tr>td{display:block;width:auto;min-width:0 !important;height:auto;padding:0;border:0;white-space:normal;text-align:left;position:static;box-shadow:none;background:none !important;}
     .tbl.cfg-veh>tbody>tr>td.cfg-veh-name,.tbl.cfg-veh>tbody>tr>td.cfg-veh-wide,.tbl.cfg-veh>tbody>tr>td.cfg-veh-span{grid-column:1 / -1;}
     .tbl.cfg-veh>tbody>tr>td.cfg-veh-name{position:static;box-shadow:none;}
@@ -1237,7 +1237,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .phone-tab .rail-count{position:absolute;top:5px;left:calc(50% + 9px);min-width:18px;padding:0 5px;border-radius:9px;background:var(--action);color:var(--action-fg);line-height:18px;}
   /* the sheet and its shade stop at the tab bar (57 px: a 56 px tab and its rule), so More still shuts it */
   .phone-more-back{position:absolute;top:0;left:0;right:0;bottom:calc(57px + env(safe-area-inset-bottom,0px));z-index:44;background:rgba(16,24,40,.35);border:0;}
-  .phone-more{position:absolute;left:0;right:0;bottom:calc(57px + env(safe-area-inset-bottom,0px));z-index:45;max-height:85%;overflow-y:auto;background:var(--surface);border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -12px 32px rgba(16,24,40,.22);padding:6px 0 10px;}
+  .phone-more{position:absolute;left:0;right:0;bottom:calc(57px + env(safe-area-inset-bottom,0px));z-index:45;max-height:85%;overflow-y:auto;background:var(--surface);border-top:1px solid var(--line);border-radius:6px 6px 0 0;box-shadow:0 -12px 32px rgba(16,24,40,.22);padding:6px 0 10px;}
   .phone-more h3{margin:0;padding:12px 20px 4px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
   .phone-more p{margin:0;padding:0 20px 8px;font-size:14px;color:var(--muted);}
   .phone-more-item{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 20px;border:0;background:transparent;color:var(--ink);font:500 15px var(--f-text);text-align:left;text-decoration:none;cursor:pointer;}
@@ -1254,12 +1254,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .tap48{min-height:48px;}
   /* the phone Look-ahead: a date strip, one card for the chosen day, the day's lines (mockup 10) */
   .ph-la{padding:16px 16px 24px;}
-  .ph-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .ph-seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
   .ph-seg button{min-height:48px;padding:0 16px;border:0;background:var(--surface);color:var(--muted);font:600 14px var(--f-text);cursor:pointer;}
   .ph-seg button+button{border-left:1px solid var(--line);}
   .ph-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);}   /* 24 Nov 2026 (own look, stage 3): a tint, not a fill */
   .ph-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 0 12px;}
-  .ph-day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);font:500 13px/1.2 var(--f-text);cursor:pointer;}
+  .ph-day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font:500 13px/1.2 var(--f-text);cursor:pointer;}
   .ph-day b{font-size:18px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
   .ph-day[aria-pressed="true"]{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);color:var(--navy);}
   .ph-day[aria-pressed="true"] b{color:var(--navy);}
@@ -1309,16 +1309,16 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      display:none on [hidden], but a utility class on the same element would win, so it
      is forced here. */
   [hidden]{display:none !important;}
-  .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;}
+  .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;}
   .dash-wallbar-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
-  .dash-wallbar-btn{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:8px;padding:5px 11px;cursor:pointer;}
+  .dash-wallbar-btn{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:6px;padding:5px 11px;cursor:pointer;}
   .dash-wallbar-btn:hover{background:var(--grey);}
   .dash-wallbar-btn.is-on{background:var(--navy-soft);color:var(--navy);}   /* 24 Nov 2026 (own look, stage 3): a tint, not a fill */
-  .dash-wallbar-sel{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
+  .dash-wallbar-sel{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 7px;cursor:pointer;}
   .dash-wallbar-sep{width:1px;height:20px;background:var(--line);margin:0 3px;}
   .dash-clock{margin-left:auto;font:700 clamp(15px,2.2vh,40px)/1 var(--f-text);color:var(--ink);font-variant-numeric:tabular-nums;}
   .dash-wallbar-note{font-size:12px;color:var(--muted);}
-  .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:12px;}
+  .dash-wallbar-note code{background:var(--surface-3);border-radius:3px;padding:1px 5px;font-size:12px;}
   .dash-divider{font:700 12px var(--f-text);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
                 border-top:2px solid var(--line);padding-top:9px;margin-bottom:10px;}
   .dash-wall .dash-divider{font-size:14px;}
@@ -1328,11 +1328,11 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   ::-webkit-scrollbar{height:9px;width:9px;} ::-webkit-scrollbar-thumb{background:var(--grey);border-radius:6px;}
   /* 22 Oct 2026 (S16 / B5): the Abnormal loads page */
   .al-stats{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px;}
-  .al-stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:120px;}
+  .al-stat{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 14px;min-width:120px;}
   .al-stat b{display:block;font-size:20px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;}
   .al-stat span{font-size:12px;color:var(--muted);}
   .al-holidays{margin-left:auto;font-size:12px;color:var(--muted);max-width:420px;}
-  .al-cap{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:14px;border-radius:10px 10px 0 0;}
+  .al-cap{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:14px;border-radius:6px 6px 0 0;}
   .al-form{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:18px;padding:14px;}
   .al-set{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;padding:14px;}
   .al-tbl .link-btn, .al-set .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 2px;} /* 22 Oct: the row's text actions are 24 px tall (WCAG 2.2 target size; the audit's targets-24px / axe target-size failed on them) */
@@ -1344,12 +1344,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .al-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;} .al-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
   .al-tick{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink);margin:6px 0;}
   .al-tick input{margin-top:3px;flex:none;}
-  .al-advice{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:13px;}
+  .al-advice{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;font-size:13px;}
   .al-lines{margin:0;padding-left:16px;} .al-lines li{margin:4px 0;}
   .al-notes{margin:8px 0 0;padding-left:16px;color:var(--warn-text);} .al-notes li{margin:3px 0;}
   .al-foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px;margin:10px 0 0;}
   .al-flag{display:inline-block;margin:2px 4px 2px 0;}
-  .al-chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid transparent;white-space:nowrap;margin-right:4px;}
+  .al-chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:6px;border:1px solid transparent;white-space:nowrap;margin-right:4px;}
   .al-so{background:#F5F3FF;color:#5B21B6;border-color:#DDD6FE;} .al-vr1{background:#ECFEFF;color:#0E7490;border-color:#A5F3FC;}
   .al-stgo{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;} .al-cu{background:var(--surface-3);color:var(--ink);border-color:var(--line);}
   .al-warn{background:#FFFBEB;color:var(--warn-text);border-color:#FDE68A;} .al-bad{background:#FEF2F2;color:var(--bad-text);border-color:#FECACA;}
@@ -1376,7 +1376,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .al-typed-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;}
   .al-via{margin-top:8px;max-width:520px;} .al-via .ctl{font-family:ui-monospace,Consolas,monospace;font-size:12px;}
   .al-mark{margin-left:6px;font-weight:600;}
-  .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13px;background:var(--surface);margin-top:12px;}
+  .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-size:13px;background:var(--surface);margin-top:12px;}
   .al-strip b{font-size:16px;font-variant-numeric:tabular-nums;} .al-strip-btn{padding:4px 9px;font-size:13px;} .al-strip-words{flex-basis:100%;color:var(--muted);font-size:12px;}
 </style>
 </head>
@@ -2545,9 +2545,9 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
     // capacity; a gate with no check-in has no track
     data: { labels: rowsC.map(r => r.g.location_name), datasets: [
       { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#EDEEEF"),
-        borderColor: tok("--grey", "#E1E2E4"), borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
+        borderColor: tok("--grey", "#E1E2E4"), borderWidth: 1, borderRadius: 3, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
       { label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day),
-        backgroundColor: rowsC.map(r => r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
+        backgroundColor: rowsC.map(r => r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 3, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 12, right: 250 } },
       plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
         title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
@@ -3179,8 +3179,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const cost = data.costing || {};
   const K = D.kpis;
   const ctW = ctFig(ct, ctErr);        // 11 Oct 2026: the carbon target as one more big-screen figure
-  const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>
-                        : s === "route" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span> : null;
+  const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">target</span>
+                        : s === "route" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">quote</span> : null;
   // KPI cards: two figures per row below 1536 px, four on a wide screen — a figure is
   // never truncated (the 11 Sep screenshot: "1 017 …", "€ 3.31…")
   const Group = ({ title, children, tone }) => (
@@ -3294,7 +3294,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> plan lines have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
           <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)} per litre</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
-          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
+          {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>}
       </PageHeader>}
       {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={firstRun ? null : `${D.lines} plan line${D.lines === 1 ? "" : "s"} in view`} />}
@@ -3786,7 +3786,7 @@ function DashboardToday({ meta, week, err, wall, fill }){
     </div>
   );
   const Bar = ({ pct, tone }) => (
-    <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>
+    <div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>
   );
   const acctReportedPlanT = acct ? (acct.rows || []).filter(r => r.actual_qty != null).reduce((s, r) => s + (r.planned_t || 0), 0) : 0;
   const acctPct = acct && acct.reported > 0 && acctReportedPlanT > 0 ? acct.actual_t * 100 / acctReportedPlanT : null;
@@ -4209,9 +4209,9 @@ function clpBulletCfg(rows, valKey, nameKey, word){
   return { type: "bar",
     data: { labels: rows.map(r => r[nameKey]), datasets: [
       { label: "Cap a day", data: rows.map(r => r.cap), backgroundColor: tok("--surface-3", "#EDEEEF"), borderColor: tok("--grey", "#E1E2E4"),
-        borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
+        borderWidth: 1, borderRadius: 3, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
       { label: `Planned ${word}`, data: rows.map(r => r[valKey]), backgroundColor: rows.map(r => r.over ? RED : C1), borderWidth: 0,
-        borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
+        borderRadius: 3, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 8, right: 200 } },
       plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1 } },
       scales: { x: { min: 0, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: fs } },
@@ -8579,7 +8579,7 @@ function DashFirstSteps({ locCount, routeCount, onOpen }){
       <ol className="space-y-2.5 list-none p-0 m-0">
         {steps.map(s => (
           <li key={s.n} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm" data-first-step={s.n} data-done={s.done ? "1" : "0"}>
-            <span aria-hidden="true" className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold"
+            <span aria-hidden="true" className="inline-flex items-center justify-center w-6 h-6 rounded text-xs font-semibold"
               style={s.done ? { background: "rgba(3,158,134,.12)", color: "var(--ok-text)" } : { background: "var(--surface-3)", color: "var(--ink-2, var(--ink))" }}>{s.done ? "✓" : s.n}</span>
             <span className={s.done ? "text-slate-500" : "text-slate-700"}>{s.text}{s.done ? <span className="sr-only"> (done)</span> : null}</span>
             {!s.done && s.page && (s.who
@@ -10005,7 +10005,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   ].filter(Boolean);
   const clearOne = (k) => setF(x => ({ ...x, [k]: k === "mine" ? false : k === "q" ? "" : "ALL" }));
   const clearAll = () => setF({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
-  const chip = (t, title) => <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600" title={title}>{t}</span>;
+  const chip = (t, title) => <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600" title={title}>{t}</span>;
   const sortCaption = `sorted by ${sort.key === "quantity" ? "total" : sort.key === "months" ? "months" : "route"}, ${sort.dir === "desc" ? "largest first" : "smallest first"}`;
   const qtyHead = unitSel === "loads" ? "Loads" : unitSel === "lorries" ? "Lorries" : "Tonnes";
   // the one status: what needs a person first (Rejected, a ROAD LIMIT, Pending, Mixed), else Approved; +1 when both
@@ -10108,7 +10108,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                             : grp(q)}</td>
                           <td className="num" data-label={`Planned ${CUR()}`} data-cost-cell="1">{!cost ? <span className="text-slate-500">…</span> : !c ? <span className="text-slate-500">—</span>
                             : c.planned == null ? <span className="text-slate-500">rate not set</span>
-                            : <>{CUR()}{grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[12px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</td>
+                            : <>{CUR()}{grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[12px] font-medium px-1.5 rounded bg-slate-100 text-slate-600">target</span>}</>}</td>
                           <td className="num" data-label={`Fair ${CUR()}`} style={{ color: "var(--chart-4)" }}>{!cost ? <span className="text-slate-500">…</span> : (!c || c.fair == null) ? <span className="text-slate-500">—</span> : <>{CUR()}{grp(c.fair)}</>}</td>
                           <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
                           <td className="num whitespace-nowrap rd-actions">
@@ -11201,7 +11201,7 @@ function CarbonStep({ n, children, ...rest }){
     <li>
       <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5" id={"carbon-step-" + n} data-step={n} {...rest} aria-labelledby={"carbon-step-" + n + "-h"}>
         <h2 id={"carbon-step-" + n + "-h"} className="flex items-center gap-3 text-lg font-semibold text-slate-800">
-          <span className="inline-flex items-center justify-center shrink-0 text-base font-bold tabular-nums" style={{ width: 28, height: 28, borderRadius: 14, border: "1px solid var(--line)", background: "var(--surface-2)", color: "var(--ink)" }}>{n}</span>
+          <span className="inline-flex items-center justify-center shrink-0 text-base font-bold tabular-nums" style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface-2)", color: "var(--ink)" }}>{n}</span>
           <span>{CARBON_STEP_TITLES[n - 1]}</span>
         </h2>
         {children}
@@ -11296,7 +11296,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
   const lab = "block text-sm font-medium text-slate-700 mb-1";
   const inp = "border border-slate-300 rounded-md px-2 py-1 text-sm w-full tabular-nums bg-white";
   const big = "kpi-num font-bold text-[color:var(--navy-deep)] mt-3";
-  const Chip = ({ s }) => (s ? <span className="inline-flex items-center gap-1.5 text-sm text-slate-700 whitespace-nowrap"><i aria-hidden="true" style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, background: CARBON_TONE[s] || "var(--chart-none)" }}></i>{CARBON_STATUS_WORD[s] || s}</span> : null);
+  const Chip = ({ s }) => (s ? <span className="inline-flex items-center gap-1.5 text-sm text-slate-700 whitespace-nowrap"><i aria-hidden="true" style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: CARBON_TONE[s] || "var(--chart-none)" }}></i>{CARBON_STATUS_WORD[s] || s}</span> : null);
   const lorryLine = (sc) => {
     const f = sc.fleet || {};
     return (
@@ -11415,7 +11415,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
         {/* ---------------- 1. your approved plan ---------------- */}
         <CarbonStep n={1} data-guide="carbon-compare">
           <div className="flex items-start gap-3 mt-3" role="note">
-            <span aria-hidden="true" className="inline-flex items-center justify-center font-bold shrink-0" style={{ width: 26, height: 26, borderRadius: 13, background: "var(--ink)", color: "var(--bg)" }}>!</span>
+            <span aria-hidden="true" className="inline-flex items-center justify-center font-bold shrink-0" style={{ width: 26, height: 26, borderRadius: 6, background: "var(--ink)", color: "var(--bg)" }}>!</span>
             <strong className="text-base text-slate-800">Planning estimates. Not a National Highways Carbon Tool return.</strong>
           </div>
           <div className={big} style={{ fontSize: "clamp(1.4rem, 2vw, 2rem)" }}
@@ -11894,12 +11894,12 @@ const spanLabel = (a, b) => {
 function IptPill({ ipt }){
   const k = iptKey(ipt);
   if(!k) return <span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>;
-  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"
+  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded text-white"
     style={{ background: IPT_PALETTE_C[k] || "#62656B" }}>{teamName(k)}</span>;
 }
 function WsPill({ ws }){
   if(!ws) return null;
-  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
     style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>;
 }
 function LaKpi({ value, caption, tone }){
@@ -12535,7 +12535,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     : sum.baf_reason === "no share" ? "BAF: type a fuel share"
     : "BAF: no index";
   const baseTxt = fuelS.baf_base_eur_per_l != null ? `base ${CUR()}${(+fuelS.baf_base_eur_per_l).toFixed(3)} · ${fuelDate(fuelS.baf_base_bulletin_date)}` : "no base locked";
-  const staleChip = hasIndex && idx.stale ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span> : null;
+  const staleChip = hasIndex && idx.stale ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span> : null;
   const inputCls = "border border-slate-300 rounded px-1.5 py-0.5 text-xs text-right tabular-nums w-20";
   const setting = (k, label, placeholder, title) => (
     <label className="inline-flex items-center gap-1 text-xs text-slate-600" title={title}>
@@ -13206,7 +13206,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                           </td>}
                           {acctCost && <><td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
-                              <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
+                              <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
                               {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
                               {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()}{grp(r.planned_eur_adj)}</div>}
                             </>}
@@ -16001,7 +16001,7 @@ function VehChips({ profiles }){
                     (p.return_baked ? ", return routed" : ", return NOT routed") + alts;
         return (
           <span key={k} title={tip}
-            className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+            className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
             style={{ background: bg, color: fg }}>
             {vehShort(k)}{p.baked && !p.return_baked ? " ↦" : ""}
           </span>
@@ -16468,7 +16468,7 @@ function NearCell({ data, id }){
   const chips = nearChipCounts(c);
   if(!chips.length) return <span className="text-slate-500">None of these</span>;
   return <span className="inline-flex flex-wrap gap-1">{chips.map(x => (
-    <span key={x.k} className="text-[12px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 whitespace-nowrap"><b>{x.n}</b> {x.w}</span>))}</span>;
+    <span key={x.k} className="text-[12px] px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-700 whitespace-nowrap"><b>{x.n}</b> {x.w}</span>))}</span>;
 }
 // 17 Nov 2026 (routes-card-room): a box in the open route's panel (it was a row of the Routes list's table)
 function NearDetails({ data, id }){
@@ -16613,7 +16613,7 @@ function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, ro
     const f = r ? legFig(r.profiles[prof], key, alt) : null;
     return (
       <div className="flex items-center gap-2 text-[13px]" data-route-full-leg={key}>
-        <span aria-hidden="true" style={{ width: 16, height: 4, borderRadius: 2, background: colour, flex: "none" }}></span>
+        <span aria-hidden="true" style={{ width: 16, height: 4, borderRadius: 3, background: colour, flex: "none" }}></span>
         <span className="font-semibold w-10">{word}</span>
         <span className="tabular-nums">{f ? `${fmtDist(f.km, 1)} ${DU()}` : "—"}</span>
         <span className="tabular-nums text-slate-500">{f && f.min != null ? `${f.min} min` : ""}</span>
@@ -17147,7 +17147,7 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
               return (
                 <div key={"u" + u.from} className="text-[13px] mt-2" data-busy-in-use={u.from} data-busy-status={u.status}>
                   <p className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                       style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
                       Busy hours: Alt {u.alt}{u.status === "paused" ? " · paused" : ""}</span>
                     <span>{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}{since ? ` since ${since}` : ""}{u.decided_by ? `, by ${u.decided_by}` : ""}.</span>
@@ -17189,7 +17189,7 @@ function CatChips({ list, dir }){
   return (
     <span className="flex flex-wrap gap-1">
       {arr.map(c => (
-        <span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"
+        <span key={c} className="text-xs px-1.5 py-0.5 rounded whitespace-nowrap"
           style={{ background: bg, color: fg }}>{c}</span>
       ))}
     </span>
@@ -20395,16 +20395,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               ))}
               {/* 8 Nov 2026 (task 2.1-7): out green, back amber, the picked route a blue halo */}
               <span className="inline-flex items-center gap-1.5" data-legend-leg="out">
-                <span style={{ background: LEG_OUT, width: 14, height: 4, borderRadius: 2, display: "inline-block" }} />Out
+                <span style={{ background: LEG_OUT, width: 14, height: 4, borderRadius: 3, display: "inline-block" }} />Out
               </span>
               <span className="inline-flex items-center gap-1.5" data-legend-leg="back">
-                <span style={{ background: LEG_BACK, width: 14, height: 4, borderRadius: 2, display: "inline-block" }} />Back
+                <span style={{ background: LEG_BACK, width: 14, height: 4, borderRadius: 3, display: "inline-block" }} />Back
               </span>
               <span className="inline-flex items-center gap-1.5" data-legend-leg="picked">
-                <span style={{ background: "rgba(29,78,216,.32)", width: 14, height: 8, borderRadius: 4, display: "inline-block" }} />Picked
+                <span style={{ background: "rgba(29,78,216,.32)", width: 14, height: 8, borderRadius: 3, display: "inline-block" }} />Picked
               </span>
               <span className="inline-flex items-center gap-1.5" title="Other ways this route could go, for the selected vehicle">
-                <span style={{ background: ALT_COLOR, width: 14, height: 3, borderRadius: 2, display: "inline-block" }} />Alternative
+                <span style={{ background: ALT_COLOR, width: 14, height: 3, borderRadius: 3, display: "inline-block" }} />Alternative
               </span>
               <span className="inline-flex items-center gap-1.5" title="Could not be routed: shown as a straight line between the two points">
                 <span style={{ width: 14, height: 3, display: "inline-block",
@@ -20465,7 +20465,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <td className="px-3 py-2 text-center" data-label="Gate">
                     {(l.gate_lat != null && l.gate_lon != null)
                       ? <span title={`Routes via ${Number(l.gate_lat).toFixed(5)}, ${Number(l.gate_lon).toFixed(5)}`}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>
                       : <span className="text-slate-500" title="Routes to the marker itself">—</span>}
                   </td>
@@ -20576,7 +20576,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <span className="flex flex-wrap items-center gap-1 mt-1" data-route-notes={r.id}>
                       {!!(r.gate_blockers || []).length && (
                         <span title={(r.gate_blockers || []).join("; ")}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                           gate blocked
                         </span>
@@ -20590,13 +20590,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const words = hr.state === "calls" ? `Calls at ${H.name || "the holding area"}` : hr.state === "route_again" ? "Route again: does not pass the holding area"
                           : hr.state === "skip" ? "Does not call off" : hr.state === "exempt" ? "Straight to the gate" : "Not routed yet";
                         return <span data-route-holding={hr.state} title={hr.state === "route_again" ? "Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)" : undefined}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
                       })()}
                       {(busyUses || []).filter(u => u.route_id === r.id && u.status !== "stopped").map(u => (
                         // 5 Nov 2026 (task 0d-2): "Busy hours: Alt 2", hover for the hours; amber while paused
                         <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}${u.status === "paused" ? " · paused: the road changed" : ""}`}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
                           Busy hours: Alt {u.alt}</span>))}
                       {(() => {
@@ -20607,7 +20607,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         // tint read 4.09:1 in the audit
                         return <span data-route-return={mode} data-route-return-typed={typed ? "1" : "0"}
                           title={typed ? "Chosen in the row's planning figures" : "Guessed from the route's start; choose in the row's planning figures"}
-                          className={"text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
+                          className={"text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
                           style={typed ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : undefined}>{words}</span>;
                       })()}
                       {(() => {
@@ -20619,7 +20619,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const more = (used.length ? used : bad).length - 1;
                         return (
                           <span data-route-diverted={r.id}
-                            className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                             style={used.length ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }
                                                : { background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                             {used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}{more > 0 ? ` +${more}` : ""}
@@ -20628,7 +20628,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {!!(r.haul_roads || []).length && (
                         // 22 Oct 2026 (UI fix 6, card 6): the chip sits on a SOLID var(--haul-soft) (4.64:1 on any row; the tint fell to 4.24:1 on a selected row)
                         <span title={`Routed through ${(r.haul_roads || []).length} temporary haul road(s): ${(r.haul_roads || []).join(", ")}. Expand the row to edit.`}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}>
                           haul ×{(r.haul_roads || []).length}
                         </span>
@@ -21918,7 +21918,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
       <PalBtn onClick={() => setTool({ kind: "select" })} on={tk === "select"}>↖ Select</PalBtn>
       <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">Lines</div>
       {LINES.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "line", style: s.key })} on={tk === "line:" + s.key}>
-        <span aria-hidden="true" style={{ width: 18, height: 4, background: s.color, borderRadius: 2, flex: "none" }}></span>{s.label}</PalBtn>)}
+        <span aria-hidden="true" style={{ width: 18, height: 4, background: s.color, borderRadius: 3, flex: "none" }}></span>{s.label}</PalBtn>)}
       <div className="flex items-center justify-between pt-1">
         <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">Areas</span>
         <select value={shape} onChange={ev => { setShape(ev.target.value); if(tool.kind === "area") setTool({ ...tool, shape: ev.target.value }); }} aria-label="Area shape" className="border border-slate-300 rounded px-1 py-0.5 text-[12px] bg-white">
@@ -21926,7 +21926,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         </select>
       </div>
       {AREAS.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "area", style: s.key, shape })} on={tk === "area:" + s.key}>
-        <span aria-hidden="true" style={{ width: 14, height: 14, background: s.color, opacity: Math.max(0.35, s.opacity), border: `1.5px ${s.outline === "dashed" ? "dashed" : "solid"} ${s.color}`, borderRadius: 2, flex: "none" }}></span>{s.label}</PalBtn>)}
+        <span aria-hidden="true" style={{ width: 14, height: 14, background: s.color, opacity: Math.max(0.35, s.opacity), border: `1.5px ${s.outline === "dashed" ? "dashed" : "solid"} ${s.color}`, borderRadius: 3, flex: "none" }}></span>{s.label}</PalBtn>)}
       <PalBtn onClick={() => setTool({ kind: "text" })} on={tk === "text"}><span aria-hidden="true" className="font-bold" style={{ width: 18, textAlign: "center" }}>T</span>Words</PalBtn>
       {groups.map(g => <div key={g}>
         <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">{g}</div>

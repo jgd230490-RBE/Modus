@@ -4076,20 +4076,21 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
   // NARROWED 22 Oct 2026 (UI fix 6, card 3; finding #11): the one text-[9px] that was left, the Horizon's role word, is 12 px
   // too (text-xs), slate-600 on the commit week's shade — so no text-[9px] is left anywhere
+  // NARROWED 24 Nov 2026 (own look, B1 stage 1): every rounded-full chip is "rounded", the one 6 px corner (the Tailwind config maps it)
   ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; no text-[9px] is left (22 Oct: the horizon's role word is 12 px, UI fix 6)",
-     code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>')
-     && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span>')
-     && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)"')
-     && code.includes('className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route')
+     code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">target</span>')
+     && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">quote</span>')
+     && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)"')
+     && code.includes('className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route')
      && code.includes('<span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>')
      && code.includes('<span className="ml-1 text-xs text-amber-700" title="Spring load restrictions')
-     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"')
-     && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"\n    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>')
+     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded text-white"')
+     && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded"\n    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>')
      && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
-     && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"')
-     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded whitespace-nowrap"')
+     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
-     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
+     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
      // RE-PINNED 29 Oct 2026 (task 3c): + the Routes row's holding-area chip, the same house chip (four)
      // RE-PINNED 5 Nov 2026 (task 0d-2): + the Routes row's "Busy hours: Alt N" chip, the same house chip (five)
@@ -4097,8 +4098,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
      // NARROWED 10 Nov 2026 (UI critique 23): the five chips moved under "From → to" (a flex row with a gap, data-route-notes), so they lose ml-1.5
      && (() => { const _rn = code.slice(code.indexOf("data-route-notes={r.id}"), code.indexOf("data-route-near-cell={r.id}"));
-        return (_rn.match(/className="text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
-     && code.includes('className={"text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
+        return (_rn.match(/className="text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
+     && code.includes('className={"text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
@@ -4314,12 +4315,13 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tdF.includes("const moreT = T.rows.slice(nShown).reduce((s, r) => s + (r.tonnes || 0), 0);")
      && /\n  \.today-more\{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var\(--line\);font-weight:600;color:var\(--muted\);\}\n/.test(html)
      && _tdF.indexOf("today-more") > _tdF.indexOf("</table>)}"));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 1): the bars take the small 3 px corner (rounded-sm), not rounded-full
   ok("⭐ UI FIX 6 card 5 (the user: keep the progress bars): the four figures and BOTH bars, 'This week to date' and 'Last week', are where they were and as they were",
      _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />')
      && _tdF.includes('<span className="font-semibold text-slate-700">This week to date<InfoTip id="dash.week_to_date"')
      && _tdF.includes('<span className="font-semibold text-slate-700">Last week{acct && acct.week ?')
      && (_tdF.match(/<Big value=/g) || []).length === 4 && _tdF.indexOf("This week to date") < _tdF.indexOf("today-lines")
-     && _tdF.includes('<div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
+     && _tdF.includes('<div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
   // REVERSED 22 Oct 2026 (card 4, the user: "yes, build card 4 ... keeping the progress bars"): All sections now fits whole rows
   // like the filled layouts; the working Dashboard is still unchanged (wall false). The fill switch stays the Dashboard's.
   ok("UI FIX 6 card 4: 'All sections' fits whole rows too (tvList = wall, not fill); the working Dashboard keeps its scrolling list; the fill switch is the Dashboard's",
