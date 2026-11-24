@@ -156,6 +156,8 @@ ok("9 ceiling: the ceilings themselves are at or under the branch's measured fig
 // 24 Nov 2026: with the carbon target flush to the column, its fold's summary (21 px) met the note's "i" at 390 px (the
 // UI audit's targets-24px): 2 px above and below make it 25 px
 ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.includes(".ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;padding:2px 0;}"));
+// and 12 px above the fold, so its centre sits 22 px clear of the note's "i" on a phone (the audit's 44 px rule, 24 Nov)
+ok("5 carbon target: the decisions fold stands 12 px below the note", css.includes(".ct-more{margin-top:12px;font-size:14px;color:var(--ink);}"));
 // 24 Nov 2026: the Best option card's eyebrow in sentence case, as the third mockup draws it (".ey": 12 px, muted, no capitals)
 ok("5 best option: the card's eyebrow is not small capitals", /\n  \.bo-eye\{(?![^}]*(uppercase|letter-spacing))[^}]*\}/.test(css));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
