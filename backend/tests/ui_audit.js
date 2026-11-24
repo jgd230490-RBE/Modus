@@ -1212,7 +1212,7 @@ async function errorStates(page, ctx, store, meta, w) {
 // the team (submitter) role: fewer pages, no approve, a locked team
 async function walkTeam(browser, base) {
   const look = LOOKS[0], w = DESK_W;
-  const ctx = await newContext(browser, look, "orange", w);
+  const ctx = await newContext(browser, look, w);
   const page = await ctx.newPage(); const store = newStore(); watch(page, store);
   const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base, ...(extra || {}) });
   try { await signIn(page, base, { code: OPT.teamCode, name: "UI audit team" }); }
@@ -1245,7 +1245,7 @@ async function walkLogin(browser, base) {
   if (!made) return;
   const link = made.replace(/^https?:\/\/[^/]+/, base);
   for (const w of [DESK_W, PHONE_W].filter((x, i, a) => a.indexOf(x) === i)) {
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
     const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base, ...(extra || {}) });
     if (w !== DESK_W) {
@@ -1348,7 +1348,7 @@ async function walkReviewer(browser, base) {
   if (!made) return;
   const codes = [];
   for (const w of [DESK_W, PHONE_W].filter((x, i, a) => a.indexOf(x) === i)) {
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
     const apiSeen = []; page.on("request", rq => { if (rq.url().startsWith(base + "/api/")) apiSeen.push(rq.url()); });
     const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base, ...(extra || {}) });
@@ -1402,7 +1402,7 @@ async function walkEmpty(browser) {
   try { server = await startServer({ empty: true }); } catch (e) { note("empty-tenant walk skipped: " + e.message); return; }
   try {
     const look = LOOKS[0], w = DESK_W;
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
     const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base: server.base, ...(extra || {}) });
     await signIn(page, server.base, { code: OPT.code });
@@ -1422,7 +1422,7 @@ async function walkUnsigned(browser, base) {
   const look = LOOKS[0];
   const meta = (name, w) => ({ name, width: w, height: HEIGHT[w] || 800, look, base });
   for (const w of WIDTHS) {
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
     await page.goto(base + "/map/", { waitUntil: "domcontentloaded" });
     await audit(page, store, meta("map-password", w));
