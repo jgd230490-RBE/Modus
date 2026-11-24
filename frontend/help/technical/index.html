@@ -976,7 +976,43 @@ database: <code>render.yaml</code> runs one.</li>
 third waits up to <code>WAIT_S</code> = 90 s, then 503. <code>solo(name)</code> runs one build of that name at a time (a CLP document,
 a drawing read): a second waits <code>SOLO_WAIT_S</code> = 5 s, then 503 in words; <code>solo</code> is per name, so two different
 builds can overlap. <code>trim()</code> hands freed memory back after a build. The community and collision fetches share one
-lock (<code>backend/fetch_guard.py</code>): each refuses while the other runs.</li>
+lock (<code>backend/fetch_guard.py</code>); since 23 Nov 2026 every long job in the &ldquo;Working&rdquo; list refuses while
+another runs (below).</li>
+<li id="t4-working"><strong>The &ldquo;Working&rdquo; list (23 Nov 2026).</strong> <code>backend/working.py</code> keeps one row a
+long job in the table <code>working_jobs</code>: the kind, the subject (a route), <code>done</code> of <code>total</code>, who
+started it, <code>started_at</code>, <code>beat_at</code> and the state. The table carries <code>tenant_id</code> but is not in
+the organisation file, so a re-import (itself a job) does not wipe its own row; it is in <code>db.NO_DATA_TABLES</code>, and
+<code>/api/working/</code> is in <code>AUDIT_SKIP_PREFIXES</code>, so a batch&rsquo;s progress write moves no data version and
+empties no kept read. Nine kinds, three ways of running:
+<ul>
+<li><em>sent by the page</em> (Route all, Busy-hour times, a zone&rsquo;s re-route, Route again): the page still sends the
+batches. <code>POST /api/working/start</code> makes the row (Route all&rsquo;s total is <code>network.bake_todo</code> summed over
+the lorry types); each batch carries <code>job=&lt;id&gt;</code> and <code>bake-routes</code>, <code>hour-times/bake</code> and
+<code>bake-route</code> move the row on by what the batch reached (<code>working.progress</code>) and hand the line back as
+<code>working</code>; the page ends it with <code>POST /api/working/&lt;id&gt;/end</code>. A row with no batch for
+<code>working.GAP</code> = 5 minutes reads &ldquo;stopped&rdquo;; a tab that is closing says so itself at once (a keep-alive
+request on <code>pagehide</code>). The row is in the database, so a stopped job still reads &ldquo;stopped&rdquo; after a restart
+and &ldquo;Carry on&rdquo; starts a new row that keeps the old count.</li>
+<li><em>held by one request</em> (Make primary, the re-import): <code>working.held()</code> wraps the request. The ids held by this
+process are in memory (<code>_HELD</code>; one worker), so a row the process no longer holds after a restart reads
+&ldquo;stopped&rdquo; at once; it has no &ldquo;Carry on&rdquo; and leaves the list after 30 minutes. A request that refuses or
+rolls back leaves no row.</li>
+<li><em>run by the server</em> (the two fetches, the road closures check): each keeps its own state, which is read
+(<code>community.run_state</code>, <code>collisions.run_state</code>, <code>restrictions.refresh_state</code>) and never copied;
+only &ldquo;this finished line was closed&rdquo; is stored. A fetch cut short by a restart goes on reading &ldquo;running&rdquo;
+until its own stale limit (30 minutes for the community fetch, 45 for the collision history), and blocks every other job until then.</li>
+</ul>
+One job at a time for the organisation: <code>working.refusal(kind)</code> gives the one sentence
+(<code>working.sentence</code>: &ldquo;&lt;A&gt; is running. &lt;B&gt; can start when it finishes.&rdquo;, &ldquo;are&rdquo; and
+&ldquo;they finish&rdquo; for Busy-hour times), returned with status 423 by <code>/api/working/start</code>, the batch endpoints
+(a batch of the job already running is never refused), Make primary, the re-import, the closures check, a haul road put on or
+taken off a route, and a zone write whose own dry run says it would clear route legs; the two fetches return it as their
+<code>message</code>. Clear all routes is refused the same way (24 Nov 2026): it is no job, so it has a name for the sentence
+(<code>working.ALSO</code>) and no row. A start that checks and marks takes <code>fetch_guard.LOCK</code>. <code>GET /api/working</code> (any staff
+sign-in; a client reviewer is refused) gives the rows running, those stopped part-way and those ended in the last
+<code>working.KEEP</code> = 30 minutes and not closed, and <code>busy</code>: the refusal for each kind while something runs.
+The page asks every 4 s while a job runs and every 30 s otherwise, never from a hidden tab. Option A of the mockup: the server
+does not run the page-sent jobs itself.</li>
 </ul>
 
 <h2 id="t4-organisation">A deployment per organisation (28 Oct 2026, pilot readiness phase 3)</h2>
@@ -1370,10 +1406,11 @@ collisions and lines only. Offered first: nothing changes until a planner or adm
 alternative.</p>
 <p id="t9-one-fetch"><strong>One big fetch at a time (29 Oct 2026).</strong> The community considerations&rsquo; fetch and the
 collision history&rsquo;s fetch each read large files on a thread; run together on live they took the service over its memory and
-it restarted, killing both. Each start now takes one shared lock (<code>fetch_guard.LOCK</code>) and refuses while the other is
-running, with the sentence Config shows (&ldquo;The community considerations are being fetched. Fetch the collision history when that
-has finished.&rdquo; and the other way round). A run left &lsquo;running&rsquo; by a restart stops blocking once its own stale limit
-passes (community 30 min, collisions 45 min).</p>
+it restarted, killing both. Each start takes one shared lock (<code>fetch_guard.LOCK</code>) and refuses while the other is
+running. Since 23 Nov 2026 it refuses while ANY long job in the &ldquo;Working&rdquo; list runs, in that list&rsquo;s one
+sentence (&ldquo;The community places fetch is running. The collision history fetch can start when it finishes.&rdquo;;
+<a href="#t4-working">the &ldquo;Working&rdquo; list</a>), which replaced the two sentences of 29 Oct. A run left
+&lsquo;running&rsquo; by a restart stops blocking once its own stale limit passes (community 30 min, collisions 45 min).</p>
 <h1 id="t10-public-map">T10 The public map</h1>
 <p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
 <ul>

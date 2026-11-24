@@ -398,7 +398,10 @@ community._write_meta("running", dict(community._detail(community._meta_row()), 
 ok("⭐ 3c. a fetch started 45 minutes ago that beat a moment ago still reads running (it was 'failed' at 30 minutes)",
    community.status()["state"] == "running")
 r_ = community.start_refresh(by="x", sync=True, fetchers=FETCH, today=TODAY)
-ok("3c. ...so a second Fetch now is refused while it runs", r_["started"] is False and "already running" in r_["message"])
+# REVERSED 23 Nov 2026 (claude/working-list): refused in the "Working" list's one sentence, not "already running"
+ok("3c. ...so a second Fetch now is refused while it runs", r_["started"] is False and "already running" not in r_["message"]
+   and r_["message"] == "The community places fetch is running. The community places fetch can start when it finishes.",
+   str(r_.get("message")))
 community._write_meta("running", dict(community._detail(community._meta_row()), beat=_old_t), started_at=_old_t)
 ok("3c. one with no beat for 45 minutes reads failed (a restart killed it)", community.status()["state"] == "failed")
 _src_r = read("backend/community.py").split("def refresh(")[1].split("\ndef ")[0]
@@ -414,7 +417,10 @@ _main = read("backend/main.py").split("def community_refresh(")[1].split("\n@app
 ok("4. Fetch now (POST /api/community/refresh) calls start_refresh with no strip and no all_options: every option",
    "community.start_refresh(by=" in _main and "all_options" not in _main and "strip=" not in _main)
 ok("4. the one lock with the collision fetch is kept, and the fetch is never started by a page view",
-   "with fetch_guard.LOCK, _LOCK:" in _c and 'fetch_guard.other_running("community")' in _c)
+   # NARROWED 23 Nov 2026 (claude/working-list): the check under the one lock is working.refusal (any long job, the
+   # collision fetch included)
+   "with fetch_guard.LOCK, _LOCK:" in _c and 'working.refusal("community")' in _c
+   and 'fetch_guard.other_running(' not in _c)
 ok("4. the slice size measured on 16 Nov is set in the module (one pass), with its reason beside it",
    "SLICE_LINES = None" in _c and "measured" in _c.split("SLICE_LINES = None")[0][-300:])
 _rc = read("backend/route_compare.py")
