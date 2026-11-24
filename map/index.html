@@ -259,6 +259,15 @@
             #kpi-cards .kpi-sep{ display:none; }
         }
         @media (min-width:1024px) and (max-width:1279px){ #kpi-cards .kpi-card{ padding:0 8px; } }
+        /* 24 Nov 2026 (John: "Fix it tonight"): with the conditions chip showing, the cards were squeezed to their longest word (a label
+           on three lines, its figure higher than the rest) and the last ones ran under the chip. While the chip shows, a card keeps its
+           own width (a label at most 104 px, so two lines), the cards wrap, and every row after the first is cut off whole by the bar's
+           own 72 px box: a card that does not fit is not shown. Without the chip nothing here applies. */
+        @media (min-width:1024px){
+            #kpi-hud:has(#kpi-conditions.on) #kpi-cards{ flex-wrap:wrap; align-content:flex-start; overflow:hidden; }
+            #kpi-hud:has(#kpi-conditions.on) #kpi-cards .kpi-row{ display:contents; }
+            #kpi-hud:has(#kpi-conditions.on) #kpi-cards .kpi-card{ flex-shrink:0; height:100%; box-sizing:border-box; justify-content:flex-start; padding-top:6px; }
+        }
         .kpi-card.lead .kpi-label{ color:var(--muted); font-weight:400; }
         .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
         .layers-box > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
