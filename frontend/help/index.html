@@ -6,50 +6,53 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1F2024">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
-:root{--navy:#2563EB;--deep:#1F2024;--blue:#3B82F6;--green:#059669;--red:#DC2626;--gold:#D97706;--ink:#1E293B;--grey:#64748B;--line:#E2E8F0;--paper:#fff;--panel:#F8FAFC}
+:root{--navy:#0B4EA2;--deep:#1F2024;--blue:#0B4EA2;--green:#059669;--red:#DC2626;--gold:#D97706;--ink:#1F2024;--grey:#62656B;--line:#E1E2E4;--paper:#fff;--panel:#F5F5F6}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;font:15px/1.6 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
+body{margin:0;font:15px/1.6 'IBM Plex Sans',system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
+/* 24 Nov 2026 (the own look, claude/own-look-pages; notes\design-language-1123.md): Sora for headings, IBM Plex Sans for the
+   rest; neutral greys from the ink; the sign blue for links and what is chosen; one 6 px corner (3 px for code); no pill */
+h1,h2,h3,h4,#nav .brand{font-family:Sora,'IBM Plex Sans',system-ui,sans-serif}a{color:var(--navy)}
 #nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;background:var(--deep);color:rgba(255,255,255,.72);padding:18px 14px 30px;font-size:13px;border-right:2px solid #FF8C14}
-#nav .brand{color:#fff;font-weight:800;font-size:16px;line-height:1.2;margin:0 6px 14px}#nav .brand span{display:block;font-weight:500;color:rgba(255,255,255,.55);font-size:12px;margin-top:4px}
+#nav .brand{color:#fff;font-weight:700;font-size:16px;line-height:1.2;margin:0 6px 14px}#nav .brand span{display:block;font-weight:500;color:rgba(255,255,255,.55);font-size:12px;margin-top:4px}
 #nav .brand svg{display:block;height:34px;width:auto;margin-bottom:6px}
 #nav ol{list-style:none;margin:0;padding:0}#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}
 #nav li.l1 a{font-weight:700;color:#fff;margin-top:8px}#nav li.l2 a{padding-left:20px;font-size:12.5px}#nav li a:hover{background:rgba(255,255,255,.08)}
 main{margin-left:280px;padding:28px 44px 80px;max-width:1040px}
 h1{color:var(--deep);font-size:26px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--line)}h1:first-child{border-top:0;margin-top:0}
-h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:#1D4ED8;font-size:16px;margin:22px 0 6px}h4{font-size:15px;margin:16px 0 4px}
-p{margin:0 0 10px}p.muted{color:var(--grey);font-style:italic}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px}
-pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font:12.5px/1.45 Consolas,ui-monospace,monospace}
+h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:var(--deep);font-size:16px;margin:22px 0 6px}h4{font-size:15px;margin:16px 0 4px}
+p{margin:0 0 10px}p.muted{color:var(--grey);font-style:italic}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EDEEEF;padding:1px 4px;border-radius:3px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow:auto;font:12.5px/1.45 Consolas,ui-monospace,monospace}
 ul{margin:0 0 12px;padding-left:22px}li{margin:0 0 6px}
-.tbl{overflow-x:auto;margin:6px 0 18px}table{border-collapse:collapse;width:100%;font-size:13.5px}caption{text-align:left;font-weight:700;color:var(--navy);padding:0 0 6px}
-th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight:600}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--navy);white-space:nowrap}
-figure{margin:14px 0 22px;text-align:center}figure img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;box-shadow:0 2px 10px rgba(10,20,70,.08)}figcaption{color:var(--grey);font-size:13px;font-style:italic;margin-top:6px}
-.callout{border-left:5px solid;border-radius:8px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
-.callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:#1D4ED8}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}
+.tbl{overflow-x:auto;margin:6px 0 18px}table{border-collapse:collapse;width:100%;font-size:13.5px}caption{text-align:left;font-weight:700;color:var(--deep);padding:0 0 6px}
+th{background:#fff;color:var(--deep);text-align:left;padding:7px 9px;font-weight:600;border-bottom:2px solid var(--deep)}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--deep);white-space:nowrap}
+figure{margin:14px 0 22px;text-align:center}figure img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;box-shadow:0 2px 10px rgba(31,32,36,.08)}figcaption{color:var(--grey);font-size:13px;font-style:italic;margin-top:6px}
+.callout{border-left:5px solid;border-radius:6px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
+.callout.note{background:#F0F4F9;border-color:var(--blue)}.callout.note .ct{color:#0B4EA2}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}
 .callout.ok{background:#E6F4F1;border-color:var(--green)}.callout.ok .ct{color:#047857}.callout.tip{background:#FFF8E6;border-color:#B45309}.callout.tip .ct{color:#B45309}
-#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}
+#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:6px;font-size:12px}
 @media (max-width:900px){#nav{position:static;width:auto}main{margin-left:0;padding:18px 16px 60px}}
 /* 18 Oct 2026 (UI audit decision 10, #22): a skip link heads the contents — hidden at a desk until it has the focus (the
    list is a fixed column there), the first row of the list on a phone, where the 66 chapter rows sit above the text; those rows,
    the role buttons, the question buttons and "↑ top" are 44 px tall there (they were 30, 33, 40 and 35). No nested scroller. */
-.skip{position:absolute;left:8px;top:8px;z-index:9;padding:10px 14px;border-radius:8px;background:#fff;color:var(--navy);font-weight:600;text-decoration:none;transform:translateY(-200%)}
-.skip:focus{transform:none;outline:2px solid #FF8C14;outline-offset:2px}
+.skip{position:absolute;left:8px;top:8px;z-index:9;padding:10px 14px;border-radius:6px;background:#fff;color:var(--navy);font-weight:600;text-decoration:none;transform:translateY(-200%)}
+.skip:focus{transform:none;outline:2px solid var(--blue);outline-offset:2px}
 main:focus{outline:0}
 @media (max-width:900px){.skip{position:static;display:flex;align-items:center;min-height:44px;margin:0 0 8px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.1);color:#fff;transform:none}#nav li a{min-height:44px;padding:12px 8px}#roles button{min-height:44px}#top{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}.ts-q button{min-height:44px;padding:12px 13px}}
 @media print{#nav,#top{display:none}main{margin:0;padding:0;max-width:none}h1{page-break-before:always}h1:first-child{page-break-before:avoid}}
 
 /* 2026-09-14 — role switcher, troubleshooting, deep links */
 #roles{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line);margin:-28px -44px 18px;padding:12px 44px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-#roles .lab{font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.08em}
-#roles button{font:inherit;font-size:13px;padding:5px 13px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--grey);cursor:pointer}
-#roles button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600}
+#roles .lab{font-size:13px;font-weight:600;color:#44464B}
+#roles button{font:inherit;font-size:13px;padding:5px 13px;border-radius:6px;border:1px solid #C6C8CC;background:#fff;color:#44464B;cursor:pointer}
+#roles button[aria-pressed="true"]{background:rgba(11,78,162,.10);border-color:var(--navy);color:var(--navy);font-weight:600}
 #roles .who{font-size:12px;color:var(--grey);margin-left:auto}
 .ts-q{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;margin:14px 0 8px}
-.ts-q button{font:inherit;font-size:13.5px;text-align:left;padding:11px 13px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer;line-height:1.35}
-.ts-q button:hover{border-color:var(--blue);background:#F7FBFF}
-.ts-q button[aria-expanded="true"]{border-color:var(--navy);background:var(--panel);font-weight:600}
-.ts-a{display:none;border-left:5px solid var(--blue);background:#EEF4FB;border-radius:8px;padding:12px 15px;margin:4px 0 18px}
+.ts-q button{font:inherit;font-size:13.5px;text-align:left;padding:11px 13px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);cursor:pointer;line-height:1.35}
+.ts-q button:hover{border-color:var(--blue);background:var(--panel)}
+.ts-q button[aria-expanded="true"]{border-color:var(--navy);background:rgba(11,78,162,.10);color:var(--navy);font-weight:600}
+.ts-a{display:none;border-left:5px solid var(--blue);background:#F0F4F9;border-radius:6px;padding:12px 15px;margin:4px 0 18px}
 .ts-a.on{display:block}
 .ts-a .verdict{font-weight:700;margin-bottom:5px}
 .ts-a .verdict.fine{color:var(--green)}.ts-a .verdict.fault{color:var(--red)}
@@ -89,7 +92,7 @@ figcaption .go{font-style:normal;white-space:nowrap}
 <p>The menu on the left (the rail) has four groups: <strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner, Abnormal loads, Stockpiles, Pours, Simulation, CLP documents), <strong>TRACK</strong> (Look-ahead; Concerns — planners and admins only), <strong>DATA</strong> (Locations, Routes, Zones, Config — planners and admins only; Users — admins only) and <strong>MAP</strong> (<strong>Route map</strong>: the public map inside the app). Each page has an icon.</p>
 <ul><li><strong>Find a page…</strong> at the top filters the menu as you type; Enter opens the first match and Esc clears the box. <strong>Ctrl K</strong> (Cmd K on a Mac) opens the menu and jumps to the box from any page.</li><li>At the foot: <strong>User guide</strong> opens this guide in a new tab; <strong>‹ Collapse</strong> folds the menu to icons and <strong>›</strong> opens it again; under them, your name and your role or team.</li><li>The app remembers the page you were on and whether the menu was folded. A page your login cannot open falls back to the Dashboard.</li><li>For a planner, the Forecasts entry shows how many lines are Pending or Mixed (§5) while the menu is open.</li></ul>
 <p>In the header:</p>
-<ul><li><strong>Vehicle names</strong> — vehicles are named in English, as on Config → Vehicles. Small buttons to switch the names to another language appear (on a wide enough window) only when your organisation's vehicle list carries names in one; only the names on screen change. The demo's list is English only, so it has none.</li><li><strong>Appearance</strong> — the round, half-filled button picks the look: <strong>Ink</strong> (the default), <strong>Light</strong> or <strong>Dark</strong>, and under it the accent: <strong>Orange</strong> (the default), <strong>Blue</strong>, <strong>Blue shades</strong> or <strong>Orange shades</strong>, the colour of the buttons and of the chart series. In every accent the first series is the plan and the second what was delivered; a warning is a triangle and a problem a diamond beside its word, whatever the colours. It changes colours only, in this browser.</li><li>Your team's name (team code) or your role, and <strong>Sign out</strong>. On the demo, the place for your organisation's name reads "Your organisation's name appears here".</li><li>The staff pages are made for a desktop browser, ideally 1440 px wide or more. On a phone see §2.4. The public map has its own phone layout. Below 768 px the left menu shows its icons only; <strong>›</strong> at its foot opens it over the page until you pick one.</li></ul>
+<ul><li><strong>Vehicle names</strong> — vehicles are named in English, as on Config → Vehicles. Small buttons to switch the names to another language appear (on a wide enough window) only when your organisation's vehicle list carries names in one; only the names on screen change. The demo's list is English only, so it has none.</li><li><strong>Appearance</strong> — the round, half-filled button picks the look: <strong>Ink</strong> (the default), <strong>Light</strong> or <strong>Dark</strong>. On a chart the first series is the plan and the second what was delivered; a warning is a triangle and a problem a diamond beside its word, whatever the look. It changes colours only, in this browser.</li><li>Your team's name (team code) or your role, and <strong>Sign out</strong>. On the demo, the place for your organisation's name reads "Your organisation's name appears here".</li><li>The staff pages are made for a desktop browser, ideally 1440 px wide or more. On a phone see §2.4. The public map has its own phone layout. Below 768 px the left menu shows its icons only; <strong>›</strong> at its foot opens it over the page until you pick one.</li></ul>
 <figure><img src="media/D01.png" alt="The Dashboard in the Dark look" width="1440" height="760" loading="lazy"><figcaption>Figure 4 — The Dashboard in the Dark look &nbsp;·&nbsp; <a class="go" href="/#dashboard" target="_blank" rel="noopener">open it in the app &rarr;</a></figcaption></figure>
 <h2 id="2-3-on-the-demo-scheme-the-bar-and-the-tour">2.3 On the demo scheme: the bar and the tour</h2>
 <p>On the demo, every screen — the public map, its password box, sign-in and every page — has a bar under the header that reads <strong>DEMO · FICTIONAL SCHEME</strong>. Your organisation's own site has no bar and no tour.</p>

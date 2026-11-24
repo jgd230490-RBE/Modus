@@ -221,7 +221,7 @@ function gradeRules(stop, m, pins) {
 }
 
 // ---------------------------------------------------------------- in Node: comparing two runs ----------------------
-const stopKey = (s) => `${s.name}|${s.width}|${s.look}|${s.accent}`;
+const stopKey = (s) => `${s.name}|${s.width}|${s.look}`;   // 24 Nov 2026 (own look, stage 5): no accent axis
 // prev, now: the two reports. Returns { words: [...], ready: [...], unsettled: [...], earlierMeasured } — a row per stop both
 // runs measured; `warn` set on the rows that cross the limits. A stop the earlier run did not measure (an older run: no
 // `words`) gets no row. A stop that had not finished loading in EITHER run (a not-settled or ready-none warning) gets no row
@@ -248,10 +248,10 @@ function compareRules(prev, now) {
   }
   return { words, ready, unsettled, earlierMeasured };
 }
-// a compare's new finding keys (name|width|look|accent|id|…) split: those of a rule check the earlier run did not have are
+// a compare's new finding keys (name|width|look|id|…) split: those of a rule check the earlier run did not have are
 // FIRST MEASURED, not new; the compare-time ids are never findings
 function splitFindings(keys, earlierMeasured) {
-  const idOf = (k) => k.split("|")[4];
+  const idOf = (k) => k.split("|")[3];   // 24 Nov 2026 (own look, stage 5): no accent in the key, so the id is the 4th part
   const fresh = [], first = [];
   for (const k of keys) { const id = idOf(k); if (COMPARE_IDS.includes(id)) continue; (!earlierMeasured && RULE_IDS.includes(id) ? first : fresh).push(k); }
   return { fresh, first };
@@ -266,8 +266,8 @@ function prLines(report) {
   const failIds = new Set();
   for (const s of report.stops || []) for (const ch of s.checks || []) if (!ch.ok) failIds.add(stopKey(s) + "|" + ch.id);
   if (c) {
-    const newFail = (c.newFindings || []).filter(k => failIds.has(k.split("|").slice(0, 5).join("|")));
-    L.push(`- **New failing checks:** ${newFail.length}${newFail.length ? " — " + [...new Set(newFail.map(k => k.split("|").slice(0, 5).join(" ")))].slice(0, 12).join("; ") : ""}`);
+    const newFail = (c.newFindings || []).filter(k => failIds.has(k.split("|").slice(0, 4).join("|")));
+    L.push(`- **New failing checks:** ${newFail.length}${newFail.length ? " — " + [...new Set(newFail.map(k => k.split("|").slice(0, 4).join(" ")))].slice(0, 12).join("; ") : ""}`);
     if (c.firstMeasured && c.firstMeasured.length) L.push(`  (${c.firstMeasured.length} finding(s) of the rule checks are FIRST MEASURED: the earlier run had no rule measures, so they are not counted as new)`);
     const w = (c.rules && c.rules.words) || [];
     if (!c.rules || !c.rules.earlierMeasured) L.push("- **Screen words +/−:** the earlier run has no word counts (made before the rule measures); the next compare has them");

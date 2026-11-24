@@ -1543,7 +1543,7 @@ def leaflet_html(S):
             f"<title>{e(S['brand_title'])} · {ONE_PAGE} · {e(S['tenant'])}</title>"
             "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\">"
             "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">"
-            "<link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap\" rel=\"stylesheet\">"
+            "<link href=\"https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\">"
             f"<style>{LEAFLET_CSS}</style></head><body data-bulletin=\"leaflet\">"
             + _band_html(S, ONE_PAGE) + "<main>" + notice
             + f'<h1>Lorries on your roads in {e(S["month_long"])}</h1><div class="figs">{head}</div>'
@@ -1566,12 +1566,16 @@ def _report_html(S):
 
 
 # 13 Oct 2026 (D43): the leaflet page's own stylesheet — the newsletter page's rules it needs, nothing below 14 px
+# 24 Nov 2026 (the own look, claude/own-look-pages): the WEB pages take Sora for headings and figures and IBM Plex Sans for
+# the rest, the neutral greys, the sign blue #0B4EA2 for the button, links and focus, one 6 px corner and sentence-case
+# labels; the PDFs keep Inter (export.py, untouched)
 LEAFLET_CSS = (":root{color-scheme:light} *{box-sizing:border-box} body{margin:0;background:#fff;color:#1F2024;"
-               "font:16px/1.5 Inter,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}"
+               "font:16px/1.5 'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}"
+               " h1,h2,.band-t,.fig .v{font-family:Sora,'IBM Plex Sans',sans-serif}"
                " main{max-width:880px;margin:0 auto;padding:16px} .lede{font-size:17px}"
                " .band{background:#1F2024;color:#fff} .band-in{max-width:880px;margin:0 auto;padding:14px 16px 12px}"
                " .band-in .brand-logo{display:block;height:30px;width:auto;margin-bottom:6px}"
-               " .band-t{font-size:23px;font-weight:700;line-height:1.25} .band-s{font-size:14px;color:#C9CED6}"
+               " .band-t{font-size:23px;font-weight:700;line-height:1.25} .band-s{font-size:14px;color:#C9CACE}"
                " .band-rule{height:4px;background:linear-gradient(90deg,#FF8312,#FFA10A)}"
                " .notice{display:inline-block;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-bottom-width:3px;"
                "border-radius:6px;padding:3px 12px;font-size:14px;font-weight:700}"
@@ -1579,32 +1583,33 @@ LEAFLET_CSS = (":root{color-scheme:light} *{box-sizing:border-box} body{margin:0
                "border-radius:3px;background:#B91C1C;color:#FFFFFF;letter-spacing:.08em}"
                " .figs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}"
                " @media (min-width:720px){.figs{grid-template-columns:repeat(4,minmax(0,1fr))}}"
-               " .fig{border:1px solid #E7E5E4;border-radius:8px;padding:10px 12px}"
-               " .fig .v{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums} .fig .l{font-size:14px;color:#57534E}"
-               " svg{width:100%;height:auto;display:block} svg .pin{fill:#fff;font:700 14px Inter,Arial,sans-serif}"
-               " svg .tagt{fill:#B91C1C;font:700 14px Inter,Arial,sans-serif}"
-               " .mapwrap{overflow-x:auto} .mapwrap svg{min-width:720px} .mapwrap:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}"
+               " .fig{border:1px solid #E1E2E4;border-radius:6px;padding:10px 12px}"
+               " .fig .v{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums} .fig .l{font-size:14px;color:#62656B}"
+               " svg{width:100%;height:auto;display:block} svg .pin{fill:#fff;font:700 14px 'IBM Plex Sans',Arial,sans-serif}"
+               " svg .tagt{fill:#B91C1C;font:700 14px 'IBM Plex Sans',Arial,sans-serif}"
+               " .mapwrap{overflow-x:auto} .mapwrap svg{min-width:720px} .mapwrap:focus-visible{outline:2px solid #0B4EA2;outline-offset:2px}"
                " .mapframe{position:relative} .maptag,.maphint{display:none}"
                " @media (max-width:759px){.maptag{display:block;position:absolute;left:7px;top:7px;background:#fff;border:1.5px solid #B91C1C;"
-               "border-radius:3px;color:#B91C1C;font:700 14px Inter,Arial,sans-serif;padding:2px 6px;pointer-events:none}"
-               " .mapwrap svg .map-tag{display:none} .maphint{display:block;font-size:14px;color:#57534E;margin:4px 0 0}}"
-               " .legend{font-size:14px;color:#57534E;margin:6px 0}"
+               "border-radius:3px;color:#B91C1C;font:700 14px 'IBM Plex Sans',Arial,sans-serif;padding:2px 6px;pointer-events:none}"
+               " .mapwrap svg .map-tag{display:none} .maphint{display:block;font-size:14px;color:#62656B;margin:4px 0 0}}"
+               " .legend{font-size:14px;color:#62656B;margin:6px 0}"
                " .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;"
                "border:1px solid rgba(0,0,0,.08)} .cc-legend .lg{display:inline-block;margin-right:12px;white-space:nowrap}"
                " h2{font-size:19px;margin:24px 0 8px;padding-top:12px;border-top:2px solid #1F2024} p,li{font-size:15px}"
-               " .report{background:#FFF4E8;border-left:5px solid #FF8312;border-radius:4px;padding:10px 14px;margin:16px 0}"
+               " .report{background:#FFF4E8;border-left:5px solid #FF8312;border-radius:6px;padding:10px 14px;margin:16px 0}"
                " .report p{margin:4px 0} h1{font-size:28px;line-height:1.2;margin:16px 0 8px}"
-               " .def{font-size:14px;color:#57534E;margin:4px 0 0} h2.mt{border-top:0;padding-top:0}"
-               " .credit{white-space:nowrap} svg .sc{fill:#1F2024;font:14px Inter,Arial,sans-serif}"
+               " .def{font-size:14px;color:#62656B;margin:4px 0 0} h2.mt{border-top:0;padding-top:0}"
+               " .credit{white-space:nowrap} svg .sc{fill:#1F2024;font:14px 'IBM Plex Sans',Arial,sans-serif}"
                " .key{display:grid;grid-template-columns:1fr;gap:4px 24px;margin:10px 0}"
                " @media (min-width:720px){.key{grid-template-columns:2fr 1fr}}"
-               " .key h3{font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:#57534E;margin:0 0 4px;"
-               "border-bottom:1px solid #E7E5E4;padding-bottom:2px} .kl{list-style:none;margin:0;padding:0}"
+               " .key h3{font-size:14px;font-weight:600;color:#44464B;margin:0 0 4px;"
+               "border-bottom:1px solid #E1E2E4;padding-bottom:2px} .kl{list-style:none;margin:0;padding:0}"
                " .kl li{font-size:15px;margin:2px 0} .kl.two{columns:2;column-gap:24px} .amber{color:#D97706}"
-               " .btn{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:6px;background:#C2410C;"
-               "color:#fff;font-weight:600;text-decoration:none;font-size:15px} .muted{color:#57534E;font-size:14px}"
+               " .btn{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:6px;background:#0B4EA2;"
+               "color:#fff;font-weight:600;text-decoration:none;font-size:15px} .muted{color:#62656B;font-size:14px} a{color:#0B4EA2}"
+               " a.btn{color:#fff}"
                # 12 Nov 2026 (seen on live): `svg{display:block}` above is the map's; the footer's mark stays in the line
-               " footer{margin:28px 0 12px;font-size:14px;color:#57534E} footer .brand-logo{display:inline-block;height:16px;width:auto;vertical-align:-3px}"
+               " footer{margin:28px 0 12px;font-size:14px;color:#62656B} footer .brand-logo{display:inline-block;height:16px;width:auto;vertical-align:-3px}"
                " @media print{@page{size:A4;margin:12mm} .actions,.btn{display:none} .mapwrap svg{min-width:0}"
                " .band,.band-rule{-webkit-print-color-adjust:exact;print-color-adjust:exact}}")
 
@@ -1835,15 +1840,16 @@ def html(S):
 <title>{page_title}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
-:root{{color-scheme:light;--ink:{INK};--muted:{MUTED};--line:#E7E5E4;--plan:{PLAN_BLUE};--tint:{PLAN_TINT};--flag:{FLAG_RED};--amber:{CLOSURE_AMBER};--head:#F1F5F9}}
+:root{{color-scheme:light;--ink:{INK};--muted:#62656B;--line:#E1E2E4;--plan:{PLAN_BLUE};--tint:{PLAN_TINT};--flag:{FLAG_RED};--amber:{CLOSURE_AMBER};--head:#F5F5F6;--sign:#0B4EA2}}
 *{{box-sizing:border-box}}
-body{{margin:0;background:#fff;color:var(--ink);font:16px/1.5 Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
+body{{margin:0;background:#fff;color:var(--ink);font:16px/1.5 'IBM Plex Sans',-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
+h1,h2,.kick,.band-t,.fig .v{{font-family:Sora,'IBM Plex Sans',sans-serif}} a{{color:var(--sign)}}   /* 24 Nov 2026 (the own look): the web page in Sora and IBM Plex Sans, neutral greys, the sign blue; the PDFs keep their own type */
 main{{max-width:880px;margin:0 auto;padding:16px}}
 h1{{font-size:26px;line-height:1.2;margin:8px 0 4px}}
 h2{{font-size:19px;margin:28px 0 8px}} h2.mt{{margin-top:20px}}
-.kick{{font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#C2410C;margin:40px 0 0;padding-top:12px;border-top:2px solid var(--ink)}}
+.kick{{font-size:14px;font-weight:700;color:#C2410C;margin:40px 0 0;padding-top:12px;border-top:2px solid var(--ink)}}
 .kick+h2{{margin-top:6px}}
 p,li,dd,td,th{{font-size:15px}}
 .muted{{color:var(--muted)}} .amber{{color:var(--amber)}}
@@ -1854,45 +1860,45 @@ p,li,dd,td,th{{font-size:15px}}
 .def{{font-size:14px;color:var(--muted);margin:4px 0 0}}
 .figs{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0 4px}}
 @media (min-width:720px){{.figs{{grid-template-columns:repeat(4,minmax(0,1fr))}}}}
-.fig{{border:1px solid var(--line);border-radius:8px;padding:10px 12px}}
+.fig{{border:1px solid var(--line);border-radius:6px;padding:10px 12px}}
 .fig .v{{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}} .fig .l{{font-size:14px;color:var(--muted)}}
 .actions{{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}}
-.btn{{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:6px;background:#C2410C;color:#fff;font-weight:600;text-decoration:none;font-size:15px}}
-.lnk{{display:inline-flex;align-items:center;min-height:44px;color:#1D4ED8;font-size:15px}}
-.nav{{display:flex;justify-content:space-between;margin:6px 0}} .nav a{{min-height:44px;display:inline-flex;align-items:center;color:#1D4ED8}}
-svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px Inter,Arial,sans-serif}} svg .sc{{fill:var(--ink);font:14px Inter,Arial,sans-serif}}
+.btn{{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:6px;background:var(--sign);color:#fff;font-weight:600;text-decoration:none;font-size:15px}}
+.lnk{{display:inline-flex;align-items:center;min-height:44px;color:var(--sign);font-size:15px}}
+.nav{{display:flex;justify-content:space-between;margin:6px 0}} .nav a{{min-height:44px;display:inline-flex;align-items:center;color:var(--sign)}}
+svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px 'IBM Plex Sans',Arial,sans-serif}} svg .sc{{fill:var(--ink);font:14px 'IBM Plex Sans',Arial,sans-serif}}
 .mapwrap{{overflow-x:auto;border:1px solid var(--line)}} .mapwrap svg{{min-width:720px}}   /* the map's 14 px pin letters never scale below 14 px: it scrolls instead */
 .mapframe{{position:relative}} .maptag,.maphint{{display:none}}   /* 10 Nov 2026 (UI critique 25d): on a phone the map scrolls; it opens centred (MAP_CENTRE_JS), its demo tag is pinned over the corner you see and one line says it moves */
-@media (max-width:759px){{.maptag{{display:block;position:absolute;left:7px;top:7px;background:#fff;border:1.5px solid #B91C1C;border-radius:3px;color:#B91C1C;font:700 14px Inter,Arial,sans-serif;padding:2px 6px;pointer-events:none}} .mapwrap svg .map-tag{{display:none}} .maphint{{display:block;font-size:14px;color:var(--muted);margin:4px 0 0}}}}
+@media (max-width:759px){{.maptag{{display:block;position:absolute;left:7px;top:7px;background:#fff;border:1.5px solid #B91C1C;border-radius:3px;color:#B91C1C;font:700 14px 'IBM Plex Sans',Arial,sans-serif;padding:2px 6px;pointer-events:none}} .mapwrap svg .map-tag{{display:none}} .maphint{{display:block;font-size:14px;color:var(--muted);margin:4px 0 0}}}}
 .legend{{font-size:14px;color:var(--muted);margin:6px 0}} .credit{{white-space:nowrap}}
 .key{{display:grid;grid-template-columns:1fr;gap:4px 24px;margin:12px 0}} @media (min-width:720px){{.key{{grid-template-columns:2fr 1fr}}}}
-.key h3{{font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;border-bottom:1px solid var(--line);padding-bottom:2px}}
+.key h3{{font-size:14px;font-weight:600;color:#44464B;margin:0 0 4px;border-bottom:1px solid var(--line);padding-bottom:2px}}
 .kl{{list-style:none;margin:0;padding:0}} .kl li{{margin:2px 0}} .kl.two{{columns:2;column-gap:24px}}
 .tw{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line)}}
-.mapwrap:focus-visible,.tw:focus-visible{{outline:2px solid #1D4ED8;outline-offset:2px}}   /* the wrappers that scroll on a phone are tab stops (tabindex 0, a named region): a ring says where the focus is */
+.mapwrap:focus-visible,.tw:focus-visible{{outline:2px solid #0B4EA2;outline-offset:2px}}   /* the wrappers that scroll on a phone are tab stops (tabindex 0, a named region): a ring says where the focus is */
 th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}} td.n,th.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
 td.flag{{color:var(--flag);font-weight:700}} td.near{{color:#B45309;font-weight:700}} tr.this td{{font-weight:700}} td.lt{{color:var(--muted);white-space:nowrap}}
 td.bar{{min-width:200px;white-space:nowrap}} .bn{{display:inline-block;width:2.2em;text-align:right;font-weight:700;margin-right:8px;font-variant-numeric:tabular-nums}}
-.bt{{position:relative;display:inline-block;width:calc(100% - 3em);height:12px;vertical-align:-1px}} .bf{{position:absolute;left:0;top:0;bottom:0;border-radius:2px}}
+.bt{{position:relative;display:inline-block;width:calc(100% - 3em);height:12px;vertical-align:-1px}} .bf{{position:absolute;left:0;top:0;bottom:0;border-radius:3px}}
 .bc{{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--flag)}}
 dl.terms{{display:grid;grid-template-columns:1fr;gap:2px 16px}} @media (min-width:720px){{dl.terms{{grid-template-columns:11em 1fr}}}}
 dt{{font-weight:700}} dd{{margin:0 0 6px}}
-.report{{background:#FFF4E8;border-left:5px solid #FF8312;border-radius:4px;padding:10px 14px;margin:16px 0}} .report p{{margin:4px 0}}
+.report{{background:#FFF4E8;border-left:5px solid #FF8312;border-radius:6px;padding:10px 14px;margin:16px 0}} .report p{{margin:4px 0}}
 .empty{{background:#FFFBEB;border-left:3px solid var(--amber);padding:10px 14px}}
 footer{{margin:28px 0 12px;font-size:14px;color:var(--muted)}}
 tr.nr td{{color:var(--muted)}} tr.nr td.n{{font-style:italic}}
 .sw{{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.08)}}
 .cc-legend .lg{{display:inline-block;margin-right:12px;white-space:nowrap}}
 .dn{{display:inline-flex;align-items:baseline}} .dn .sw{{flex:none}}   /* 13 Oct 2026: the square never wraps away from its name */
-.band{{background:#1F2024;color:#fff}} .band-in{{max-width:880px;margin:0 auto;padding:14px 16px 12px}} .band-in .brand-logo{{display:block;height:30px;width:auto;margin-bottom:6px}} .band-t{{font-size:23px;font-weight:700;line-height:1.25}} .band-s{{font-size:14px;color:#C9CED6}} .band-rule{{height:4px;background:linear-gradient(90deg,#FF8312,#FFA10A)}} .brief li{{margin:4px 0}} svg .tagt{{fill:#B91C1C;font:700 14px Inter,Arial,sans-serif}} footer .brand-logo{{height:16px;width:auto;vertical-align:-3px}}
+.band{{background:#1F2024;color:#fff}} .band-in{{max-width:880px;margin:0 auto;padding:14px 16px 12px}} .band-in .brand-logo{{display:block;height:30px;width:auto;margin-bottom:6px}} .band-t{{font-size:23px;font-weight:700;line-height:1.25}} .band-s{{font-size:14px;color:#C9CACE}} .band-rule{{height:4px;background:linear-gradient(90deg,#FF8312,#FFA10A)}} .brief li{{margin:4px 0}} svg .tagt{{fill:#B91C1C;font:700 14px 'IBM Plex Sans',Arial,sans-serif}} footer .brand-logo{{height:16px;width:auto;vertical-align:-3px}}
 .lot{{border-top:2px solid var(--ink)}} .lot>p:first-child{{margin:8px 0}} .lot-row{{display:grid;grid-template-columns:1fr;gap:0 16px;border-bottom:1px solid var(--line);padding:8px 0}}
 @media (min-width:720px){{.lot-row{{grid-template-columns:13em 1fr}}}}
-.lot-l{{font-size:14px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}} .lot-row p{{margin:0}}
+.lot-l{{font-size:14px;font-weight:600;color:#44464B}} .lot-row p{{margin:0}}
 .lot-src{{font-size:14px;color:var(--muted)}} .lot-demo{{color:#B91C1C;font-weight:600}} .lot-st{{white-space:nowrap}}
 sup{{font-size:14px;line-height:0}} sup a{{color:var(--muted);text-decoration:none;padding:0 2px}}
 ol.src{{padding-left:24px}} ol.src li{{font-size:14px;color:var(--muted);margin:3px 0}}
 @media (min-width:720px){{ol.src{{columns:2;column-gap:28px}} ol.src li{{break-inside:avoid}}}}
-svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}} svg .cn{{font-weight:700}}
+svg .cl{{fill:var(--ink);font:14px 'IBM Plex Sans',Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}} svg .cn{{font-weight:700}}
 @media print{{
   @page{{size:A4;margin:14mm}}
   body{{font-size:11pt}} main{{max-width:none;padding:0}}

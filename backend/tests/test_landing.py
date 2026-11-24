@@ -619,5 +619,17 @@ ok("privacy notice: the older pinned sentences are still there (no tracking cook
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")
 
+# 24 Nov 2026 (the own look, claude/own-look-pages; notes\design-language-1123.md): CEILINGS that may only come down while
+# John decides whether the landing family (the landing pages and the tool pages, one set of tokens) takes the sign blue in
+# place of its orange buttons. The landing pages already use Sora and IBM Plex Sans; nothing on them was changed.
+import glob as _own_glob
+_own_pages = {os.path.basename(f): open(f, encoding="utf-8").read() for f in sorted(_own_glob.glob(os.path.join(ROOT, "landing", "*.html")))}
+ok("OWN LOOK: every landing page is read for the ceilings (%d pages)" % len(_own_pages), len(_own_pages) >= 5 and "index.html" in _own_pages)
+ok("🔴 OWN LOOK: no landing page loads or names Inter (ceiling 0)", not any(re.search(r"\bInter\b", t) for t in _own_pages.values()))
+ok("🔴 OWN LOOK: no landing page uses the stock blue #2563EB / #3B82F6 (ceiling 0)",
+   not any(re.search(r"#(2563EB|3B82F6)\b", t, re.I) for t in _own_pages.values()))
+ok("🔴 OWN LOOK: the landing pages' 999px corners stay at 3 or fewer (24 Nov: index.html 2, tools.html 1; the own look wants 0)",
+   sum(t.count("999px") for t in _own_pages.values()) <= 3)
+
 print(f"test_landing.py: {passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)
