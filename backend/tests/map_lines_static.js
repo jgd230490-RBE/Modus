@@ -205,6 +205,54 @@ ok("F5 the key's badge rows follow the switch (badgesOn: Labels \"All\"), and a 
    && (code.match(/badgesOn\(\) \? '<div class="ml-row ml-key">/g) || []).length === 2
    && /LABELS\.mode = mode;\s*applyLabels\(true\); syncLabelsSwitch\(\);\s*try \{ if \(typeof renderModeLegends === 'function'/.test(code));
 
+// ---------------------------------------------------------------------------------------------------------------
+console.log("G. Card 6: the picked route in ink on a sign-blue halo, and easy to hit");
+ok("G1 the pick's paint: ink #1F2024 on white, the halo #0B4EA2 at 0.3; no green / amber left on the pick",
+   code.includes("const SEL = { core: '#1F2024', coreDark: '#F5F5F4', casing: '#ffffff', casingDark: '#1F2024', glow: '#0B4EA2', glowOpacity: 0.3 };")
+   && /id:'sel-core'[^\n]*'line-color':selPaint\(\)\.core,/.test(code) && /id:'sel-glow'[^\n]*'line-color':SEL\.glow,[^\n]*'line-opacity':SEL\.glowOpacity,/.test(code)
+   && !/'#059669','Outbound Highway','#f59e0b'/.test(code));
+ok("G2 kept: the other routes dim as before (0.42, setRouteDim on a pick, cleared on none)",
+   code.includes("const DIM_OPACITY = 0.42;") && /setRouteDim\(routeId\);/.test(code) && /setRouteDim\(null\);/.test(code));
+let selOk = false, selDark = null, selLight = null;
+try {
+  const S = vm.runInContext("({ SEL, applySelLook })", sb);
+  ['sel-core', 'sel-casing', 'sel-glow'].forEach(l => { sb.layers[l] = {}; });
+  sb.DARK = false; S.applySelLook(); selLight = [P('sel-core', 'line-color'), P('sel-casing', 'line-color'), P('sel-glow', 'line-color'), P('sel-glow', 'line-opacity')];
+  sb.DARK = true; sb.applyLegLook(); selDark = [P('sel-core', 'line-color'), P('sel-casing', 'line-color')];
+  sb.DARK = false; selOk = true;
+} catch (e) { selOk = e.message; }
+ok("G3 sandbox: light ground — ink core, white casing, sign-blue halo at 0.3", selOk === true
+   && JSON.stringify(selLight) === JSON.stringify(['#1F2024', '#ffffff', '#0B4EA2', 0.3]), [selOk, selLight]);
+ok("G4 sandbox: a dark ground (through applyLegLook, as the basemap / light switch calls it) — a pale core on a dark casing",
+   selOk === true && JSON.stringify(selDark) === JSON.stringify(['#F5F5F4', '#1F2024']) && contrast('#F5F5F4', '#1F2024') >= 7, selDark);
+// the click box: the point first, then ROUTE_HIT_PAD px either side; never a wider line
+const hitSrc = between("    const ROUTE_HIT_PAD = ", "    (function initAnalysis(){");
+const hb = { calls: [], answer: [] };
+hb.map = { getLayer: id => id !== 'nope', queryRenderedFeatures: (q, o) => { hb.calls.push([q, o.layers]); return hb.answer.shift() || []; } };
+vm.createContext(hb);
+let hErr = "";
+try { vm.runInContext(hitSrc + "\nthis.routeHitsAt = routeHitsAt; this.PAD = ROUTE_HIT_PAD;", hb); } catch (e) { hErr = e.message; }
+ok("G5 sandbox: routeHitsAt runs", typeof hb.routeHitsAt === "function", hErr);
+if (typeof hb.routeHitsAt === "function") {
+  hb.answer = [[{ id: 'on' }]]; hb.calls = [];
+  const a = hb.routeHitsAt({ x: 100, y: 50 }, ['forecast-layer', 'nope']);
+  ok("G6 a hit on the line answers from the point alone (one query, the layers that exist)",
+     a.length === 1 && a[0].id === 'on' && hb.calls.length === 1 && JSON.stringify(hb.calls[0][1]) === '["forecast-layer"]');
+  hb.answer = [[], [{ id: 'near' }]]; hb.calls = [];
+  const b = hb.routeHitsAt({ x: 100, y: 50 }, ['forecast-layer']);
+  ok("G7 a miss asks a box 5 px either side of the point", b.length === 1 && b[0].id === 'near' && hb.PAD === 5
+     && JSON.stringify(hb.calls[1][0]) === JSON.stringify([[95, 45], [105, 55]]));
+  hb.calls = [];
+  ok("G8 no layer or no point: nothing, and no query", hb.routeHitsAt({ x: 1, y: 1 }, ['nope']).length === 0 && hb.routeHitsAt(null, ['forecast-layer']).length === 0 && hb.calls.length === 0);
+}
+const ia = between("    (function initAnalysis(){", "    })();");
+ok("G9 a click on a line keeps its own layer's handler; a near miss goes through the same routeClick, unless something with a click of its own is under it; else the pick clears",
+   /map\.on\('click', lid, \(e\)=>\{\s*if\(!e\.features\|\|!e\.features\.length\) return;\s*routeClick\(e, e\.features\[0\]\);/.test(ia)
+   && /if\(hits\.length\) return;[\s\S]{0,300}const near=routeHitsAt\(e\.point, routeLayers\);\s*if\(near\.length && !\(typeof clickableAt === 'function' && clickableAt\(e\.point\)\)\)\{ routeClick\(e, near\[0\]\); return; \}\s*clearSelection\(\);/.test(ia));
+ok("G10 the hover asks the same box (the hand and the tip within 5 px of a line), and the line widths are not widened for it",
+   /map\.on\('mousemove', \(e\) => \{\s*(\/\/[^\n]*\n\s*)?let features = routeHitsAt\(e\.point, interactiveLayers\);/.test(html)
+   && html.includes("const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];"));
+
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

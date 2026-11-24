@@ -2728,7 +2728,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // 4. one hover handler
   ok("hover: ONE mousemove handler queries the three route layers (the forEach registered it three times and never used its argument)",
      (code.match(/map\.on\('mousemove'/g) || []).length === 1 && !code.includes("interactiveLayers.forEach")
-     && code.includes("map.on('mousemove', (e) => {\n                    let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });"));
+     // NARROWED 24 Nov 2026 (the route lines mockup, card 6): the one query is routeHitsAt (the point, then a box ROUTE_HIT_PAD px
+     // either side when the point finds no line), so a thinner line is as easy to reach
+     && /map\.on\('mousemove', \(e\) => \{\s*let features = routeHitsAt\(e\.point, interactiveLayers\);/.test(code));
   // 5. the demo strip on a phone
   ok("mobile: the demo strip is 14 px below 1024 (was 9.5), wrapping, and the offsets under it follow its MEASURED height (--notice-h, 26 px floor)",
      // NARROWED 13 Oct 2026 (D45, Option A): the strip's rule is 3 px (was 1 px)
@@ -6613,10 +6615,13 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
               geometry: { type: 'LineString', coordinates: [[-0.9008, 52.5], [-0.9008, 52.502]] } }] }).features.length === 2);
     }
   }
-  ok("⭐ 23 Oct: a clicked route — a blue halo (the accent, never the breach red), its own casing and colours re-drawn on top, under the labels; the rest dim to 0.42",
-     /id:'sel-glow'[^\n]*'line-color':CONFIG\.COLORS\.brand,'line-width':14,'line-opacity':0\.28,'line-blur':3,'line-offset':SEL_OFFSET\}\}, labelAnchor\(\)\);/.test(code)
-     && /id:'sel-casing'[^\n]*'line-color':'#ffffff','line-width':SEL_CASING_WIDTH/.test(code)
-     && /id:'sel-core'[^\n]*'line-color':\['match',\['get','type'\],'Inbound Highway','#059669','Outbound Highway','#f59e0b',CONFIG\.COLORS\.brand\]/.test(code)
+  ok("⭐ 23 Oct: a clicked route — a blue halo (the sign blue, never the breach red), its casing and an ink line re-drawn on top, under the labels; the rest dim to 0.42 (NARROWED 24 Nov 2026)",
+     // NARROWED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, card 6): the halo is the sign blue #0B4EA2
+     // at 0.3 (was the accent at 0.28); the picked route is INK on its casing (was its own green / amber), pale on a dark ground
+     /id:'sel-glow'[^\n]*'line-color':SEL\.glow,'line-width':14,'line-opacity':SEL\.glowOpacity,'line-blur':3,'line-offset':SEL_OFFSET\}\}, labelAnchor\(\)\);/.test(code)
+     && /const SEL = \{ core: '#1F2024', coreDark: '#[0-9A-F]{6}', casing: '#ffffff', casingDark: '#[0-9A-F]{6}', glow: '#0B4EA2', glowOpacity: 0\.3 \};/.test(code)
+     && /id:'sel-casing'[^\n]*'line-color':selPaint\(\)\.casing,'line-width':SEL_CASING_WIDTH/.test(code)
+     && /id:'sel-core'[^\n]*'line-color':selPaint\(\)\.core,/.test(code) && !/'#059669','Outbound Highway','#f59e0b'/.test(code)
      && !/sel-(glow|core|casing)[^\n]*CONFIG\.COLORS\.selection/.test(code)
      && /const DIM_OPACITY = 0\.42;/.test(code) && /function setRouteDim\(routeId\)\{/.test(code) && /\['case', \['==', \['get', 'route_id'\], routeId\], 1, DIM_OPACITY\] : 1/.test(code)
      && /setRouteDim\(routeId\);/.test(code) && /setRouteDim\(null\);/.test(code));

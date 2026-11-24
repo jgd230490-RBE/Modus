@@ -3073,6 +3073,21 @@
                 map.setPaintProperty('route-alt-lines', 'line-width', NET.altWidth);
             }
         } catch (e) {}
+        applySelLook();     // 24 Nov 2026 (card 6): the picked route follows the ground too
+    }
+    // 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, card 6): a picked route is drawn in INK (both legs:
+    // the green / amber gone with them) on its white casing, over a soft sign-blue halo; on a dark ground a pale line on a
+    // dark casing. The dim of the other routes is as before (setRouteDim).
+    const SEL = { core: '#1F2024', coreDark: '#F5F5F4', casing: '#ffffff', casingDark: '#1F2024', glow: '#0B4EA2', glowOpacity: 0.3 };
+    function selPaint(){ const d = netDark(); return { core: d ? SEL.coreDark : SEL.core, casing: d ? SEL.casingDark : SEL.casing }; }
+    function applySelLook(){
+        if (!map || !map.getLayer) return;
+        const p = selPaint();
+        try {
+            if (map.getLayer('sel-core')) map.setPaintProperty('sel-core', 'line-color', p.core);
+            if (map.getLayer('sel-casing')) map.setPaintProperty('sel-casing', 'line-color', p.casing);
+            if (map.getLayer('sel-glow')) { map.setPaintProperty('sel-glow', 'line-color', SEL.glow); map.setPaintProperty('sel-glow', 'line-opacity', SEL.glowOpacity); }
+        } catch (e) {}
     }
     //: a leg (and its haul pieces) on the month's forecast is not drawn as a leg: the forecast line is drawn in its place.
     //: With no month on screen no feature is on the forecast, so this lets every leg through.
@@ -6817,7 +6832,8 @@
                 const interactiveLayers = ['inbound-lines', 'outbound-lines', 'forecast-layer'];
                 // the layer list is filtered at each move, in case a layer is added later
                 map.on('mousemove', (e) => {
-                    let features = map.queryRenderedFeatures(e.point, { layers: interactiveLayers.filter(l => map.getLayer(l)) });
+                    // 24 Nov 2026 (card 6): within ROUTE_HIT_PAD px of a thin line, as the click
+                    let features = routeHitsAt(e.point, interactiveLayers);
                     // 12 Oct 2026 (Track C review): over a shared section (Road load on) the SECTION answers the hover, as it
                     // answers the click (the route click yields to roadLoadHitAt): its own figure and "Click for the routes on
                     // this section". One route's card under it put a second figure on the same road.
@@ -7037,6 +7053,7 @@
         META.ready=true;
     }
 
+    // (24 Nov 2026, card 6: the green / amber became ink, see SEL by the legs' look.)
     // 23 Oct 2026 (the user: "more subtle" than the breach red): a clicked route keeps its own green / amber over a soft
     // blue halo, re-drawn above its neighbours with its casing, and every other route dims (setRouteDim). Under the
     // labels, like every route line. The halo is the accent blue, never the red: red stays the word for a breach.
@@ -7052,9 +7069,10 @@
         if(!map.getLayer('busy-core')) map.addLayer({id:'busy-core',type:'line',source:'busy-route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':BUSY_ROAD_COLOR,'line-width':2.6,'line-offset':SEL_OFFSET}}, labelAnchor());
         if(!map.getSource('busy-hours-at')) map.addSource('busy-hours-at',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
         if(!map.getLayer('busy-hours-at')) map.addLayer({id:'busy-hours-at',type:'symbol',source:'busy-hours-at',layout:{'symbol-placement':'point','text-field':['get','hours'],'text-size':12,'text-font':['literal',BADGE_FONT],'text-anchor':'right','text-offset':[-0.8,0],'text-allow-overlap':true},paint:{'text-color':'#1D4ED8','text-halo-color':'#ffffff','text-halo-width':2}});
-        if(!map.getLayer('sel-glow')) map.addLayer({id:'sel-glow',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':CONFIG.COLORS.brand,'line-width':14,'line-opacity':0.28,'line-blur':3,'line-offset':SEL_OFFSET}}, labelAnchor());
-        if(!map.getLayer('sel-casing')) map.addLayer({id:'sel-casing',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':SEL_CASING_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
-        if(!map.getLayer('sel-core')) map.addLayer({id:'sel-core',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['match',['get','type'],'Inbound Highway','#059669','Outbound Highway','#f59e0b',CONFIG.COLORS.brand],'line-width':SEL_CORE_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
+        // 24 Nov 2026 (card 6): ink on white over a sign-blue halo at 0.3 (selPaint: pale on dark on a dark ground)
+        if(!map.getLayer('sel-glow')) map.addLayer({id:'sel-glow',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':SEL.glow,'line-width':14,'line-opacity':SEL.glowOpacity,'line-blur':3,'line-offset':SEL_OFFSET}}, labelAnchor());
+        if(!map.getLayer('sel-casing')) map.addLayer({id:'sel-casing',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':selPaint().casing,'line-width':SEL_CASING_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
+        if(!map.getLayer('sel-core')) map.addLayer({id:'sel-core',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':selPaint().core,'line-width':SEL_CORE_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
         raiseMarks();
     }
     function selectRoute(routeId){
@@ -9793,6 +9811,19 @@
         if (TL.wall && e.key === 'Escape') { e.preventDefault(); exitWallMode(); }
     });
 
+    // 24 Nov 2026 (card 6): the lines are thinner now (the first band 3 px, the network 1.1 px at zoom 7), so a click or a
+    // hover within ROUTE_HIT_PAD px of a route line counts as on it: the query box widens, never the line. A hit exactly on
+    // a line answers first; the box is asked only when the point itself finds none.
+    const ROUTE_HIT_PAD = 5;
+    function routeHitsAt(point, layers){
+        const ls = (layers || []).filter(l => map.getLayer(l));
+        if (!ls.length || !point) return [];
+        let fs = [];
+        try { fs = map.queryRenderedFeatures(point, { layers: ls }); } catch (e) { return []; }
+        if (fs.length) return fs;
+        try { return map.queryRenderedFeatures([[point.x - ROUTE_HIT_PAD, point.y - ROUTE_HIT_PAD], [point.x + ROUTE_HIT_PAD, point.y + ROUTE_HIT_PAD]], { layers: ls }); }
+        catch (e) { return []; }
+    }
     (function initAnalysis(){
         buildRouteInfo();
         fetchMeta();
@@ -9800,10 +9831,14 @@
         routeLayers.forEach(lid=>{
             map.on('click', lid, (e)=>{
                 if(!e.features||!e.features.length) return;
+                routeClick(e, e.features[0]);
+            });
+        });
+        function routeClick(e, feature){
                 if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;   // 12 Oct: the section card answers
                 if(typeof limitHitAt === 'function' && limitHitAt(e.point)) return;         // 13 Oct: a lorry limit's sign answers
                 if(typeof markerHitAt === 'function' && markerHitAt(e.point)) return;       // 11 Nov: a place's or a gate's marker answers
-                const p=e.features[0].properties, rid=p.route_id||'Route';
+                const p=feature.properties, rid=p.route_id||'Route';
                 selectRoute(rid);
                 // 10 Nov 2026 (v2.1 2.1-4, Q1): a click on a route opens THE ROAD's card — every route on that road — in every
                 // mode, on a phone in the sheet; the route's own card is its button ("R050's card")
@@ -9817,12 +9852,15 @@
                     '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">'+(info.origin||'—')+' → '+(info.dest||'—')+(info.distance_km?(' · '+fmtDist(info.distance_km, 1)+' '+DU()):'')+'</div>'+
                     '<button class="rb-popup-btn" onclick="openRouteAnalysis(\''+safe+'\')">Full route analysis →</button></div>';
                 new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(html).addTo(map);
-            });
-        });
+        }
         map.on('click',(e)=>{
             const active=routeLayers.filter(l=>map.getLayer(l));
             const hits=active.length?map.queryRenderedFeatures(e.point,{layers:active}):[];
-            if(!hits.length) clearSelection();
+            if(hits.length) return;                       // on a line: its own layer's handler answered
+            // 24 Nov 2026 (card 6): near a thin line, and nothing else with a click of its own here: the same as a click on it
+            const near=routeHitsAt(e.point, routeLayers);
+            if(near.length && !(typeof clickableAt === 'function' && clickableAt(e.point))){ routeClick(e, near[0]); return; }
+            clearSelection();
         });
         map.on('style.load', ()=>{ ensureSelectionLayers(); if(selectedRouteId) selectRoute(selectedRouteId); });
         if(map.isStyleLoaded()) ensureSelectionLayers();
