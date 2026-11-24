@@ -120,6 +120,35 @@ ok("8 select: a chosen tab is sign blue words on a 2 px sign blue underline, no 
 ok("8 warning: a warning sentence carries the diamond (every amber block sentence and the road-closures line when not checked)",
    css.includes('p.text-amber-700::before,.warn-line>span:first-child::before{content:"";display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);')
    && code.includes('"text-amber-700 warn-line")}>'));
+// ---------------------------------------------------------------- stage 9: ceilings that may only come down
+// 24 Nov 2026 (B1 item 9). Each figure was measured when the branch was built; a change may LOWER a ceiling (and should,
+// when it removes one), never raise it. A new screen or part follows the rule instead (the one corner, a shape and a word,
+// the ruled strip, a ruled section).
+const CEIL = {
+  cornerSizes: 9,          // distinct border-radius values in the stylesheet (6px, 3px, 50%, 0, 0 !important, 9px count dot, three half-corners)
+  css999: 0,               // border-radius:999px in the stylesheet (the count dots are 9 px on 18 px)
+  inline999: 1,            // borderRadius: 999 in the script (one 10 px legend dot)
+  tintedStatus: 0,         // --st-*-bg tints, and a .row-st rule with a fill
+  boxedFigureTiles: 0,     // a figure tile with its own box ("card px-4 py-3 min-w-0", a strip cell with a 1 px border)
+  roundedXlBox: 0,         // "rounded-xl border" section boxes in the markup
+  roundedLgBox: 52,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
+  cssBoxes: 16,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
+};
+const radiiNow = [...new Set((css.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))];
+const now = {
+  cornerSizes: radiiNow.length,
+  css999: count(css, /999px/g),
+  inline999: count(code, /borderRadius: 999/g),
+  tintedStatus: count(html, /--st-(ok|warn|bad|none)-bg/g) + count(css, /\n  \.row-st[^{]*\{[^}]*background:(?!transparent|var\(--(green|gold|red)\))/g),
+  boxedFigureTiles: count(code, /"card px-4 py-3 min-w-0/g) + count(css, /\n  \.(lp-kpi|al-stat|pour-figs div|rc-tile|dash-cards \.dash-card)\{[^}]*border:1px solid/g),
+  roundedXlBox: count(code, /rounded-xl border/g),
+  roundedLgBox: count(code, /rounded-lg border/g),
+  cssBoxes: count(css, /\n  [^\n{]*\{[^}]*border:1px solid var\(--line\)[^}]*border-radius:6px[^}]*\}/g),
+};
+for (const k of Object.keys(CEIL)) ok(`9 ceiling: ${k} ${now[k]} ≤ ${CEIL[k]} (may only come down)`, now[k] <= CEIL[k], { now: now[k], ceiling: CEIL[k] });
+ok("9 ceiling: the ceilings themselves are at or under the branch's measured figures (a raised ceiling fails here first)",
+   CEIL.cornerSizes <= 9 && CEIL.css999 === 0 && CEIL.inline999 <= 1 && CEIL.tintedStatus === 0 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
+   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 16);
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
