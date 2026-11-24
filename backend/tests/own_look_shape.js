@@ -153,6 +153,9 @@ for (const k of Object.keys(CEIL)) ok(`9 ceiling: ${k} ${now[k]} ≤ ${CEIL[k]} 
 ok("9 ceiling: the ceilings themselves are at or under the branch's measured figures (a raised ceiling fails here first)",
    CEIL.cornerSizes <= 9 && CEIL.css999 === 0 && CEIL.inline999 <= 1 && CEIL.tintedStatus === 0 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
    && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 16 && CEIL.smallCaps <= 18);
+// 24 Nov 2026: with the carbon target flush to the column, its fold's summary (21 px) met the note's "i" at 390 px (the
+// UI audit's targets-24px): 2 px above and below make it 25 px
+ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.includes(".ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;padding:2px 0;}"));
 // 24 Nov 2026: the Best option card's eyebrow in sentence case, as the third mockup draws it (".ey": 12 px, muted, no capitals)
 ok("5 best option: the card's eyebrow is not small capitals", /\n  \.bo-eye\{(?![^}]*(uppercase|letter-spacing))[^}]*\}/.test(css));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
