@@ -4550,7 +4550,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && dm.includes("onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>"));
   ok("⭐ UI FIX 9 ZONES: the zone's name is a button named `Edit ${z.name}`, opening through openZoneFromKeys (the row offered only Delete)",
      dm.includes('<button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}')
-     && dm.includes("onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>"));
+     && dm.includes("onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{roadPlates(z.name)}</button>"));   // 24 Nov 2026 (own look, road plates): the name with its road number on a plate, own_look_plates.js
   ok("⭐ UI FIX 9 ROUTES: the route's code is a button named `Show ${r.id} on the map` that picks it (selectRoute), so Route sheet / Collision evidence work from the keyboard",
      dm.includes('<button type="button" className="row-open" data-route-open={r.id} aria-label={`Show ${r.id} on the map`}')
      && dm.includes("onClick={(e) => { e.stopPropagation(); selectRoute(r.id); }}>{r.id}</button>"));
