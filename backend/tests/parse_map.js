@@ -8479,6 +8479,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ OWN LOOK (map): no slate, gray or stone grey in the page's own CSS rules (the demo notice's unchanged grey aside)", slate.length === 0, slate.map(r => r.sel).join(" | "));
   ok("OWN LOOK (map): no stock grey in a popup's words written by script (captions read --muted, second lines --ink-2)",
      !/color:#(6b7280|64748b|475569|374151)\b/i.test(code));
+  ok("OWN LOOK (map): a popup's title written by script reads the ink token, never config's fixed ink (in Dark it vanished on the dark card)",
+     !/COLORS\.brandDark/.test(html) && (html.match(/<h4 style="margin:0 0 4px;color:var\(--ink\);/g) || []).length === 4);
   // the figures bar: one ruled strip at a desk
   ok("⭐ OWN LOOK (map): the figures bar is one ruled strip at a desk: a hairline between every figure, the group line folded in, one label weight",
      html.includes("#kpi-cards .kpi-card{ display:flex; flex-direction:column; justify-content:center; padding:0 10px; border-left:1px solid var(--line); }")
