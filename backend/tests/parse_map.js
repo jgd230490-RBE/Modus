@@ -8425,6 +8425,84 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      /RME\.staff = !!\(j && j\.level === 'staff'\);[^\n]*\n\s*if \(typeof renderPlanInfo === 'function'\) renderPlanInfo\(\);/.test(code));
 }
 
+// ---- 24 Nov 2026: THE OWN LOOK on the public map (Group B2, claude/own-look-map; notes/design-language-1123.md). Guards that
+// keep the banned parts out: each count is a CEILING that may only come down, as the long-prose pins do.
+{
+  const CEIL = { stockBlue: 7, pill: 0, burnt: 0 };   // may only come down
+  const styles = (html.match(/<style>[\s\S]*?<\/style>/g) || []).join("\n");
+  const rules = []; styles.replace(/([^{}]+)\{([^{}]*)\}/g, (_, sel, body) => { rules.push({ sel: sel.trim(), body }); return ""; });
+  const tok = (name, block) => ((block || html).match(new RegExp("--" + name + ":\\s*([^;]+);")) || ["", ""])[1].trim();
+  const rootBlock = (html.match(/:root\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  const darkBlock = (html.match(/html\[data-look="dark"\]\{([\s\S]*?)\n        \}/) || ["", ""])[1];
+  ok("⭐ OWN LOOK (map): the page loads Sora and IBM Plex Sans and no other face, and names Inter nowhere",
+     (html.match(/fonts\.googleapis\.com\/css2\?family=Sora:wght@500;600;700&family=IBM\+Plex\+Sans:wght@400;500;600;700/g) || []).length === 2
+     && !/family=Inter/.test(html) && !/\bInter\b/.test(html));
+  ok("OWN LOOK (map): the two face tokens are the app's, and the body, a popup and every control read the text token",
+     tok("f-text", rootBlock) === "'IBM Plex Sans',system-ui,sans-serif" && tok("f-head", rootBlock) === "Sora,'IBM Plex Sans',system-ui,sans-serif"
+     && /body \{ margin:0; padding:0; font-family:var\(--f-text\);/.test(html) && /\.mapboxgl-popup-content \{[^}]*font-family:var\(--f-text\) !important;/.test(html)
+     && html.includes(".kpi-title, .kpi-value, .sidebar h2, .area-ch, .lim-title, .m-fig b{ font-family:var(--f-head); }"));
+  ok("OWN LOOK (map): no screen text in a system face (the map's own signs drawn on a canvas or in an SVG keep theirs)",
+     !rules.some(r => /font(-family)?:[^;]*\bsystem-ui\b/.test(r.body) && !/var\(--f-/.test(r.body))
+     && !/style="font:1[34]px(\/1\.45)? system-ui/.test(html));
+  const blues = html.match(/#2563EB|#3B82F6/gi) || [];
+  ok("⭐ OWN LOOK (map): the stock blue is left only as the map's own data colours (the movement badge, its key, the Sites dot) and two history comments: a ceiling of " + CEIL.stockBlue,
+     blues.length <= CEIL.stockBlue && !rules.some(r => /#2563EB|#3B82F6|#1A73E8|rgba\(37,99,235/i.test(r.body) && !/^\.mv-pill$/.test(r.sel)), blues.length);
+  ok("⭐ OWN LOOK (map): no pill: no 999px corner anywhere (ceiling " + CEIL.pill + ")", (html.match(/999px/g) || []).length <= CEIL.pill);
+  const radii = new Set(); html.replace(/border-radius:\s?([^;}"'!]+?)\s*(?:!important)?\s*[;}"']/g, (_, v) => { radii.add(v.trim()); return ""; });
+  ok("⭐ OWN LOOK (map): ONE corner size, 6 px, and 3 px for a small inner piece (a circle and a square corner aside)",
+     [...radii].every(v => ["0", "3px", "6px", "50%", "3px 3px 0 0", "6px 6px 0 0"].includes(v)), [...radii].join(" | "));
+  ok("⭐ OWN LOOK (map): no burnt orange (#C2410C) and no orange on a control in any look (ceiling " + CEIL.burnt + ")",
+     (html.match(/#C2410C|rgba\(194,\s?65,\s?12/gi) || []).length <= CEIL.burnt && tok("action", rootBlock) === "#0B4EA2" && tok("action", darkBlock) === "#8AB4F8"
+     && !/#FF8C14/i.test(styles));
+  const selRe = /aria-pressed="true"|aria-checked="true"|aria-expanded="true"|:checked|\.active\b|\.on\b|\.tdy\b/;
+  const fillRe = /background(-color)?:\s*(var\(--navy\)|var\(--action\)|#0B4EA2|#1F2024|#2563EB|#1D4ED8)\s*(!important)?\s*;/i;
+  const filled = rules.filter(r => selRe.test(r.sel) && fillRe.test(r.body) && !/^\.tl-sw input:checked \+ i$/.test(r.sel));
+  ok("⭐ OWN LOOK (map): nothing chosen is a filled block (a chosen segment, chip, tab or button is a tint with blue words); the one exception is the timeline's on/off switch track",
+     filled.length === 0, filled.map(r => r.sel).join(" | "));
+  ok("OWN LOOK (map): the chosen Heat map / Labels segment, the year and month buttons, the month and Views chips are the 10 % tint with sign-blue words",
+     html.includes(".heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy-soft); color:var(--navy); font-weight:600; }")
+     && html.includes('.month-picker button[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy); font-weight:700; }')
+     && html.includes('.month-chip[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy); font-weight:600; }')
+     && html.includes('.preset-chip[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy); font-weight:600; }')
+     && tok("navy", rootBlock) === "#0B4EA2" && tok("navy-soft", rootBlock) === "rgba(11,78,162,.10)" && tok("navy", darkBlock) === "#8AB4F8" && tok("navy-soft", darkBlock) === "rgba(138,180,248,.16)");
+  ok("⭐ OWN LOOK (map): Play is the one filled button, in the action colour wherever it is drawn (panel, bar, tablet, phone)",
+     /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html) && html.includes('<button type="button" class="btn" id="tl-open" onclick="startTimeline()">▶ Play forecast timeline</button>')
+     && /#timeline-bar #tl-play\{ width:48px; background:var\(--action\);/.test(html) && /#t-strip \.t-play\{[^}]*background:var\(--action\); color:var\(--action-fg\);/.test(html)
+     && /\.m-play\{[^}]*background:var\(--action\); color:var\(--action-fg\);/.test(html));
+  // the greys: neutral, from the ink, the app's values; no slate or stone grey in the page's own rules
+  ok("⭐ OWN LOOK (map): the grey tokens are the app's neutral greys, light and Dark (no blue-tinted or warm grey)",
+     tok("ink", rootBlock) === "#1F2024" && tok("ink-2", rootBlock) === "#44464B" && tok("muted", rootBlock) === "#62656B" && tok("note", rootBlock) === "#62656B"
+     && tok("line", rootBlock) === "#E1E2E4" && tok("ctl-line", rootBlock) === "#C6C8CC" && tok("surface-2", rootBlock) === "#F5F5F6" && tok("ctl-edge", rootBlock) === "#8A8D93"
+     && tok("muted", darkBlock) === "#9C9FA4" && tok("line", darkBlock) === "#333539" && tok("ctl-line", darkBlock) === "#4B4D52" && tok("ink-2", darkBlock) === "#C9CACE");
+  const slate = rules.filter(r => /#64748B|#94A3B8|#475569|#334155|#CBD5E1|#E2E8F0|#F1F5F9|#F8FAFC|#6B7280|#374151|#E7E5E4|#D6D3D1|#57534E|#78716C|#FAFAF9|#A8A29E|#eef2f7|#9AA1AB|#C9CCD1|#45484F|#8A94A3/i.test(r.body)
+                              && !/#demo-notice|\.area-sw-hatch/.test(r.sel));
+  ok("⭐ OWN LOOK (map): no slate, gray or stone grey in the page's own CSS rules (the demo notice's unchanged grey aside)", slate.length === 0, slate.map(r => r.sel).join(" | "));
+  ok("OWN LOOK (map): no stock grey in a popup's words written by script (captions read --muted, second lines --ink-2)",
+     !/color:#(6b7280|64748b|475569|374151)\b/i.test(code));
+  // the figures bar: one ruled strip at a desk
+  ok("⭐ OWN LOOK (map): the figures bar is one ruled strip at a desk: a hairline between every figure, the group line folded in, one label weight",
+     html.includes("#kpi-cards .kpi-card{ display:flex; flex-direction:column; justify-content:center; padding:0 10px; border-left:1px solid var(--line); }")
+     && html.includes("#kpi-cards .kpi-sep{ display:none; }") && html.includes("#kpi-cards .kpi-card[hidden]{ display:none; }")
+     && html.includes(".kpi-card.lead .kpi-label{ color:var(--muted); font-weight:400; }") && !/#kpi-hud\{[^}]*border-(top|bottom):\s?[2-9]px/.test(html));
+  // every main pair measured (WCAG 2.x), with the page's own values
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const rgb = h => { const n = parseInt(h.replace("#", ""), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const over = (fg, a, bg) => { const f = rgb(fg), b = rgb(bg); return "#" + f.map((v, i) => Math.round(a * v + (1 - a) * b[i]).toString(16).padStart(2, "0")).join(""); };
+  const L = h => { const [r, g, b] = rgb(h); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
+  const cr = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const pairs = [
+    ["sign blue on white", tok("navy", rootBlock), "#FFFFFF", 4.5], ["sign blue on its 10 % tint", "#0B4EA2", over("#0B4EA2", .10, "#FFFFFF"), 4.5],
+    ["white on the action colour", "#FFFFFF", tok("action", rootBlock), 4.5], ["captions on the soft surface", tok("muted", rootBlock), tok("surface-2", rootBlock), 4.5],
+    ["captions on a picked row", tok("muted", rootBlock), "#F0F4F9", 4.5], ["ink on a picked row", "#1F2024", "#F0F4F9", 4.5],
+    ["the control edge on white (3:1)", tok("ctl-edge", rootBlock), "#FFFFFF", 3],
+    ["Dark: the light sign blue on the panel", tok("navy", darkBlock), "#1F2024", 4.5], ["Dark: the light sign blue on its 16 % tint", "#8AB4F8", over("#8AB4F8", .16, "#1F2024"), 4.5],
+    ["Dark: the action words on the action colour", tok("action-fg", darkBlock), tok("action", darkBlock), 4.5], ["Dark: captions on the panel", tok("muted", darkBlock), "#1F2024", 4.5],
+    ["Dark: captions on a picked row", tok("muted", darkBlock), "#2C323D", 4.5], ["Dark: the control edge on the panel (3:1)", tok("ctl-edge", darkBlock), "#1F2024", 3]];
+  const low = pairs.filter(p => !(cr(p[1], p[2]) >= p[3]));
+  ok("⭐ OWN LOOK (map): every main pair measured, light and Dark: text 4.5:1, a control's edge 3:1 (" + pairs.map(p => p[0] + " " + cr(p[1], p[2]).toFixed(2)).join("; ") + ")",
+     low.length === 0, low.map(p => p[0] + " " + cr(p[1], p[2]).toFixed(2)).join("; "));
+}
+
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
   for (const f of fail) console.log("  FAIL:", f);
