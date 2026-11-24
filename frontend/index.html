@@ -67,7 +67,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
        the status colours read well as text (8.47:1 and better on the surface), so the pairs are the same values there. */
     --ok-text:#047857; --warn-text:#B45309; --bad-text:#B91C1C;
     /* 10 Nov 2026 (wave 2, card 12): the status chip's tints, one a tone; the words above read 4.5:1 or better on them */
-    --st-ok-bg:#ECFDF5; --st-warn-bg:#FFFBEB; --st-bad-bg:#FEF2F2; --st-none-bg:#F1F5F9;
+    --st-none:#44464B;   /* 24 Nov 2026 (own look, B1 item 2): a status has no tint; the none word and its ring are the second text */
     /* 22 Oct 2026 (UI fix 6, card 6; decision 13): the haul-road colour as TEXT and as a button FILL. The map line keeps
        ZONE_HAUL #C2790B (picked so a haul road never reads as closed), but as words or a fill it failed in every look:
        white on it 3.48:1, the chips 2.82 to 3.06:1. The haul text colour is the same brown, darker, #9A5F08: white on it
@@ -107,7 +107,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     --ok-btn:#34D399; --ok-btn-fg:#1F2024;
     --ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;
     --haul-text:#F0A838; --haul-soft:#3A2E1C;
-    --st-ok-bg:#052E16; --st-warn-bg:#3A2E1C; --st-bad-bg:#3F1D1D; --st-none-bg:#26282D;
+    --st-none:#C9CACE;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
     color-scheme:dark;
@@ -326,12 +326,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ws-tab:hover{color:var(--ink);}
   .ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}
   .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
-  .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
+  .chip-st i{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block;box-sizing:border-box;}
   /* 13 Oct 2026 (W16, D39): a status is a SHAPE and a word, never colour alone — the plan orange is 6.5 from the
      warning amber for full colour vision and 1.8 for a colour-blind reader. Green stays a dot; amber is a triangle,
      red a diamond (an octagon was tried: at 9 px it reads as a dot). Matched on the token the dot is painted with, so every chip-st in the app follows. */
-  .chip-st i[style*="--gold"]{width:10px;height:9px;border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%);}
-  .chip-st i[style*="--red"]{width:10px;height:10px;border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);}
+  .chip-st i[style*="--gold"]{width:9px;height:9px;border-radius:0;margin:0 1px;transform:rotate(45deg);}   /* 24 Nov 2026 (own look): warning a diamond */
+  .chip-st i[style*="--red"]{border-radius:0;}   /* 24 Nov 2026 (own look): bad a square (was a diamond; a triangle for amber) */
   .empty-ic{width:40px;height:40px;border-radius:6px;background:var(--surface-3);margin:0 auto 12px;}
   .empty-ic.error{background:rgba(220,38,38,.12);}
   .skel{display:inline-block;height:14px;border-radius:3px;vertical-align:middle;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 50%,var(--surface-3) 75%);background-size:200% 100%;animation:skel 1.4s infinite;}
@@ -1060,16 +1060,16 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rd-days th{font-weight:600;color:var(--muted);font-size:12px;}
   .rd-days th:first-child,.rd-days td:first-child{text-align:left;}
   .rd-mini td.rd-primary{min-width:0;} .rd-mini .row-st{white-space:normal;} .rd-mini .rd-chip{white-space:normal;} .rd-mini .rd-sum{font-size:12px;} .rd-mini .rd-dl{padding-left:12px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
-  /* 10 Nov 2026 (wave 2, card 12): THE status chip — every status in the app is this pill (RowStatus; StatusWord draws it
-     too): a tinted pill, the word in sentence case in the tone's text colour, and the tone's own icon SHAPE (✓ circle, !
-     square, ! circle, – circle, a hollow ring), so a status is never colour alone (D39). One shape and one colour a state. */
-  .row-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;line-height:1.35;color:var(--ink);white-space:nowrap;
-    border-radius:6px;padding:2px 10px 2px 3px;background:var(--st-none-bg);}
-  .row-st i{flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:700;line-height:1;color:#fff;border-radius:50%;background:var(--chart-none);}
-  .row-st.rs-ok{background:var(--st-ok-bg);color:var(--ok-text);} .row-st.rs-ok i{background:var(--ok-btn);color:var(--ok-btn-fg);}
-  .row-st.rs-warn{background:var(--st-warn-bg);color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
-  .row-st.rs-bad{background:var(--st-bad-bg);color:var(--bad-text);} .row-st.rs-bad i{background:var(--bad-text);color:var(--st-bad-bg);}
-  .row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);width:14px;height:14px;}
+  /* 10 Nov 2026 (wave 2, card 12): THE status chip — every status in the app is this (RowStatus; StatusWord draws it too).
+     24 Nov 2026 (own look, B1 item 2; John's yes to the second and third mockups): a status is a SHAPE and a WORD with no
+     tinted pill: dot = ok, diamond = warning, square = bad, ring = none; the shapes 10 px, the ring a 2 px stroke in the
+     second-text grey. A CLP draft (rs-draft, on no mockup) is the ring with its word. The word keeps its tone's text colour. */
+  .row-st{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;line-height:1.35;color:var(--st-none);white-space:nowrap;}
+  .row-st i{flex:none;box-sizing:border-box;width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var(--st-none);}
+  .row-st.rs-ok{color:var(--ok-text);} .row-st.rs-ok i{background:var(--green);border:0;}
+  .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate(45deg);}
+  .row-st.rs-bad{color:var(--bad-text);} .row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}
+  .row-st.rs-draft i{background:transparent;border:2px solid var(--st-none);}
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
      John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
      head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
@@ -1991,10 +1991,10 @@ function useBoxWide(min){
 }
 // the one status: a word, an icon whose SHAPE says the tone (✓ circle, ! square, ! circle, – circle), and
 // how many more things are flagged (the details spell each one out)
-const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };   // 9 Nov 2026: draft (CLP documents) a hollow ring
+const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };   // 24 Nov 2026 (own look): the <i> is the shape, drawn in CSS, no glyph; draft (CLP documents) the ring
 function RowStatus({ word, tone, more }){
-  const t = Object.prototype.hasOwnProperty.call(RS_ICON, tone || "") ? tone : "none";
-  return <span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}{more > 0 && <span className="rs-more">+{more}</span>}</span>;
+  const t = Object.prototype.hasOwnProperty.call(RS_TONES, tone || "") ? tone : "none";
+  return <span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true"></i>{word}{more > 0 && <span className="rs-more">+{more}</span>}</span>;
 }
 // one fact in the details: a label and its value; nothing at all when there is no value
 function RdItem({ t, children, wide, bad }){

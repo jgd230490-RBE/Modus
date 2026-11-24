@@ -3083,9 +3083,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/useUnits\("gates"\)/.test(src));
   ok("W6: the status is a word and an icon whose shape says the tone (✓ circle, ! square, ! circle, – circle), never colour alone",
      // NARROWED 9 Nov 2026 (UI critique card 11): + draft, a hollow ring with no glyph (a CLP draft; the – circle read "blocked")
-     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
-     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--chart-none\);/.test(html)
-     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}'));
+     // REVERSED 24 Nov 2026 (own look, B1 stage 2; John's yes to the second and third mockups): no glyph; the <i> IS the shape,
+     // drawn in CSS: dot = ok, diamond = warning, square = bad, ring = none; draft the ring with its word
+     src.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !src.includes("RS_ICON")
+     && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(html) && /\.row-st\.rs-warn i\{[^}]*border-radius:0;[^}]*transform:rotate\(45deg\);/.test(html)
+     && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(html)
+     && /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true"></i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
      ["lookahead", "gates", "today", "dashboard", "forecasts"].every(n => src.includes(`data-rd-table="${n}"`))
      && (src.match(/<RowDetails key=/g) || []).length === 5);
@@ -3451,9 +3456,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
      // NARROWED 23 Nov 2026 (own look, stage 2): the fallback ink is #1F2024
      && /ctx\.fillStyle = tok\("--ink", "#1F2024"\);/.test(src));
-  ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
-     /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
-     && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
+  // REVERSED 24 Nov 2026 (own look, B1 stage 2): the four shapes of the one status rule (design language §2): amber a DIAMOND
+  // (was a triangle), red a SQUARE (was a diamond), green a dot; still matched on the token the shape is painted with
+  ok("W16 (D39): an amber status is a diamond and a red one a square beside its word — every .chip-st dot, by the token it is painted with",
+     /\.chip-st i\[style\*="--gold"\]\{width:9px;height:9px;border-radius:0;margin:0 1px;transform:rotate\(45deg\);\}/.test(html)
+     && /\.chip-st i\[style\*="--red"\]\{border-radius:0;\}/.test(html) && !/clip-path:polygon\(50% 0,100% 100%,0 100%\)/.test(html)
+     && /\.chip-st i\{width:10px;height:10px;border-radius:50%;/.test(html));
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
      // NARROWED 16 Oct 2026 (S7): the Simulation's lorry dots read their token --sim-lorry, with #2563EB as the fallback
@@ -4358,8 +4366,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _css = [...html.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].filter(m => +m[1] < 12).map(m => html.slice(Math.max(0, html.lastIndexOf("\n", m.index)), m.index + 20).trim());
   const _font = [...html.matchAll(/font:\s*(?:\d{3}\s+)?(\d+(?:\.\d+)?)px/g)].filter(m => +m[1] < 12).map(m => html.slice(Math.max(0, html.lastIndexOf("\n", m.index)), m.index + 12).trim());
   const _jsx = [...src.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)\b/g)].filter(m => +m[1] < 12).map(m => src.slice(m.index, m.index + 24));
-  ok("⭐ UI FIX 7: under 12 px only the three glyphs: the status dot's mark (.row-st i), the info button's 'i' (.ibtn) and the Routes chevron (▶)",
-     _css.length === 1 && _css[0].startsWith(".row-st i{") && _font.length === 1 && _font[0].startsWith(".ibtn{")
+  // NARROWED 24 Nov 2026 (own look, B1 stage 2): the status shape carries no glyph now, so the stylesheet has no small text left
+  ok("⭐ UI FIX 7: under 12 px only the two glyphs: the info button's 'i' (.ibtn) and the Routes chevron (▶) (the status shape has no mark)",
+     _css.length === 0 && _font.length === 1 && _font[0].startsWith(".ibtn{")
      && _jsx.length === 1 && _jsx[0].startsWith("fontSize: 10 }}>▶"), JSON.stringify([_css, _font, _jsx]));
   ok("UI FIX 7: the stylesheet's small words lifted to 12 px — the Appearance menu headings, the big screen bar's labels and code tag, the rail's 'Ctrl K' (on one line) and, the user's choice (card 9), the rail's group names and count",
      html.includes(".appearance-menu h6{margin:0;font-size:12px;") && html.includes(".dash-wallbar-lbl{font-size:12px;")

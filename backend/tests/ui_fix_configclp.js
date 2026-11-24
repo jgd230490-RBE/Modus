@@ -198,7 +198,8 @@ function sourceRules(){
   ok("⭐ CLP LIST (source): Download draft is the first line of every row's ⋯ (never the main button)",
      /<RowMenu name=\{c\.name \+ " · " \+ teamWord\(c\)\}>\n\s*<button type="button" onClick=\{\(\) => draft\(c\)\} disabled=\{!!building\}>Download draft<\/button>/.test(src)
      && !/data-clp-primary[^>]*>Download draft/.test(src));
-  ok("CLP LIST (CSS): the draft ring — hollow, no glyph", html.includes(".row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);") && src.includes('draft: ""'));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 2): the ring is the second-text grey (--st-none), and no status has a glyph now
+ok("CLP LIST (CSS): the draft ring — hollow, no glyph", html.includes(".row-st.rs-draft i{background:transparent;border:2px solid var(--st-none);") && src.includes("draft: 1 }") && !src.includes("RS_ICON"));
 
   // reviewer (card 11)
   ok("⭐ REVIEW (source): rvScheme turns a demo name's '— demo scheme' into '(demo)' and leaves other names alone",

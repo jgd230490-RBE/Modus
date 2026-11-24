@@ -30,5 +30,22 @@ const jsxR = [...new Set((code.match(/borderRadius: \d+/g) || []))].sort();
 ok("1 corner: inline corners in the script are the small 3 px, the one 6 px or a legend dot (999 on a 10 px dot)",
    jsxR.every(r => ["borderRadius: 3", "borderRadius: 6", "borderRadius: 999"].includes(r)), jsxR);
 
+// ---------------------------------------------------------------- stage 2: status = a shape and a word, no tint
+ok("2 status: RowStatus draws an empty <i> (the shape, in CSS) and the word — no glyph, no RS_ICON",
+   code.includes('<i aria-hidden="true"></i>{word}') && !code.includes("RS_ICON") && !/RS_[A-Z]+ = \{[^}]*"✓"/.test(code));
+ok("2 status: dot = ok, diamond = warning, square = bad, ring = none (and draft), 10 px, the ring a 2 px stroke",
+   /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(css)
+   && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(css)
+   && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate\(45deg\);\}/.test(css)
+   && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(css)
+   && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(css));
+ok("2 status: the chip has no tint, no padding, no corner; the --st-*-bg tints are gone (nothing reads them)",
+   !/\.row-st(\.rs-\w+)?\{[^}]*(background|padding|border-radius)/.test(css) && !/--st-(ok|warn|bad|none)-bg/.test(html));
+ok("2 status: the second-text token for the ring and the none word, light #44464B and Dark #C9CACE",
+   /--st-none:#44464B;/.test(css) && /--st-none:#C9CACE;/.test(css));
+ok("2 status: the Look-ahead flag chips (.chip-st) take the same four shapes, 10 px (warning a diamond, bad a square)",
+   /\.chip-st i\{width:10px;height:10px;border-radius:50%;/.test(css) && /\.chip-st i\[style\*="--gold"\]\{[^}]*transform:rotate\(45deg\);\}/.test(css)
+   && /\.chip-st i\[style\*="--red"\]\{border-radius:0;\}/.test(css) && !/clip-path:polygon/.test(css.slice(css.indexOf(".chip-st"), css.indexOf(".chip-st") + 1200)));
+
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

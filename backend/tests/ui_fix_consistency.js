@@ -38,21 +38,24 @@ const lum = (hex) => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2)
 const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 
 // ---------------------------------------------------------------- finding 12: the one status chip
-// NARROWED 24 Nov 2026 (own look, B1 stage 1): the pill takes the one 6 px corner (stage 2 removes the pill)
-ok("⭐ 12: the status chip is a pill — rounded, padded, tinted per tone, the word in the tone's text colour",
-   /\.row-st\{[^}]*border-radius:6px;padding:2px 10px 2px 3px;background:var\(--st-none-bg\);\}/.test(css)
-   && css.includes(".row-st.rs-ok{background:var(--st-ok-bg);color:var(--ok-text);}")
-   && css.includes(".row-st.rs-warn{background:var(--st-warn-bg);color:var(--warn-text);}")
-   && css.includes(".row-st.rs-bad{background:var(--st-bad-bg);color:var(--bad-text);}"));
-ok("...each tone keeps its own icon SHAPE (✓ circle, ! square, ! circle, hollow ring), so a status is never colour alone (D39)",
-   code.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };')
-   && css.includes(".row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}") && css.includes(".row-st.rs-draft i{background:transparent;"));
-const tints = [["ok-text", "st-ok-bg"], ["warn-text", "st-warn-bg"], ["bad-text", "st-bad-bg"], ["ink", "st-none-bg"]];
+// REVERSED 24 Nov 2026 (own look, B1 stage 2; John's yes to the second and third mockups): the status chip is no longer a
+// tinted pill: a SHAPE (10 px) and a WORD, no background, no padding, no corner; the --st-*-bg tints are gone from both looks
+ok("⭐ 12: the status is a shape and a word — no tint, no pill, the word in the tone's text colour",
+   /\.row-st\{display:inline-flex;align-items:center;gap:7px;[^}]*color:var\(--st-none\);white-space:nowrap;\}/.test(css)
+   && !/\.row-st\{[^}]*(background|border-radius|padding)/.test(css)
+   && css.includes(".row-st.rs-ok{color:var(--ok-text);}") && css.includes(".row-st.rs-warn{color:var(--warn-text);}")
+   && css.includes(".row-st.rs-bad{color:var(--bad-text);}") && !/--st-(ok|warn|bad|none)-bg/.test(html));
+ok("...each tone keeps its own SHAPE (dot ok, diamond warning, square bad, ring none and draft), so a status is never colour alone (D39)",
+   code.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !code.includes("RS_ICON")
+   && css.includes(".row-st.rs-ok i{background:var(--green);border:0;}") && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;[^}]*rotate\(45deg\)/.test(css)
+   && css.includes(".row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}") && css.includes(".row-st.rs-draft i{background:transparent;border:2px solid var(--st-none);}"));
+const tints = [["ok-text", "surface"], ["warn-text", "surface"], ["bad-text", "surface"], ["st-none", "surface"]];
 const lows = [];
 for (const [T, look] of [[ROOT_T, "ink"], [Object.assign({}, ROOT_T, DARK_T), "dark"]]) {
   for (const [fg, bg] of tints) { const r = cr(T[fg], T[bg]); if (!(r >= 4.5)) lows.push(`${look} ${fg} on ${bg} ${r.toFixed(2)}`); }
+  for (const sh of ["green", "gold", "red", "st-none"]) { const r = cr(T[sh], T.surface); if (!(r >= 3)) lows.push(`${look} shape ${sh} ${r.toFixed(2)}`); }
 }
-ok("...the chip's words read 4.5:1 or better on their tint in the light looks and in Dark (four tones × two)", lows.length === 0 && Object.keys(DARK_T).includes("st-ok-bg"), lows.join("; "));
+ok("...the words read 4.5:1 or better and the shapes 3:1 or better on the surface, in the light looks and in Dark (four tones × two)", lows.length === 0 && Object.keys(DARK_T).includes("st-none"), lows.join("; "));
 ok("...StatusWord (Forecasts' and Users' status, Config's changed / unsaved) draws the SAME chip, not the old dot",
    code.includes("function StatusWord({ status, label }){\n  return <RowStatus word={label || status} tone={STATUS_TONE[status] || \"none\"} />;")
    && !/className="chip-st"/.test(code));
