@@ -335,7 +335,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ws-tab{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border-radius:6px;border:1px solid var(--line);
     background:var(--surface);color:var(--muted);font:inherit;font-size:14px;font-weight:600;line-height:1.3;cursor:pointer;white-space:nowrap;}
   .ws-tab:hover{color:var(--ink);}
-  .ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}
+  p.text-amber-700::before,.warn-line>span:first-child::before{content:"";display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);vertical-align:middle;}   /* 24 Nov 2026 (own look, B1 item 8): a warning sentence carries the diamond */
+  /* 24 Nov 2026 (own look, B1 item 8): a chosen tab is an underline only: sign blue words and a 2 px sign blue line under, no tint, no outline */
+  .ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}
   /* 24 Nov 2026 (own look, B1 item 3; John's yes to the second mockup): a TAG (team, material, workstream, a vehicle, a
      source word such as 'target') is a plain word, never a tinted pill: no background, border, padding or corner (!important
      beats the old inline tints). Tags side by side are joined by a middle dot. A tag in the warning or bad words carries the
@@ -1289,7 +1291,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ph-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 0 12px;}
   .ph-day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font:500 13px/1.2 var(--f-text);cursor:pointer;}
   .ph-day b{font-size:18px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
-  .ph-day[aria-pressed="true"]{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);color:var(--navy);}
+  .ph-day[aria-pressed="true"]{border-color:var(--line-2);box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}   /* 24 Nov 2026 (own look, B1 item 8): a chosen day is an underline only (3 px), no outline */
   .ph-day[aria-pressed="true"] b{color:var(--navy);}
   .ph-day.is-today:not([aria-pressed="true"]){border-style:dashed;border-color:var(--muted);}
   .ph-card{padding:16px;}
@@ -12969,7 +12971,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
           {/* H1: the line reads the provider's words from the page; a tenant with no
               provider (status "off"/"skipped" with no provider) sees nothing here. */}
           {lines.length > 0 && ttSrc.restrictions !== "skipped" && ttSrc.restrictions !== "off" && ttSrc.restrictions_provider && (
-            <div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>
+            <div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700 warn-line")}>
               <span>
                 {ttRunning ? `checking ${ttName.toLowerCase()} — this takes a minute; the page will refresh when it finishes…`
                  : ttSrc.restrictions === "ok" ? `${ttName}: checked ${(ttSrc.restrictions_checked_at || "").replace("T", " ").slice(0, 16)} UTC${ttSrc.restrictions_week ? ` · flags shown for the week ${ttSrc.restrictions_week[0]} → ${ttSrc.restrictions_week[1]}` : ""}`

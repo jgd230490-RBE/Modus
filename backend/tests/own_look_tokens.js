@@ -97,7 +97,7 @@ ok("⭐ 3 selection: the rail's chosen page, the wall bar's chosen button and th
    && css.includes('.ph-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);}'));
 ok("3 selection: the phone's chosen tab, its More item and its chosen day read the sign blue, not the action colour",
    css.includes(".phone-tab.is-on{color:var(--navy);") && /\.phone-tab\.is-on::before\{[^}]*background:var\(--navy\);\}/.test(css)
-   && css.includes(".phone-more-item.is-on{color:var(--navy);") && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--navy);')
+   && css.includes(".phone-more-item.is-on{color:var(--navy);") && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--line-2);box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}') /* NARROWED 24 Nov 2026 (own look, B1 stage 8): an underline only */
    && !/\.(phone-tab\.is-on|phone-more-item\.is-on|ph-day\[aria-pressed="true"\]|ph-seg button\[aria-pressed="true"\])[^{]*\{[^}]*var\(--action\)/.test(css));
 ok("3 selection: the look list's chosen row is a light sign blue tint and tick on the dark popover (was orange)",
    // NARROWED 24 Nov 2026 (stage 5): the accent items went with the picker's accent half

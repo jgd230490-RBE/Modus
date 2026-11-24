@@ -626,14 +626,15 @@ ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ah
   && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
-  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
+  // NARROWED 24 Nov 2026 (own look, B1 stage 8): + warn-line, the not-checked line carries the warning's diamond
+  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700 warn-line")}>')
   && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}')
   // 24 Nov 2026 (own look, stage 3; the independent review of the second mockup): the line's link is the sign blue, never amber
   && _laBody.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
   _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
-  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}'));   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
+  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}'));   /* NARROWED 24 Nov 2026 (own look, B1 stage 8): the chosen tab is an underline only, no tint, no outline */   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
 ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
   (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
   && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2

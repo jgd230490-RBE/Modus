@@ -91,7 +91,7 @@ const navyButtons = [...code.matchAll(/<button[^>]*?background: ?"var\(--navy\)"
 ok("...no ACTION button is filled blue any more, and no selection either: the drawing palette's picked tool is a --navy-soft tint (aria-pressed)",
    navyButtons.length === 0 && /<button \{\.\.\.r\} aria-pressed=\{on\}[^\n]*style=\{on \? \{ background: "var\(--navy-soft\)", color: "var\(--navy\)" \}/.test(code), navyButtons.length + " navy buttons");
 ok("⭐ 13: ONE tab — .ws-tab, the selected one a --navy-soft tint with --navy text and edge, never filled like a button",
-   css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}'));
+   css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}'));   /* NARROWED 24 Nov 2026 (own look, B1 stage 8): the chosen tab is an underline only, no tint, no outline */
 ok("...Users' tabs, the Look-ahead's Account / Commit / Horizon, Stockpiles' piles and years and the CLP notes' tabs all use it",
    code.includes('className="ws-tab" aria-current={tab === k ? "page" : undefined}>{l}</button>)}')
    && code.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>')

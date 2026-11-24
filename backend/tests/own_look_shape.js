@@ -112,6 +112,14 @@ ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) a
    code.includes('background: "var(--ink)" }} /></div>') && !code.includes('tone || "var(--green)"') && !/<Bar [^>]*tone=/.test(code)
    && css.includes(".ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--ink);}") && !/\.ga-li-(warn|bad) \.ga-pbar i\{/.test(css)
    && css.includes(".ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--ink);}"));
+// ---------------------------------------------------------------- stage 8: a chosen tab or day is an underline only
+ok("8 select: a chosen tab is sign blue words on a 2 px sign blue underline, no tint or outline; a chosen day the same with 3 px",
+   css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}')
+   && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--line-2);box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}')
+   && !/\.ws-tab\[aria-selected="true"\][^{]*\{[^}]*navy-soft/.test(css));
+ok("8 warning: a warning sentence carries the diamond (every amber block sentence and the road-closures line when not checked)",
+   css.includes('p.text-amber-700::before,.warn-line>span:first-child::before{content:"";display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);')
+   && code.includes('"text-amber-700 warn-line")}>'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);

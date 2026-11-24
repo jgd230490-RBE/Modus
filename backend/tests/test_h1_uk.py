@@ -1215,7 +1215,8 @@ ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning t
    # NARROWED 10 Nov 2026 (wave 3, finding 5): 5 -> 6 — the Account's Actual box on a line short past the share takes an amber
    # border (a border, not text)
    # NARROWED 24 Nov 2026 (own look, B1 stage 7): 6 -> 5, the gates' amber peak bar is ink in every state
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 5 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # NARROWED 24 Nov 2026 (own look, B1 stage 8): 5 -> 6, the warning sentence's diamond is a --gold shape (a fill, not text)
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 6 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
@@ -1495,7 +1496,8 @@ ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink 
    # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
    and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
    # NARROWED 24 Nov 2026 (own look, B1 stage 5): 8 -> 7, the Config read-only note is a margin line now (no tint)
-   and len(_nsCss) >= 7 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
+   # NARROWED 24 Nov 2026 (own look, B1 stage 8): 7 -> 6, a chosen tab is an underline now, no tint
+   and len(_nsCss) >= 6 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
    str([m for m in _nsInline if 'color: "var(--navy)"' not in m][:3]) + str([r for r in _nsCss if "color:var(--navy)" not in r and "color:var(--ink)" not in r][:3]))
 # card 2 (finding #11): the Account's headings and button; card 5: the count line; card 1: the pinned short-row cell
 ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 (Ink and Light), 6.48:1 (Dark), 4.5 or better in all 12 — and the button is the accent pair (white on #C2410C 5.18:1, on #2563EB 5.17; checked in all 12 by W16 above)",
