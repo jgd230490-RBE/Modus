@@ -122,10 +122,17 @@ def _closures_label():
         return "Road restrictions"
 
 
+#: 24 Nov 2026: writes that are not long jobs (no row, no line in the list) but must not run under one: each is
+#: refused in the one sentence while a job runs, under this name
+ALSO = {"clear_routes": "Clear all routes"}
+
+
 def name_of(kind):
     """The job as the refusal names it."""
     if kind == "closures":
         return "The " + _closures_label().lower() + " check"
+    if kind in ALSO:
+        return ALSO[kind]
     return KINDS[kind]["name"]
 
 

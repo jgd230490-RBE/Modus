@@ -6562,6 +6562,7 @@ def delete_route(route_id: str, token: Optional[str] = None):
 @app.post("/api/admin/clear-routes")
 def clear_routes(token: Optional[str] = None):
     _check_admin(token)
+    _work_refuse("clear_routes")       # 24 Nov 2026: never under a long job (it would empty the routes a run is filling)
     return network.clear_routes()
 
 

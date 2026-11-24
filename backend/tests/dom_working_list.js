@@ -314,6 +314,10 @@ const SENT = "Busy-hour times are running. Route all can start when they finish.
      code.includes("disabled={routeBusy || !!work.busy.route_all || !(status && status.length)} data-route-all=\"1\"")
      && code.includes("disabled={routeBusy || !!work.busy.hour_times} data-hour-bake")
      && code.includes('{work.running && <p className="work-busy" role="status" data-work-busy="routes">{work.running === "route_all" ? work.busy.hour_times : work.busy.route_all}</p>}'));
+  ok("⭐ 7. ...and Clear all routes is off while ANY long job runs, its refusal the sentence alone (24 Nov 2026)",
+     code.includes('onClick={clearRoutes} disabled={routeBusy || !!work.running || !(status && status.length)} data-clear-routes="1"')
+     && code.includes('catch(e){ setRouteMsg(workBusy(e) || errSay("Not cleared.", e)); }')
+     && !code.includes('disabled={routeBusy || !(status && status.length)} data-clear-routes'));
   ok("⭐ 7. Carry on reaches the page that runs the job: the Data pages pick the row up and run the same action with it",
      code.includes("if(c.kind === \"route_all\") return bulkBake(c);") && code.includes("if(c.kind === \"hour_times\") return hourBake(c);")
      && code.includes("return rebakeRoute(c.subject, all.slice(Math.min(c.done || 0, all.length)), !!(c.args && c.args.via_holding), c);")

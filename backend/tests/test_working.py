@@ -414,9 +414,22 @@ if working:
        st == 423 and r == "Route all is running. Busy-hour times can start when it finishes.", f"{st} {r}")
     st, r = http(main.hour_times_clear, None, None)
     ok("6. ...and its clear (nothing is dropped while another job runs)", st == 423)
+    _cleared = []
+    _real_clear = network.clear_routes
+    network.clear_routes = lambda *a, **k: _cleared.append(1) or {"cleared": 0}
+    st, r = http(main.clear_routes, None)
+    ok("⭐ 6. Clear all routes is refused while Route all runs, in the sentence, and clears nothing (24 Nov 2026)",
+       st == 423 and r == "Route all is running. Clear all routes can start when it finishes." and _cleared == [],
+       f"{st} {r} {_cleared}")
+    ok("6. ...it is no long job: it has a name for the refusal and no kind, so no row and no line in the list",
+       "clear_routes" not in working.KINDS and working.name_of("clear_routes") == "Clear all routes"
+       and "clear_routes" not in working.listing(ADMIN)["busy"])
     st, r = http(main.bake_route, "R014", "A", None, False, None, "no-such-job")
     ok("6. ...and a Route again request carrying a job id", st == 423 and r == "Route all is running. Route again can start when it finishes.", f"{st} {r}")
     working.end(job, "done")
+    st, r = http(main.clear_routes, None)
+    ok("6. ...and with no job running Clear all routes goes through as before", st == "ok" and _cleared == [1], f"{st} {r} {_cleared}")
+    network.clear_routes = _real_clear
     network.bake_route = lambda *a, **k: {"route_id": a[0], "baked": 2}
     st, r = http(main.bake_route, "R014", "A", None, False, None, None)
     ok("6. a new or edited route's own bake (no job id) is not part of the list: never refused, no row, no line",

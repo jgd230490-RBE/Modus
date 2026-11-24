@@ -19184,7 +19184,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setSelected(null);
       await reloadNetwork();
       setRouteMsg(`Cleared ${j.cleared ?? 0} route(s). Locations kept.`);
-    } catch(e){ setRouteMsg(errSay("Not cleared.", e)); }
+    } catch(e){ setRouteMsg(workBusy(e) || errSay("Not cleared.", e)); }   // 24 Nov 2026: a long job is running
     setRouteBusy(false);
   };
 
@@ -20819,7 +20819,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                    : `Busy-hour times again · ${hourPlan.here_calls} calls`}
               </button>
             )}
-            <button type="button" onClick={clearRoutes} disabled={routeBusy || !(status && status.length)} data-clear-routes="1"
+            <button type="button" onClick={clearRoutes} disabled={routeBusy || !!work.running || !(status && status.length)} data-clear-routes="1"
               style={{ color: "var(--red)" }}>
               Clear all routes
             </button>
