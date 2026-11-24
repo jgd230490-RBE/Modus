@@ -87,7 +87,7 @@ ok("B7 with no month on screen the two figures are hidden (no '— a day', '— 
 // NARROWED 24 Nov 2026 (the route lines mockup, Q6): the badges come with Labels "All" only, so the guide's row was rewritten
 // round them; the badge with its unit and the grey route are each still said
 ok("B8 the user guide (§8) describes the badge with its unit, and the grey route (NARROWED 24 Nov 2026)",
-   guide.includes("a green badge on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)")
+   guide.includes("the same badge without the arrow on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)")
    && guide.includes("a grey route has nothing in that month, or is not routed yet.")
    && !guide.includes("a green <strong>CO₂</strong> badge"));
 

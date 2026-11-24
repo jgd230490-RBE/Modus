@@ -302,6 +302,34 @@ ok("I6 the user guide: darker and wider is more; one blue with Off; the badges u
    && guide.includes("the work-section marks, the heat map's badges and each gate's own access road") && !guide.includes("<tr><td>Blue lines with a figure</td>")
    && !guide.includes("turn blue and show their lorry movements a day"));
 
+// ---------------------------------------------------------------------------------------------------------------
+console.log("J. Card 4b: the badge is a small plate on its line, no blue (John: 'smaller and neater')");
+ok("J1 the plate's paint: white, a #C6C8CC edge, the number in ink, a grey arrow; the carbon plate the same with no arrow; no blue or green left",
+   html.includes("const BADGE_STYLE = { mv: { edge: '#C6C8CC', ink: '#1F2024', arrow: '#62656B' }, co2: { edge: '#C6C8CC', ink: '#1F2024' } };")
+   && !/BADGE_STYLE[^\n]*#2563EB|BADGE_STYLE[^\n]*#059669/.test(html));
+ok("J2 the number is 12 px bold, centred ON its line (no offset above it)",
+   html.includes("const BADGE_TEXT_SIZE = 12,") && /'text-anchor': 'center', 'text-offset': \[0, 0\],/.test(fnSrc("badgeLayout")));
+let plate = null, plErr = "";
+try {
+  const strokes = [];
+  const g = { set strokeStyle(v) { strokes.push(v); }, get strokeStyle() { return strokes[strokes.length - 1]; }, fillStyle: '', lineWidth: 0, lineCap: '', lineJoin: '',
+    beginPath() {}, moveTo() {}, lineTo() {}, arcTo() {}, closePath() {}, fill() {}, stroke() {}, getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }) };
+  const pb = { document: { createElement: () => ({ getContext: () => g }) } };
+  vm.createContext(pb);
+  vm.runInContext("const BADGE_STYLE = { mv: { arrow: '#62656B' } };\n" + fnSrc("plateBadgeImage") + "\nthis.a = plateBadgeImage('#C6C8CC', true); this.b = plateBadgeImage('#C6C8CC', false);", pb);
+  plate = { a: pb.a, b: pb.b, strokes };
+} catch (e) { plErr = e.message; }
+ok("J3 sandbox: the plate is 16 px high at pixelRatio 2, the arrow plate wider by the 8 px arrow; the edge #C6C8CC then the arrow #62656B",
+   !!plate && plate.a.img.height === 32 && plate.b.img.height === 32 && plate.a.opts.pixelRatio === 2
+   && plate.a.img.width - plate.b.img.width === 18 && plate.strokes.join() === "#C6C8CC,#62656B,#C6C8CC", plErr || JSON.stringify(plate && { aw: plate.a.img.width, bw: plate.b.img.width, s: plate.strokes }));
+ok("J4 the key's samples are the same plate (16 px, 3 px corner, 1 px #C6C8CC edge, 12 px bold ink, a grey 8 px arrow)",
+   html.includes(".mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:16px; padding:0 4px; border-radius:3px; background:#ffffff;")
+   && html.includes("font:700 12px/16px var(--f-text); white-space:nowrap; color:#1F2024; box-shadow:inset 0 0 0 1px #C6C8CC; }")
+   && html.includes('<span class="mv-pill"><svg width="8" height="8" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4h9M7 1l3 3-3 3M11 8H2M5 5L2 8l3 3" fill="none" stroke="#62656B"')
+   && !/\.mv-pill\{[^}]*#2563EB|\.co-pill\{[^}]*#059669/.test(html));
+ok("J5 still under Labels All only (the key's rows and LABEL_RULES few: null)",
+   /'road-load-labels':\s*\{ few: null, all: 0 \}/.test(html) && /'carbon-route-labels':\s*\{ few: null, all: 0 \}/.test(html) && (fnSrc("renderModeLegends").match(/badgesOn\(\) \?/g) || []).length === 2);
+
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

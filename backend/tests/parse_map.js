@@ -3405,10 +3405,12 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("browser check 12 Oct: the run label keeps to one line and is never forced over other labels",
      /function badgeLayout\(field, image\) \{/.test(blkCode)
      && !/function badgeLayout[\s\S]{0,500}'text-allow-overlap': true/.test(blkCode) && !/id: 'road-load-labels'[\s\S]{0,400}'text-allow-overlap': true/.test(blkCode));
-  ok("⭐ badges (19 Oct): the two pill images are drawn once, re-added after a basemap switch, stretch in the middle only (round ends, the arrow keep their shape)",
-     blkCode.includes("function pillBadgeImage(edge, arrow) {") && blkCode.includes("function addPillBadges(m) {")
+  // NARROWED 24 Nov 2026 (John, card 4b of the route lines mockup: "smaller and neater"): the two images are PLATES now
+  // (plateBadgeImage: 16 px high, a 3 px corner, a grey edge), not 19 Oct's pills; drawn once, re-added, stretched in the middle
+  ok("⭐ badges (19 Oct): the two plate images are drawn once, re-added after a basemap switch, stretch in the middle only (the corners, the arrow keep their shape) (NARROWED 24 Nov 2026)",
+     blkCode.includes("function plateBadgeImage(edge, arrow) {") && blkCode.includes("function addPillBadges(m) {") && !blkCode.includes("function pillBadgeImage(")
      && blkCode.includes("[['mv-badge', BADGE_STYLE.mv.edge, true], ['co2-badge', BADGE_STYLE.co2.edge, false]]")
-     && blkCode.includes("opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[8 * R, 12 * R]], content: [L, 3 * R, L + MID, H - 3 * R] }")
+     && blkCode.includes("opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[6 * R, 10 * R]], content: [L, 2 * R, L + MID, H - 2 * R] }")
      && (blkCode.match(/try \{ addPillBadges\(map\); \} catch \(e\) \{\}/g) || []).length === 2);
   // the four count pins of review §2.2d, honoured (asserted above unchanged; these say WHY they still hold)
   ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
@@ -3606,8 +3608,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   }
   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the two label layers share badgeLayout at BADGE_TEXT_SIZE, 13 px (the floor
   // since decision 4, 17 Oct; was 14); no literal size under 13 anywhere in the block
-  ok("C1: every new symbol layer is 13 px or more (the badges' one size)",
-     (blkCode.match(/'text-size': BADGE_TEXT_SIZE/g) || []).length === 1 && blkCode.includes("const BADGE_TEXT_SIZE = 13,")
+  // REVERSED 24 Nov 2026 (John, card 4b: "please make smaller and neater"): the badges' number is 12 px, the app's floor for
+  // a chip or a label (13 px is for sentences); no literal size under 12 in the block
+  ok("C1: every new symbol layer is 12 px or more (the badges' one size; REVERSED 24 Nov 2026: was 13)",
+     (blkCode.match(/'text-size': BADGE_TEXT_SIZE/g) || []).length === 1 && blkCode.includes("const BADGE_TEXT_SIZE = 12,")
      && !/'text-size': (1[0-2]|[0-9])\b/.test(blkCode));
 
   // ---- the block, run against a fake map and DOM ----
@@ -8506,7 +8510,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
 // ---- 24 Nov 2026: THE OWN LOOK on the public map (Group B2, claude/own-look-map; notes/design-language-1123.md). Guards that
 // keep the banned parts out: each count is a CEILING that may only come down, as the long-prose pins do.
 {
-  const CEIL = { stockBlue: 7, pill: 0, burnt: 0 };   // may only come down
+  const CEIL = { stockBlue: 4, pill: 0, burnt: 0 };   // may only come down (24 Nov 2026: 7 to 4, the badge plates of card 4b)
   const styles = (html.match(/<style>[\s\S]*?<\/style>/g) || []).join("\n");
   const rules = []; styles.replace(/([^{}]+)\{([^{}]*)\}/g, (_, sel, body) => { rules.push({ sel: sel.trim(), body }); return ""; });
   const tok = (name, block) => ((block || html).match(new RegExp("--" + name + ":\\s*([^;]+);")) || ["", ""])[1].trim();
@@ -8523,7 +8527,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      !rules.some(r => /font(-family)?:[^;]*\bsystem-ui\b/.test(r.body) && !/var\(--f-/.test(r.body))
      && !/style="font:1[34]px(\/1\.45)? system-ui/.test(html));
   const blues = html.match(/#2563EB|#3B82F6/gi) || [];
-  ok("⭐ OWN LOOK (map): the stock blue is left only as the map's own data colours (the movement badge, its key, the Sites dot) and two history comments: a ceiling of " + CEIL.stockBlue,
+  ok("⭐ OWN LOOK (map): the stock blue is left only as the map's own data colour (the Sites dot) and two history comments (24 Nov 2026: the badge and its key are grey plates): a ceiling of " + CEIL.stockBlue,
      blues.length <= CEIL.stockBlue && !rules.some(r => /#2563EB|#3B82F6|#1A73E8|rgba\(37,99,235/i.test(r.body) && !/^\.mv-pill$/.test(r.sel)), blues.length);
   ok("⭐ OWN LOOK (map): no pill: no 999px corner anywhere (ceiling " + CEIL.pill + ")", (html.match(/999px/g) || []).length <= CEIL.pill);
   const radii = new Set(); html.replace(/border-radius:\s?([^;}"'!]+?)\s*(?:!important)?\s*[;}"']/g, (_, v) => { radii.add(v.trim()); return ""; });
