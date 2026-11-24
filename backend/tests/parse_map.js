@@ -1223,7 +1223,8 @@ ok("§A: locations are a real SYMBOL layer, not a circle and not a DOM marker",
   // NARROWED 5 Nov 2026 (group 6): one DOM marker is allowed — the pin a person places in the Report a concern form (it is
   // not a location, and a DOM marker keeps its place through a basemap switch); still no marker for a location
   && !/id: 'railheads'/.test(code) && (code.match(/new mapboxgl\.Marker/g) || []).length === 1
-  && /function concernSetPin\([\s\S]{0,400}new mapboxgl\.Marker\(\{ color: '#C2410C' \}\)/.test(code));
+  // NARROWED 24 Nov 2026 (the own look, B2): the placed pin is the sign blue, as the form's crosshair (--action); no orange anywhere a person acts
+  && /function concernSetPin\([\s\S]{0,400}new mapboxgl\.Marker\(\{ color: '#0B4EA2' \}\)/.test(code));
 // 2026-09-08 (pm): locGlyph gained a fourth argument. A stockpile's image depends on
 // its STOCK LEVEL, not only on its type, so the level has to reach the painter.
 ok("§A: the marks are generated on a canvas, one image per type",
@@ -2014,9 +2015,10 @@ ok("11 Oct: one pulsing dot per visible feature, hover / focus / tap shows its l
   code.includes("function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }") && code.includes("const on = guideHintsOn() && guideIndex < 0;")
   && code.includes("dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;")
   && /\.guide-dot\{position:fixed;z-index:9002;[^}]*animation:guide-pulse 2s infinite\}/.test(html) && /prefers-reduced-motion:reduce\)\{\.guide-dot\{animation:none/.test(html));
-// NARROWED 24 Nov 2026 (the own look, B2): the line grey is the app's neutral #E1E2E4 (no warm grey; notes/design-language-1123.md)
+// NARROWED 24 Nov 2026 (the own look, B2): the line grey is the app's neutral #E1E2E4 (no warm grey; notes/design-language-1123.md);
+// the primary button and the controls are the sign blue #0B4EA2 (no orange on a control). The route lines' blues are the script's own.
 ok("11 Oct: the map takes the app's shell — warm neutrals, sentence-case 13 px headings, 14 px controls, orange primary buttons, routes still blue",
-  /--line:#E1E2E4; --bg:#FFFFFF;/.test(html) && /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--navy:#2563EB;/.test(html)
+  /--line:#E1E2E4; --bg:#FFFFFF;/.test(html) && /--action:#0B4EA2; --action-fg:#FFFFFF;/.test(html) && /--navy:#0B4EA2;/.test(html)
   && /\.sidebar h3 \{ margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var\(--navy-deep\); text-transform:none; \}/.test(html)
   && /select \{ width:100%;[^}]*font-size:14px;/.test(html) && /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html)
   && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div class="panel-top" aria-hidden="true"></div>') && /\.sidebar \.panel-top\{ flex:none; position:sticky; top:-20px;/.test(html)   /* NARROWED 28 Oct 2026 (task 0a, card 6): the spacer is the sticky strip */
@@ -6301,7 +6303,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
        && /function applyFilters\(\) \{[\s\S]{0,400}syncFilterReset\(\);/.test(code));
   }
   ok("19 Oct (seen in Chrome): the pressed heat-map segment's rule outranks the segments' white (was white text on white)",
-     html.includes(".heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }")
+     // NARROWED 24 Nov 2026 (the own look, B2): the chosen segment is a tint with blue words, never a filled block
+     html.includes(".heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy-soft); color:var(--navy); font-weight:600; }")
      && !html.includes(".heat-seg label:has(input:checked)"));
   ok("19 Oct (seen in Chrome): the 2×2 filters and the share row are 13 px, so 'All destinations' is whole and the buttons sit two to a row",
      // NARROWED 27 Oct 2026 (group 2e): the select rule also carries grid-column:span 7 (see the 27 Oct check below)
@@ -6354,7 +6357,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     }
     ok("19 Oct month picker: 32 px buttons on a desk, 44 px on a phone (the phone rule); pressed = the accent",
        html.includes(".month-picker button{ height:32px;") && /@media \(max-width:767px\)[\s\S]*?\.month-picker button\{ min-height:44px; \}/.test(html)
-       && html.includes('.month-picker button[aria-pressed="true"]{ background:var(--navy);'));
+       && html.includes('.month-picker button[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy);'));   // NARROWED 24 Nov 2026 (own look, B2): a tint, not a fill
   }
   // ---- the council read: every month at once, unpacked exactly ----
   {
