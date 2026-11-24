@@ -139,7 +139,7 @@ const M = (blocks, primaries) => ({ words: 50, blocks, primaries: primaries || [
   const c0 = R.compareRules(old, now);
   ok("C: an earlier run made before the measures pairs, but gives no word or speed rows and says so (earlierMeasured false)",
      !c0.earlierMeasured && !c0.words.length && !c0.ready.length);
-  const key = (id, x) => `dashboard|1366|ink|orange|${id}|${x}`;
+  const key = (id, x) => `dashboard|1366|ink|${id}|${x}`;   // NARROWED 24 Nov 2026 (own look, stage 5): no accent in a stop's key
   const sp0 = R.splitFindings([key("long-prose", "p.ct-note Busiest"), key("filled-primaries", "button Big screen"), key("axe-wcag", "color-contrast"), key("words-grew", "")], false);
   ok("C: ...so this run's rule findings read as FIRST MEASURED, an older check's finding stays new, and a compare-made warning is never a finding",
      sp0.first.length === 2 && sp0.fresh.length === 1 && /axe-wcag/.test(sp0.fresh[0]));
@@ -160,11 +160,12 @@ const M = (blocks, primaries) => ({ words: 50, blocks, primaries: primaries || [
   ok("A3: over 1 s but only 20 % slower does not (2000 → 2400 ms); 24.9 % does not either (900 → 1124)", !rd.config.warn && !rd.zones.warn);
   ok("A3: a stop with no time on either side has no row", !rd.help);
   const report = { stops: cur.stops.map(s => ({ ...s, checks: s.name === "submit" ? [{ id: "long-prose", ok: false }] : [] })),
-                   compare: { newFindings: ["submit|1366|ink|orange|long-prose|p A long one"], firstMeasured: [], rules: c1 } };
+                   compare: { newFindings: ["submit|1366|ink|long-prose|p A long one"], firstMeasured: [], rules: c1 } };
   const L = R.prLines(report).join("\n");
+  // NARROWED 24 Nov 2026 (the own look, stage 5): a stop's key has no accent any more (name|width|look)
   ok("D: the PR lines name the new failing checks, the screen words +/− per stop changed and the slowest page ready",
-     /New failing checks:\*\* 1 — submit 1366 ink orange long-prose/.test(L) && /Screen words \+\/−\*\* \(6 stop\(s\) changed, 3 over the limit\)/.test(L)
-     && /dashboard 1366 ink orange: 300 → 326 \(\+26, \+8\.7 %\) ⚠/.test(L) && /Slowest page ready:\*\* 2400 ms, config at 1366 px/.test(L) && /not live's speed/.test(L), L);
+     /New failing checks:\*\* 1 — submit 1366 ink long-prose/.test(L) && /Screen words \+\/−\*\* \(6 stop\(s\) changed, 3 over the limit\)/.test(L)
+     && /dashboard 1366 ink: 300 → 326 \(\+26, \+8\.7 %\) ⚠/.test(L) && /Slowest page ready:\*\* 2400 ms, config at 1366 px/.test(L) && /not live's speed/.test(L), L);
   const L0 = R.prLines({ stops: now.stops.map(s => ({ ...s, checks: [] })), compare: { newFindings: [], firstMeasured: ["x"], rules: c0 } }).join("\n");
   ok("D: ...and against an older run they say it has no word counts, and how many findings are first measured",
      /has no word counts/.test(L0) && /1 finding\(s\) of the rule checks are FIRST MEASURED/.test(L0), L0);
@@ -213,7 +214,8 @@ ok("wiring: the portal's header wait does NOT end on a phone's desk-only card (t
 ok("wiring: every run starts with the rules' self-test in its own browser, and --self-test runs only that",
    audit.includes("await selfTestRules(browser);   // FR1") && audit.includes('else if (a === "--self-test") o.selfTest = true;') && fnSrc("selfTestRules").includes("RULES.FIXTURES"));
 ok("wiring: the measures are NOT part of the run's shape (a run before them pairs); the report carries ruleVersion",
-   /function sameShape\(a, b\) \{ const k = \(o\) => \[o\.widths, o\.looks, o\.extraAccents, o\.extraPasses \|\| \[\], o\.browser \|\| "chromium"\];/.test(audit)
+   // NARROWED 24 Nov 2026 (own look, stage 5): the accent keys read as empty when absent, so a run since has neither
+   /function sameShape\(a, b\) \{ const k = \(o\) => \[o\.widths, o\.looks, o\.extraAccents \|\| \[\], o\.extraPasses \|\| \[\], o\.browser \|\| "chromium"\];/.test(audit)
    && audit.includes("ruleVersion: RULES.RULES_VERSION") && !/options: \{[^}]*ruleVersion/.test(audit));
 ok("wiring: the compare splits first-measured findings out, adds words-grew / ready-slower, and never keys those two as findings",
    fnSrc("compareRuns").includes("RULES.splitFindings(diff.newFindings, diff.rules.earlierMeasured)") && fnSrc("compareRuns").includes('id: "words-grew"')

@@ -613,16 +613,22 @@ ok("...colours lines by leg (CM_OUT / CM_BACK), not by team; the team is named i
 // 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
 // NARROWED 17 Oct 2026 (UI fix 2, claude/ui-fix-dark, finding 2): the wash is var(--navy-soft) INLINE — the .tbl th rule
 // out-ranks a bg-blue-50 class — so the dark look paints today's column in its own tint (the figures were 1.14:1 on #eff6ff)
+// NARROWED 24 Nov 2026 (the own look, Group A, stage 3): a table column is the 6 % tint --navy-soft-col (a chosen thing is the 10 % --navy-soft)
 ok("today's column carries the wash and the '· today' suffix",
-  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft)" } : {}}'));
+  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft-col)" } : {}}'));
 // NARROWED 27 Oct 2026 (stockpile forecast, card 4): + the Horizon's stockpile strip's heading row keeps the commit wash (eight)
 ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; eight inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td, the stockpile strip's heading cell); the week pill reads var(--muted) when off",
   !/#eff6ff|#64748b|#B45309/i.test(_laBody)
-  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 8
+  // NARROWED 24 Nov 2026 (own look, stage 3): of the eight, the seven column washes are the 6 % column tint, --navy-soft-col
+  // (and the Horizon's stockpile cell's `bg` the same), and the eighth, the chosen week pill, keeps the 10 % --navy-soft
+  && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 7 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
   _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
-  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}'));
+  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}')
+  // 24 Nov 2026 (own look, stage 3; the independent review of the second mockup): the line's link is the sign blue, never amber
+  && _laBody.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
   _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
@@ -2031,30 +2037,36 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // 8b. the data palette: six tokens, light and dark, read in fixed order, never a raw hex on a dataset
   // 11 Oct 2026 NARROWED: the user chose the orange-led palette (plan = brand orange, delivered = blue, model = violet)
   ok("the data palette is six tokens in the light look (plan orange, delivered blue, teal, model violet, gold, not-yet grey)",
-    /--chart-1:#E8590C; --chart-1-soft:rgba\(232,89,12,\.18\); --chart-2:#2563EB; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E;/.test(html));
+    /--chart-1:#E8590C; --chart-1-soft:rgba\(232,89,12,\.18\); --chart-2:#0B4EA2; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E;/.test(html));   // NARROWED 24 Nov 2026 (own look, stage 6): delivered is the sign blue (was #2563EB / Dark #5B8FF0); the palette check passes
   ok("...and six dark steps on the dark surface (validated 10 Oct, colour-system-1010.md)",
-    /--chart-1:#E8681E; --chart-1-soft:rgba\(232,104,30,\.22\); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965;/.test(html));
+    /--chart-1:#E8681E; --chart-1-soft:rgba\(232,104,30,\.22\); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965;/.test(html));   // NARROWED 24 Nov 2026 (own look, stage 6): delivered is the sign blue (was #2563EB / Dark #5B8FF0); the palette check passes
   ok("⭐ the charts read the slots in FIXED order and a sixth series is grey, never a new hue (no cycled PALETTE)",
     code.includes('const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];')
     && code.includes('const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");') && !/const PALETTE = \[/.test(code));
   ok("🔴 no Dashboard dataset carries a raw hex: planned is slot 1, delivered slot 2, the model slot 4 (status colours stay on the stockpile chart only)",
     !/backgroundColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody) && !/borderColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody)
-    && _dbBody.includes('C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED")')
+    && _dbBody.includes('C2 = tok("--chart-2", "#0B4EA2"), C4 = tok("--chart-4", "#7C3AED")')   // NARROWED 24 Nov 2026 (own look, stage 6): the fallback follows the token
     && _dbBody.includes("data: D.actualM, backgroundColor: C2") && _dbBody.includes("data: D.fairM, backgroundColor: C4")
     && _dbBody.includes("data: D.co2M, borderColor: C1, backgroundColor: C1S"));
   // 8. the shell: warm neutrals, a dimmed rail whose active item is ink
-  ok("the shell tokens are the warm neutrals and the rail has its own two tokens, light and dark",
-    /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--rail-bg:#FAFAF9; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
-  ok("⭐ the rail's active item is INK, not the action colour (one accent on a neutral shell)",
-    /\.rail-item\.is-on\{background:var\(--surface\);color:var\(--rail-on\);font-weight:600;box-shadow:0 0 0 1px var\(--line\);\}/.test(html)
+  // NARROWED 23 Nov 2026 (the own look, Group A, stage 2): the greys are the neutral ramp made from the ink
+  // (the warm stone line #E7E5E4 and the warm rail #FAFAF9 were the 11 Oct shell; the banned list rules out warm paper)
+  ok("the shell tokens are the NEUTRAL greys made from the ink and the rail has its own two tokens, light and dark",
+    /--line:#E1E2E4; --bg:#FFFFFF;/.test(html) && /--rail-bg:#F5F5F6; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 3): the chosen page is a 10 % sign blue tint with sign blue words (the own look: a
+  // selection is a tint); still never the action colour, and never a fill (was ink on a white chip with a ring)
+  ok("⭐ the rail's active item is the sign blue tint, not the action colour and not a fill (one accent on a neutral shell)",
+    /\.rail-item\.is-on\{background:var\(--navy-soft\);color:var\(--navy\);font-weight:600;\}/.test(html)
     && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
     && code.includes('className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}')
     && !code.includes('border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold'));
   // NARROWED 5 Nov 2026 (group 6): the same muted count also carries the new concerns, with its own title
   ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>'));
   // 11 Oct 2026 — the fresher shell (fresh-directions.html: A with B's orange button and kicker)
-  ok("the action colour is its own token: deep orange with white text in the light looks (5.2:1), brand orange with ink text in dark (7.0:1)",
-    /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--action:#FF8C14; --action-fg:#1F2024;/.test(html)
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 4): the ONE primary button is the sign blue, white text (8.00:1), and
+  // Dark's the light sign blue with dark text (8.66:1); orange is the brand only (was #C2410C / #FF8C14)
+  ok("the action colour is its own token: the sign blue with white text in the light looks (8.0:1), the light sign blue with dark text in dark (8.7:1)",
+    /--action:#0B4EA2; --action-fg:#FFFFFF;/.test(html) && /--action:#8AB4F8; --action-fg:#141518;/.test(html)
     && /\.btn-pri\{display:inline-block;padding:7px 14px;border-radius:6px;background:var\(--action\);color:var\(--action-fg\);/.test(html)
     && (html.match(/var\(--brand-orange\)/g) || []).length <= 2);
   ok("the rail has line icons (inline SVG, no library) in place of the glyphs, one per nav entry",
@@ -2138,8 +2150,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // notice is not a hint
     // NARROWED 13 Oct 2026 (D45, Option A chosen by the user): light grey with red text and a 3 px red rule, was ink
     // with amber text and a 1 px amber rule; the token values are pinned in the 13 Oct block at the end of this file
+    // NARROWED 23 Nov 2026 (the own look, Group A): the bar's text is in the page's text face (var(--f-text), IBM Plex
+    // Sans), was Inter; nothing else in the bar moves
     ok("the bar is CSS classes in <style>: 26 px, light grey with red text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end, 14 px text",
-      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:3px solid var\(--demo-rule\);font:700 14px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
+      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:3px solid var\(--demo-rule\);font:700 14px\/1 var\(--f-text\);letter-spacing:\.06em;/.test(html)
       && !/\.demo-bar[^{]*\{[^}]*font:[^;]*\b1[0-3](?:\.\d+)?px/.test(html)
       && /\.demo-bar-text\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;\}/.test(html)
       && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;[^}]*font:600 14px\/21px /.test(html) && /\.demo-bar\.has-guide\{padding:0 84px;\}/.test(html)
@@ -2782,10 +2796,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _dbS.includes("{fill && wallSection !== simIdx && <span className=\"dash-wallbar-note\" title="));
   // 17 Oct 2026 (the user: "entry gate and empty lorry icons look too similar")
   ok("⭐ SIM: an entry gate never reads as a lorry — a bullseye (radius 7, thick ink rim, ink centre) against the empty lorry's small blue ring (radius 4); the key draws the same",
-    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });')
-    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });')
+    // NARROWED 23 Nov 2026 (own look, stage 2): the rim and centre are the ink #1F2024 (was slate-800), map and key alike
+    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1F2024", "circle-stroke-width": 2.5 } });')
+    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1F2024" } });')
     && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF"')   // NARROWED 29 Oct 2026 (task 3c)
-    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
+    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1F2024 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1F2024;width:15px;height:15px;\}/.test(html)
     && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
   // RE-PINNED 29 Oct 2026 (the page, card 5): the key is a row UNDER the map (a named list) on the page; the box over the map stays on the big screen only
   ok("SIM: the map's key is a named group on the big screen, a named list under the map on the page (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
@@ -3324,7 +3339,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
      && _cc.includes('if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();')
-     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, accent, sized]);"));   // (W16 the same evening: + accent)
+     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, sized]);"));   // (W16 the same evening: + accent; NARROWED 24 Nov 2026, own look stage 5: the accent is gone again)
   ok("W5: the rules by width: legend under the plot below 768 px, a doughnut's on the right only from 1024 px; labels 18 characters, no rotation; DPR at most 2",
      /const CHART_LABEL_MAX = 18;/.test(src) && /if\(vw < 768\) return "bottom";/.test(src)
      && /if\(type === "doughnut" \|\| type === "pie"\) return vw >= 1024 \? \(asked \|\| "right"\) : "bottom";/.test(src)
@@ -3377,7 +3392,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const DARK_BLUE = 'html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]';
   const accD = (k) => (k === "blue" || k === "blue-shades") ? toks(blockOf(DARK_BLUE)) : toks(blockOf(`html[data-theme="dark"][data-accent="${k}"]`));
   const eff = (k, dark) => dark ? { ...ROOT, ...DARK, ...(k === "orange" ? {} : accD(k)) } : { ...ROOT, ...(k === "orange" ? {} : acc(k)) };
-  const KEYS = ["orange", "blue", "blue-shades", "orange-shades"];
+  // NARROWED 24 Nov 2026 (own look, stage 5): one colour set per look is left (the name "orange" kept for the :root / Dark pair)
+  const KEYS = ["orange"];
   const series = (t) => ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map(n => t[n].toUpperCase()).filter(c => c !== t["chart-none"].toUpperCase());
   // colour maths
   const lin = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -3393,19 +3409,19 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // the pairs a reader compares: neighbours in a stack, and 1 against 4 (the cost chart: planned beside the model)
   const worst = (pal) => { let cvd = 1e9, nv = 1e9; const P = []; for (let i = 1; i < pal.length; i++) P.push([i - 1, i]); if (pal.length >= 4) P.push([0, 3]);
     for (const [i, j] of P) { cvd = Math.min(cvd, dE(pal[i], pal[j], "protan"), dE(pal[i], pal[j], "deutan")); nv = Math.min(nv, dE(pal[i], pal[j])); } return { cvd, nv }; };
-  ok("W16: the ACCENTS block exists with a light and a dark block for each of the three alternatives, and touches no status colour",
-     ["blue", "blue-shades", "orange-shades"].every(k => blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`)) && !!blockOf(DARK_BLUE)
-     && !blockOf('html[data-theme="dark"][data-accent="orange-shades"]') && !blockOf(':root:not([data-theme="dark"])[data-accent="orange"]')
-     && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; no accent block is left in the stylesheet, light or dark
+  ok("W16: the ACCENTS block is gone: no [data-accent] block for any of the three alternatives, light or dark, and no ACCENTS-START / -END",
+     ["blue", "blue-shades", "orange-shades", "orange"].every(k => !blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`) && !blockOf(`html[data-theme="dark"][data-accent="${k}"]`))
+     && !blockOf(DARK_BLUE) && !css.includes("[data-accent") && !css.includes("ACCENTS-START") && !css.includes("ACCENTS-END"));
   ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
-     series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
-     && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#2563EB" && eff("orange", true).action === "#FF8C14");
-  ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange) and 4 and 5 (the model gold: blue beside violet fails 1–4)",
-     series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #A07D34 #7C3AED" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #B48E3E #9572EE");
-  ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; in Dark each draws its primary's series",
-     series(eff("blue-shades", false)).join(" ") === "#1D4ED8 #0891B2 #4F46E5 #0D9488" && series(eff("blue-shades", true)).join(" ") === series(eff("blue", true)).join(" ")
-     && series(eff("orange-shades", false)).join(" ") === "#E8590C #9A3412 #A07D34 #BE185D"
-     && series(eff("orange-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
+     series(eff("orange", false)).join(" ") === "#E8590C #0B4EA2 #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #8AB4F8 #13A193 #9572EE #B48E3E"   /* NARROWED 24 Nov 2026 (own look, stage 6): series 2 is the sign blue */
+     && eff("orange", false).action === "#0B4EA2" && eff("orange", false).navy === "#0B4EA2" && eff("orange", true).action === "#8AB4F8");   // NARROWED 24 Nov 2026 (own look, stages 3 and 4): the button is the sign blue too (was #C2410C, Dark #FF8C14)   // NARROWED 24 Nov 2026 (own look, stage 3): the control blue is the sign blue #0B4EA2 (was #2563EB)
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the other accents' series cannot be drawn any more, so every look draws Orange primary's
+  ok("W16: Blue primary's swapped series (plan blue, delivered orange) is gone: no accent block reorders the series",
+     series(eff("blue", false)).join(" ") === series(eff("orange", false)).join(" ") && series(eff("blue", true)).join(" ") === series(eff("orange", true)).join(" "));
+  ok("W16: the shade accents' four-hue series are gone: every look draws Orange primary's five series",
+     series(eff("blue-shades", false)).length === 5 && series(eff("orange-shades", false)).join(" ") === series(eff("orange", false)).join(" ")
+     && series(eff("blue-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
   for (const k of KEYS) for (const dark of [false, true]) {
     const t = eff(k, dark), pal = series(t), w = worst(pal), surf = dark ? "#1F2024" : "#FFFFFF";
     ok(`W16 palette ${k} · ${dark ? "dark" : "light"}: neighbours and the plan–model pair apart for a colour-blind reader (≥ 8) and for everyone (≥ 15); every series ≥ 3:1 on the surface`,
@@ -3415,23 +3431,26 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      worst(["#1E3A8A", "#2563EB", "#60A5FA", "#93C5FD", "#BFDBFE"]).nv < 15 && cr("#BFDBFE", "#FFFFFF") < 3
      && worst(["#7C2D12", "#C2410C", "#FF8C14", "#FFB55C", "#FFE0B8"]).nv < 15 && cr("#FFE0B8", "#FFFFFF") < 3);
   // the state, the early script, the picker, the charts
-  ok("W16: ACCENTS + applyAccent + useAccent mirror the look; stored as modus_accent (the B6 decision: keys keep the old prefix); unknown → orange",
-     /const ACCENTS = \[\n  \["orange",/.test(src) && /const ACCENT = \{ key: "modus_accent", current: "orange", subs: new Set\(\) \};/.test(src)
-     && /if\(!ACCENTS\.some\(\(\[k\]\) => k === name\)\) name = "orange";/.test(src) && /try \{ applyAccent\(localStorage\.getItem\(ACCENT\.key\) \|\| "orange", false\); \} catch\(e\)\{ applyAccent\("orange", false\); \}/.test(src)
-     && /function useAccent\(\)\{/.test(src));
-  ok("W16: 🔴 the remembered look and accent go on <html> in a plain <head> script, BEFORE the CDN scripts and Babel (no flash of the default)",
-     html.indexOf('d.setAttribute("data-accent",') > 0 && html.indexOf('d.setAttribute("data-accent",') < html.indexOf("react.production.min.js")
-     && /\/\^\(orange\|blue\|blue-shades\|orange-shades\)\$\/\.test\(a\|\|""\)\?a:"orange"/.test(html) && /\/\^\(ink\|light\|dark\)\$\/\.test\(t\|\|""\)\?t:"ink"/.test(html));
-  ok("W16: the picker has a second group, Accent, four menuitemradio items in their own class (the three looks stay three)",
-     /<h6>Accent<\/h6>\n\s*\{ACCENTS\.map\(\(\[k, label, sw\]\) => \(/.test(src) && src.includes('className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}')
-     && src.includes("onClick={() => { setAccent(k); setOpen(false); }}"));
-  ok("W16: charts rebuild on an accent change without a reload (ChartCanvas and the Dashboard subscribe)",
-     (src.match(/const \[accent\] = useAccent\(\);/g) || []).length === 2);
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; no ACCENTS, ACCENT, applyAccent or useAccent, and nothing reads modus_accent
+  ok("W16: ACCENTS, ACCENT, applyAccent and useAccent are gone, and no script reads the stored modus_accent",
+     !/\bACCENTS\b/.test(src) && !/\bACCENT\b/.test(src) && !/applyAccent|useAccent/.test(src) && !html.includes("modus_accent"));
+  // NARROWED 24 Nov 2026 (own look, stage 5): the <head> script sets the look only; no data-accent anywhere
+  ok("W16: 🔴 the remembered look goes on <html> in a plain <head> script, BEFORE the CDN scripts and Babel (no flash of the default); no accent",
+     html.indexOf('d.setAttribute("data-theme",') > 0 && html.indexOf('d.setAttribute("data-theme",') < html.indexOf("react.production.min.js")
+     && !html.includes("data-accent") && /\/\^\(ink\|light\|dark\)\$\/\.test\(t\|\|""\)\?t:"ink"/.test(html));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the popover lists the three looks only
+  ok("W16: the picker has no Accent group: no <h6>Accent</h6>, no .accent-item (in the markup or the stylesheet), no setAccent; the three looks stay",
+     !src.includes("<h6>Accent</h6>") && !src.includes("accent-item") && !html.includes(".accent-item") && !html.includes("accent-sw") && !src.includes("setAccent")
+     && src.includes("{THEMES.map(([k, label, sw]) => ("));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the charts subscribe to the look only
+  ok("W16: charts no longer subscribe to an accent (ChartCanvas and the Dashboard read the look only)",
+     (src.match(/const \[accent\] = useAccent\(\);/g) || []).length === 0 && !/\baccent, sized\]/.test(src));
   ok("W16 (D39): every multi-series Dashboard chart names its series on the chart from 768 px; stacked segments have a 2 px surface gap",
      /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
      && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
      && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
-     && /ctx\.fillStyle = tok\("--ink", "#1E293B"\);/.test(src));
+     // NARROWED 23 Nov 2026 (own look, stage 2): the fallback ink is #1F2024
+     && /ctx\.fillStyle = tok\("--ink", "#1F2024"\);/.test(src));
   ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
      /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
      && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
@@ -3823,9 +3842,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /\.phone-tab\{[^}]*min-height:56px;/.test(_css) && /\.phone-more-item\{[^}]*min-height:48px;/.test(_css) && /\.ph-seg button\{min-height:48px;/.test(_css)
      && /\.ph-day\{[^}]*min-height:56px;/.test(_css) && /\.ph-line>button\{[^}]*min-height:48px;/.test(_css) && /\.ph-more\{[^}]*min-height:48px;/.test(_css)
      && /\.ph-actions>\*\{flex:1;min-height:48px;/.test(_css) && /\.tap48\{min-height:48px;\}/.test(_css));
-  ok("PHONE CSS: tokens only (every look and accent follows), the active tab in the accent's control colour, the 14 px floor kept (13 px only for the tab words and notes)",
-     _css.length > 3000 && !/#[0-9A-Fa-f]{3,6}\b/.test(_css) && /\.phone-tab\.is-on\{color:var\(--action\);/.test(_css)
-     && /\.phone-tab\.is-on::before\{[^}]*background:var\(--action\);\}/.test(_css) && !/font(-size)?:[^;]*\b(9|10|11|12)px/.test(_css));
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 3): the chosen tab is a selection, so the sign blue (--navy), not the action colour
+  ok("PHONE CSS: tokens only (every look and accent follows), the active tab in the sign blue, the 14 px floor kept (13 px only for the tab words and notes)",
+     _css.length > 3000 && !/#[0-9A-Fa-f]{3,6}\b/.test(_css) && /\.phone-tab\.is-on\{color:var\(--navy\);/.test(_css)
+     && /\.phone-tab\.is-on::before\{[^}]*background:var\(--navy\);\}/.test(_css) && !/font(-size)?:[^;]*\b(9|10|11|12)px/.test(_css));
   ok("PHONE CSS: the page header's actions wrap under the title (a phone, and 768–1023 px beside the open rail), the Look-ahead's flags wrap in their chips",
      /\n  \.ph-actions-box\{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;\}/.test(_css)
      && /\[data-guide="lookahead-flags"\] \.chip-st\{white-space:normal;/.test(_css)
@@ -4032,8 +4052,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("🔴 captions #3 (decision 1): ONE rule maps text-slate-400 to --muted outside the dark look, weighed with :where() so hover:text-slate-700 still wins; the dark remap keeps its line; a second rule steps the greys on a selected row (.bg-blue-50) to slate-600",
      html.includes('html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}')
      // NARROWED 10 Nov 2026 (wave 3, finding 5): + the Account's amber short-row wash (rgba(217,119,6,.06))
-     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#475569}')
-     && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9AA1AB}')
+     // NARROWED 23 Nov 2026 (the own look, Group A, stage 2): the wash step is the neutral second text #44464B, was slate-600 #475569
+     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#44464B}')
+     && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9C9FA4}')   // NARROWED 23 Nov 2026 (own look): Dark's neutral caption grey, was #9AA1AB
      // NARROWED 22 Oct 2026 (UI fix 7): fewer captions on the Data pages (the Diagnostics card and long hints went)
      && code.includes("text-slate-400 hover:text-slate-700") && (code.match(/\btext-slate-400\b/g) || []).length >= 100);
   ok("captions #3: the rail's group headings have no opacity, the big screen's labels read --muted (no #9aa1ac), the Dashboard group title defaults to --muted (no #94a3b8), and no text-slate-300 is left in the markup — every placeholder reads slate-500 (the dark remap line went with it)",
@@ -4048,7 +4069,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
-     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#f1f5f9", "#475569"]')
+     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#edeeef", "#44464B"]')   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
      && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
@@ -4269,9 +4290,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ UI FIX 6 card 3 (finding #37): the commit week's heading is text-blue-700 (the accent's darker shade, remapped per accent and look) instead of var(--navy) at 4.44:1; the commit column keeps its inline wash",
      _hz.includes('<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>')
      && !_hz.includes('style={role === "commit" ? { color: "var(--navy)" } : {}}')
-     && _hz.includes('style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>')
-     && html.includes(':root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}')
-     && html.includes('html[data-theme="dark"] .text-blue-700{color:#FFB454}') && html.includes('html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}'));
+     // NARROWED 24 Nov 2026 (own look, stage 3): the wash is the column tint; text-blue-700 is the sign blue (the page's
+     // Tailwind config) and Dark's the light sign blue #8AB4F8 (was #FFB454)
+     && _hz.includes('style={role === "commit" ? { background: "var(--navy-soft-col)" } : {}}>')
+     && !html.includes('[data-accent="orange-shades"] .text-blue-700')   // NARROWED 24 Nov 2026 (own look, stage 5): the per-accent remaps went with the accents
+     && html.includes('blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}')
+     && html.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}') && !html.includes('[data-accent^="blue"] .text-blue-700'));
   // card 5 (decision 6): Rotate and One section only
   const _tdF = src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart("));
   const _fit = src.slice(src.indexOf("function todayFit("), src.indexOf("function DashboardToday("));
@@ -4937,9 +4961,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes("if(!b.isEmpty() && m.getZoom() < 15) m.fitBounds(b, { padding: 40, maxZoom: 18, duration: 0 });")
      // NARROWED 31 Oct 2026 (PR 3): and a pinned picture's "Fit to screen" (asked for, never on its own)
      && (ed.match(/fitBounds\(/g) || []).length === 2 && ed.includes("const fitPic = (p) => {") && ed.includes("onClick={() => fitPic(p)}>Fit to screen</button>"));
-  ok("DRAW: the palette's tool button is ONE module-level component (a click never remounts it, so the focus stays), white on an inline navy when picked (the Dark look's rule)",
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 3): the picked tool is the --navy-soft tint with --navy words (a selection is a
+  // tint, never a fill; was white on an inline navy)
+  ok("DRAW: the palette's tool button is ONE module-level component (a click never remounts it, so the focus stays), the sign blue tint and words when picked",
      (src.match(/const PalBtn = /g) || []).length === 1 && src.includes('const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className=')
-     && src.includes('style={on ? { background: "var(--navy)" } : undefined} />;') && src.indexOf("const PalBtn = ") < src.indexOf("function SiteLayoutDraw(")
+     && src.includes('style={on ? { background: "var(--navy-soft)", color: "var(--navy)" } : undefined} />;') && !src.includes('style={on ? { background: "var(--navy)" } : undefined} />;') && src.indexOf("const PalBtn = ") < src.indexOf("function SiteLayoutDraw(")
      && !ed.includes("const PalBtn") && (ed.match(/<PalBtn /g) || []).length === 4 && !ed.includes("bg-[color:var(--navy)]"));
   ok("DRAW: a selected area's m² is less its holes (the Chrome check, 31 Oct)",
      ed.includes("withHoles(sel).geometry.coordinates.reduce((s, r, i) => s + (i ? -1 : 1) * window.WSLayouts.areaM2(r), 0)")
@@ -5436,7 +5462,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img (a group for a planner) with the words",
      code.includes("const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;") && lpc.includes('role={can ? "group" : "img"} aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`}')
      && lpc.includes("const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);")
-     && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}"));
+     && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#C6C8CC 0 4px,#E1E2E4 4px 8px);color:#34363A}"));   // NARROWED 23 Nov 2026 (own look): the neutral hatch
   ok("⭐ 2.1-9 (Q8): the free time in the server's words at the row's end; destination colours from the chart tokens (no hard-coded control blue)",
      lpc.includes('<div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>') && code.includes("const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`"));
   ok("⭐ 2.1-9 (Q12): Apply only in the compressed view, planners / admins, never on a confirmed week or with nothing to move, and asks first; the grid re-reads after",

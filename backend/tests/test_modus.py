@@ -717,7 +717,8 @@ ok("map: the overlay response carries the team names the map shows",
 fe_src = read("frontend/index.html")
 # REVERSED 23 Oct 2026 (claude/team-words): the tooltip showed the raw slot id to a person; the pill is the name only
 ok("frontend: the team pill shows the name, and no tooltip with the id",
-   '"#64748B" }}>{teamName(k)}</span>' in fe_src and "title={k}>{teamName(k)}</span>" not in fe_src)
+   # NARROWED 23 Nov 2026 (the own look, Group A): the unnamed team's fallback grey is the neutral caption grey, was slate #64748B
+   '"#62656B" }}>{teamName(k)}</span>' in fe_src and "title={k}>{teamName(k)}</span>" not in fe_src)
 ok("frontend: the submit picker has no hard-coded six-team fallback",
    '["IPT1","IPT2","IPT3","IPT4","IPT5","IPT6"]' not in fe_src and "Object.keys(TEAM_LABELS)" in fe_src)
 # NARROWED 14 Oct 2026 (D9): + the phone's More sheet (the header, the rail's foot, and More)
@@ -1135,9 +1136,11 @@ ok("ui_audit.js drives the installed Google Chrome (the user, 17 Oct 2026), the 
 ok("ui_audit.js (27 Oct 2026, finding #43) leaves screen-reader-only boxes (1 px, overflow hidden, absolute) out of text-clipped",
    'if (cs.position === "absolute" && parseFloat(cs.width) <= 1 && parseFloat(cs.height) <= 1 && cs.overflow === "hidden") continue;' in _audit
    and "screen-reader-only text (.sr-only: a 1 px box, overflow hidden, by design) is not a cut label" in _audit)
-ok("ui_audit.js runs the Dark + Blue pass at the desk width as part of the recorded shape (decision 15)",
-   all(s in _audit for s in ('{ look: "dark", accent: "blue", widths: [DESK_W] }', "extraPasses: EXTRA_PASSES",
-                             "await walkPortal(browser, server.base, p.look, p.accent, false, p.widths)", "o.extraPasses || []")))
+# REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accents are gone from the app, so the Dark + Blue pass and the
+# extra accents are gone from the audit; the shape still reads both keys (as empty), so a run from before does not pair
+ok("ui_audit.js no longer runs the Dark + Blue pass or the extra accents (the accents are gone); the shape reads both keys as empty, so an older run does not pair",
+   not any(s in _audit for s in ('{ look: "dark", accent: "blue", widths: [DESK_W] }', "extraPasses: EXTRA_PASSES", "EXTRA_ACCENTS", "--accents", "modus_accent"))
+   and "o.extraAccents || [], o.extraPasses || []" in _audit)
 ok("ui_audit.js grades the 44 px rule as a failure BY DEFAULT since the phone branch (decision 14), keeps --strict-44 and adds "
    "--no-strict-44 for the old grading, says since when in its header, keeps the set-apart rows as warnings and the flag out of the shape",
    all(s in _audit for s in ('else if (a === "--strict-44") o.strict44 = true', 'else if (a === "--no-strict-44") o.strict44 = false',
@@ -1178,7 +1181,8 @@ ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and
 ok("ui_audit.js measures the guide hints: the first-visitor context carries the signed-in cookies, the two guide stops assert "
    "what they are for (guide-shown) and put the counts on the record",
    # NARROWED 18 Oct 2026 (claude/ui-fix-phone, decision 8): the wait is for a dot OR the strip — the map draws no dot on a phone
-   all(s in _audit for s in ("async function guideContext(browser, ctx, base, look, accent, w)", "g.addCookies(await ctx.cookies(base))",
+   # NARROWED 24 Nov 2026 (own look, stage 5): no accent argument
+   all(s in _audit for s in ("async function guideContext(browser, ctx, base, look, w)", "g.addCookies(await ctx.cookies(base))",
                              'waitForSelector(".guide-dot, .guide-strip"', 'id: "guide-shown"', 'guide: "map"', 'guide: "portal"',
                              '"map-page+guide"', '"dashboard+guide"', "stop.guideDots = dom.guide.dots",
                              'stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null',

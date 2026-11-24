@@ -794,8 +794,11 @@ ok("...the guide names the buttons the screens now show (Route all, not routed)"
    "<strong>Route all</strong>" in src and "Bake all" not in src and "not routed" in src)
 
 # 13 Oct 2026 (bundle E): the guide describes what the Appearance button now offers, and the narrow left menu
-ok("E (W16): the guide names the four accents beside the three looks, the plan-first rule and the status shapes",
-   all(f"<strong>{w}</strong>" in src for w in ("Ink", "Light", "Dark", "Orange", "Blue", "Blue shades", "Orange shades"))
+# REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone, so the guide names the three looks and
+# no accent; the plan-first rule and the status shapes stay
+ok("E (W16): the guide names the three looks and no accent (Orange, Blue, Blue shades, Orange shades are gone), the plan-first rule and the status shapes",
+   all(f"<strong>{w}</strong>" in src for w in ("Ink", "Light", "Dark")) and not any(f"<strong>{w}</strong>" in src for w in ("Orange", "Blue", "Blue shades", "Orange shades"))
+   and "under it the accent" not in src and "In every accent" not in src
    and "the first series is the plan and the second what was delivered" in src and "a warning is a triangle and a problem a diamond" in src)
 ok("E (W5): the guide says the left menu shows icons only below 768 px and opens over the page",
    "Below 768 px the left menu shows its icons only" in src and "opens it over the page until you pick one" in src)
