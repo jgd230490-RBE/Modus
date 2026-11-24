@@ -5,36 +5,39 @@
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#1F2024">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <!-- 13 Oct 2026 (W4): the technical guide. Staff-only: it sits under the /help mount, so the same sign-in
      gate as the user guide decides who reads it (gate.scope_for polices the /help prefix). It holds
      everything the screens no longer say: endpoints, stored fields, routing internals and the formulas
      in code terms (notes/w3-w4-inventory-1013.md lists every passage that moved here and from where).
      The rule for words on a screen is the user guide's job; this page may use any word. -->
 <style>
-:root{--navy:#2563EB;--deep:#1F2024;--blue:#3B82F6;--green:#059669;--red:#DC2626;--ink:#1E293B;--grey:#64748B;--line:#E2E8F0;--paper:#fff;--panel:#F8FAFC}
+:root{--navy:#0B4EA2;--deep:#1F2024;--blue:#0B4EA2;--green:#059669;--red:#DC2626;--ink:#1F2024;--grey:#62656B;--line:#E1E2E4;--paper:#fff;--panel:#F5F5F6}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;font:15px/1.6 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
+body{margin:0;font:15px/1.6 'IBM Plex Sans',system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper)}
+/* 24 Nov 2026 (the own look, claude/own-look-pages; notes\design-language-1123.md): Sora for headings, IBM Plex Sans for the
+   rest; neutral greys from the ink; the sign blue for links and what is chosen; one 6 px corner (3 px for code); no pill */
+h1,h2,h3,h4,#nav .brand{font-family:Sora,'IBM Plex Sans',system-ui,sans-serif}a{color:var(--navy)}
 #nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;background:var(--deep);color:rgba(255,255,255,.72);padding:18px 14px 30px;font-size:13px;border-right:2px solid #FF8C14}
-#nav .brand{color:#fff;font-weight:800;font-size:16px;line-height:1.2;margin:0 6px 14px}#nav .brand span{display:block;font-weight:500;color:rgba(255,255,255,.55);font-size:12px;margin-top:4px}
+#nav .brand{color:#fff;font-weight:700;font-size:16px;line-height:1.2;margin:0 6px 14px}#nav .brand span{display:block;font-weight:500;color:rgba(255,255,255,.55);font-size:12px;margin-top:4px}
 #nav ol{list-style:none;margin:0;padding:0}#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}
 #nav li.l1 a{font-weight:700;color:#fff;margin-top:8px}#nav li.l2 a{padding-left:20px;font-size:12.5px}#nav li a:hover{background:rgba(255,255,255,.08)}
 main{margin-left:280px;padding:28px 44px 80px;max-width:1040px}
 h1{color:var(--deep);font-size:26px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--line)}h1:first-child{border-top:0;margin-top:0}
-h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:#1D4ED8;font-size:16px;margin:22px 0 6px}
-p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px}
-pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}
+h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:var(--deep);font-size:16px;margin:22px 0 6px}
+p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EDEEEF;padding:1px 4px;border-radius:3px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}
 ul{margin:0 0 12px;padding-left:22px}li{margin:0 0 6px}
 li>code,p>code{overflow-wrap:anywhere}.tbl{overflow-x:auto;margin:6px 0 18px}.tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight:600}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--navy);white-space:nowrap}
-.callout{border-left:5px solid;border-radius:8px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
-.callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:#1D4ED8}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}
-#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}
+th{background:#fff;color:var(--deep);text-align:left;padding:7px 9px;font-weight:600;border-bottom:2px solid var(--deep)}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--deep);white-space:nowrap}
+.callout{border-left:5px solid;border-radius:6px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
+.callout.note{background:#F0F4F9;border-color:var(--blue)}.callout.note .ct{color:#0B4EA2}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}
+#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:6px;font-size:12px}
 @media (max-width:900px){#nav{position:static;width:auto}main{margin-left:0;padding:18px 16px 60px}}
 /* 18 Oct 2026 (UI audit decision 10, #22): a skip link heads the contents — hidden at a desk until it has the focus, the
    first row of the list on a phone, where the chapter rows sit above the text; those rows and "↑ top" are 44 px tall there */
-.skip{position:absolute;left:8px;top:8px;z-index:9;padding:10px 14px;border-radius:8px;background:#fff;color:var(--navy);font-weight:600;text-decoration:none;transform:translateY(-200%)}
-.skip:focus{transform:none;outline:2px solid #FF8C14;outline-offset:2px}
+.skip{position:absolute;left:8px;top:8px;z-index:9;padding:10px 14px;border-radius:6px;background:#fff;color:var(--navy);font-weight:600;text-decoration:none;transform:translateY(-200%)}
+.skip:focus{transform:none;outline:2px solid var(--blue);outline-offset:2px}
 main:focus{outline:0}
 @media (max-width:900px){.skip{position:static;display:flex;align-items:center;min-height:44px;margin:0 0 8px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.1);color:#fff;transform:none}#nav li a{min-height:44px;padding:12px 8px}#top{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}}
 @media print{#nav,#top{display:none}main{margin:0;padding:0;max-width:none}}
