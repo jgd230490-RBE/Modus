@@ -7821,7 +7821,7 @@
             g.moveTo(x1, y1); g.lineTo(x0, y1); g.moveTo(x0 + hd, y1 - hd); g.lineTo(x0, y1); g.lineTo(x0 + hd, y1 + hd); g.stroke();
         }
         return { img: { width: W, height: H, data: g.getImageData(0, 0, W, H).data },
-                 opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[6 * R, 10 * R]], content: [L, 2 * R, L + MID, H - 2 * R] } };
+                 opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[6 * R, 10 * R]], content: [L, 1 * R, L + MID, H - 1 * R] } };
     }
     // re-added after a basemap switch (which drops images), like the council badges
     function addPillBadges(m) {
@@ -7836,7 +7836,7 @@
     function badgeLayout(field, image) {
         return { 'symbol-placement': 'point', 'text-field': field, 'text-size': BADGE_TEXT_SIZE, 'text-font': ['literal', BADGE_FONT],
                  'text-anchor': 'center', 'text-offset': [0, 0], 'text-padding': 3,
-                 'icon-image': image, 'icon-text-fit': 'both', 'icon-text-fit-padding': [1, 1, 1, 1] };
+                 'icon-image': image, 'icon-text-fit': 'both', 'icon-text-fit-padding': [0, 1, 0, 1] };
     }
     //: a blue at five lightness steps (HSL hue 217, mockup 5's #2071F3 family), light to dark; the light end may recede
     //: (rule 5). Track C review: this is NOT the plan blue #4A72C9 (hue 221) that the council fill (AREA_RAMP) is built

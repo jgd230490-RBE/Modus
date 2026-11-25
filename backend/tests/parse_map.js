@@ -3410,7 +3410,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("⭐ badges (19 Oct): the two plate images are drawn once, re-added after a basemap switch, stretch in the middle only (the corners, the arrow keep their shape) (NARROWED 24 Nov 2026)",
      blkCode.includes("function plateBadgeImage(edge, arrow) {") && blkCode.includes("function addPillBadges(m) {") && !blkCode.includes("function pillBadgeImage(")
      && blkCode.includes("[['mv-badge', BADGE_STYLE.mv.edge, true], ['co2-badge', BADGE_STYLE.co2.edge, false]]")
-     && blkCode.includes("opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[6 * R, 10 * R]], content: [L, 2 * R, L + MID, H - 2 * R] }")
+     // the text box of a 12 px number is about 14 px tall: 1 px above and below it makes the plate 16 px (measured in Chrome)
+     && blkCode.includes("opts: { pixelRatio: R, stretchX: [[L, L + MID]], stretchY: [[6 * R, 10 * R]], content: [L, 1 * R, L + MID, H - 1 * R] }")
+     && blkCode.includes("'icon-text-fit-padding': [0, 1, 0, 1]")
      && (blkCode.match(/try \{ addPillBadges\(map\); \} catch \(e\) \{\}/g) || []).length === 2);
   // the four count pins of review §2.2d, honoured (asserted above unchanged; these say WHY they still hold)
   ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
