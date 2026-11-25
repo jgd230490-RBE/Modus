@@ -2085,8 +2085,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && /\.kicker\{display:flex;align-items:center;gap:7px;font:400 12px\/1\.4 var\(--f-text\);color:var\(--muted\);/.test(html) && !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(html)
     && ['<PageHeader title="Dashboard" kicker=', '<PageHeader title="Forecasts" kicker="Plan"', '<PageHeader title="Configuration" kicker="Data"', '<PageHeader title="Look-ahead" kicker='].every(t => code.includes(t)));
   // NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled, not boxed: a 2 px ink line on top, a hairline under
+  // NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the ink line is each CELL's top edge (2 px, or 4 px in a
+  // status's colour), so the strip itself keeps only the hairline under it; still one ruled strip, no box
   ok("the Dashboard's six figures sit in one ruled strip, and Big screen is the orange action button",
-    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:0;border-top:2px solid var\(--ink\);border-bottom:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
+    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:0;border-bottom:1px solid var\(--line\);/.test(html)
+    && /\.dash-cards \.dash-card\{[^}]*box-shadow:inset 1px 0 0 var\(--line\),inset 0 2px 0 var\(--ink\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
   ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
     _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
     && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
@@ -2365,7 +2368,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     !/\b(bake|baked|server|endpoint|token|cached|geometry)\b/i.test(_cfBody.slice(_cfBody.indexOf('{tab === "mapbulletin"'), _cfBody.indexOf('{tab === "costing"'))));
   // 1. the one-screen Dashboard
   ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
-    (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
+    // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): each card is named (k=…) and the strip sits in its size container
+    (_dbWork.match(/<Card k="[a-z]+" label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">')
     // NARROWED 5 Nov 2026 (group 6, PR 2): the Concerns section's own <details> lives in ConcernsDash, so still five here
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
@@ -2373,10 +2377,13 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default) (question E): the second card is the organisation's count, deliveries under it
-  ok("...the six cards: material, lorry movements a day (deliveries × the count; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
-    _dbWork.includes("<Card label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}")
-    && _dbWork.includes("`${grp(Math.round(loadsPerDay))} deliveries, each in and out`") && !_dbWork.includes('label="Deliveries a day"') &&
-    ['label="Material in view"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
+  // REVERSED 24 Nov 2026 (the Dashboard rethink, A1; John's Q4): the sixth card is the carbon target's answer, NOT Transport
+  // carbon (its figure moves to the carbon section, task B); "deliveries in and out" as drawn
+  ok("...the six cards: material, lorry movements a day (deliveries × the count; working days from Config), vehicles needed, planned this week, delivered against plan, the carbon target",
+    _dbWork.includes('<Card k="movements" label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}')
+    && _dbWork.includes("`${grp(Math.round(loadsPerDay))} deliveries in and out`") && !_dbWork.includes('label="Deliveries a day"') &&
+    ['label="Material in view"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Carbon target"'].every(t => _dbWork.includes(t))
+    && !_dbWork.includes('label="Transport carbon"')
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
   // 13 Oct 2026 (W5): narrowed — no onToggle handler any more; a chart in a collapsed section is built when its box
   // first has a size (ChartCanvas's ResizeObserver), so it is measured right on the first open
@@ -2445,8 +2452,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     _dbc.indexOf("const [ct, setCt]") > 0 && _dbc.indexOf("const [ct, setCt]") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("fetch(`${API}/carbon/target`)") < _dbc.indexOf("if(err) return"));
   ok("⭐ Dashboard: a strip under the six cards, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
-    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />") && (_dbW.match(/<Card label=/g) || []).length === 6
-    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
+    // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the named cards and the strip's size container (task B moves the strip)
+    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />") && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6
+    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
     // 14 Oct 2026 (narrowed, D9): the Portal tells the Dashboard it is on a phone (no big screen there)
@@ -2458,7 +2466,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
     // NARROWED 5 Nov 2026 (group 6, PR 2): + canApprove
     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove })")
+    // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): + initialLimits
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, initialLimits, onWall, onOpen, phone, canApprove })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2578,7 +2587,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
-    && (_dbW.match(/<Card label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5
+    && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5   // NARROWED 24 Nov 2026 (A1): named cards
     // 13 Oct 2026 (W5): narrowed — the five sections no longer carry onToggle={onMore} (see the W5 block)
     && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);
   ok("the hooks sit before the early returns (React #310)",
@@ -3256,9 +3265,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // (or removed) must leave the list, and INFO_PINNED_MAX comes down with it; never raise either. A box not on the list fails
   // at 31 words. The guide link (a new or changed box links to its user-guide section) is not checked yet: FR7.
   const INFO_PINNED_30 = { "dash.carbon": 40, "dash.today_veh": 40, "fc.cost": 39, "dash.delivered": 38, "dash.sim": 38, "clp.holding_areas": 38,
-    "la.lorryplan": 37, "la.commit": 37, "dash.deliveries": 36, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
+    "la.lorryplan": 37, "la.commit": 37, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
     "map.commit.today": 33, "map.commit.week": 33, "dash.stock": 33, "dash.vehicles": 32, "la.cost_quote": 32, "clp.euro_class": 31, "clp.carbon_rate": 31 };
-  const INFO_PINNED_MAX = 21;
+  const INFO_PINNED_MAX = 20;   // 24 Nov 2026 (the Dashboard rethink, A1): dash.deliveries brought within 30 words, left the list
   const over30 = (dict) => Object.keys(dict).filter(k => words(dict[k].text) > 30);
   const unpinnedOver = (dict) => over30(dict).filter(k => !(k in INFO_PINNED_30));
   ok(`⭐ FR1 A2: every "i" box shows at most 30 words, but the pinned (${over30(INFOS).length} over 30 today, ${Object.keys(INFO_PINNED_30).length} pinned)`,
@@ -3306,7 +3315,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // what W3 removed from the screens (source-level, so a revert is caught)
   ok("🔴 W3 removed: no cursor:help and no hover title on a Dashboard card, figure or Today figure",
      !/cursor-help/.test(src) && !/cursor:help/.test(html)
-     && ["const Card = ({ label, value, sub, info, tone })", "const Fig = ({ value, label, sub, info, tone })", "const Big = ({ value, label, sub, info, tone })"].every(x => src.includes(x))
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the strip's Card takes a status, no tone and no title
+     && ["const Card = ({ k, label, value, info, bar, st, st2, lines, edge })", "const Fig = ({ value, label, sub, info, tone })", "const Big = ({ value, label, sub, info, tone })"].every(x => src.includes(x))
      && !/<Card [^>]*\btitle=/.test(src) && !/<Fig [^>]*\btitle=/.test(src) && !/<Big [^>]*\btitle=/.test(src));
   ok("🔴 ...the Dashboard shows the date range once (the kicker): the subtitle that repeated it and the scope is gone",
      !_dbBody.includes("Strategic planning view") && !_dbBody.includes("subtitle={`") && _dbBody.includes('<PageHeader title="Dashboard" kicker={firstRun ? undefined : `${rangeLabel} ·'));
@@ -5336,7 +5346,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      code.includes("{canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
      && code.includes('<Dashboard meta={meta} phone={narrow} canApprove={canApprove}')
      // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue (the render harness's months with a queue)
-     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){"));
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): + initialLimits (the traffic limits read once at load)
+     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, initialLimits, onWall, onOpen, phone, canApprove }){"));
   ok("CONCERNS DASH: the five figures, the monthly chart with a title and scope (Copy / Download), by kind, busiest routes",
      ['label="received"', 'label="open now"', 'label="working days to first reply (median)"', 'label="working days to close (median)"',
       "replied within ${data.reply_days} working days"].every(w => cd.includes(w))
@@ -5646,9 +5657,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && (code.match(/loadLimitUse\(\)/g) || []).length >= 2);
   const td = code.slice(code.indexOf("function TrafficDash("), code.indexOf("function DashboardStockChart("));
   ok("TRAFFIC DASH: a fold for planners and admins under Gate arrivals, read on first open, following the months and Sites",
-     td.includes("<summary>Traffic limits</summary>") && td.includes("if(!open) return;")
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the Dashboard reads the limits ONCE at load (its Lorry movements
+     // figure's status) and hands the read to the fold (`shared`); the fold's own read on first open stays for a caller with none
+     td.includes("<summary>Traffic limits</summary>") && td.includes("if(!open || shared) return;")
      && td.includes("fetch(`${API}/traffic-limits?${q}`)") && td.includes('"&sites=" + sites.map(encodeURIComponent).join(",")')
      && code.includes("{canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
+     && code.includes("shared={{ data: tl, err: tlErr }} />")
      && code.indexOf("<TrafficDash ") > code.indexOf("<GateArrivalsPanel ") && code.indexOf("<TrafficDash ") < code.indexOf("<ConcernsDash "));
   ok("TRAFFIC DASH: a table (road, this month, limit, months over) and a chart a limit with Copy / Download (title and scope)",
      td.includes('data-traffic-table="1"') && td.includes(">Months over</th>") && td.includes("data-traffic-chart={L.id}")

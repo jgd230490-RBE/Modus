@@ -295,7 +295,8 @@ async function carbonTargetDom(){
   await settle(50);
   const e1 = d1.el.querySelector('[data-carbon-target="error"]');
   ok("⭐ CARBON DOM: the Dashboard's own read of the target fails: one line says so, the programme figures stay",
-     !!e1 && e1.textContent === "The carbon target did not load." && d1.el.textContent.includes("Transport carbon"));
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): Transport carbon left the strip (task B shows it in the carbon section)
+     !!e1 && e1.textContent === "The carbon target did not load." && d1.el.textContent.includes("Material in view"));
   d1.done();
   const f1 = mount(w.Forecasts, { meta: dMeta, who: "t", access: plannerAcc, onEdit(){}, onChanged(){} });
   await settle(50);
@@ -879,7 +880,8 @@ async function gateArrivalsDom(){
   await settle(50);
   const e1 = d1.el.querySelector('[data-gate-arrivals="error"]');
   ok("⭐ GATE DOM: the panel's own read fails: one line says so, the carbon strip and the programme figures stay",
-     !!e1 && e1.textContent === "The gate arrivals did not load." && d1.el.textContent.includes("Transport carbon")
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the programme figures are read by their first card's name
+     !!e1 && e1.textContent === "The gate arrivals did not load." && d1.el.textContent.includes("Material in view")
      && !!d1.el.querySelector('[data-carbon-target="set"]') && !d1.el.querySelector("[data-ga-gate]"));
   ok("GATE DOM: ...it asked for this month, once, as a GET",
      gaCalls().length === 1 && gaCalls()[0].url === `/api/gates/arrivals?month=${thisMonth}` && gaCalls()[0].method === "GET");

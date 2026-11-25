@@ -38,13 +38,17 @@ ok("2: the divisor is the tonnes planned up to this month",
    "if(r.month_index <= nowIdx) T.tNow += r.tonnes" in html and "deliveredPct: pctOf(T.actualT, T.tNow)" in html
    and "plannedToDate: T.tNow" in html)
 ok("2: the table's per-line figure follows", "a.actualT * 100 / a.tNow" in html and "if(r.month_index <= nowIdx) a.tNow += r.tonnes" in html)
+# NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the strip's Delivered figure is the to-date share with
+# "X t of Y t" under it and its status; the whole plan's share moves into its "i" (the drawing's "30 % of the whole plan").
+# The big screen's two figures keep their words (2 of the old 3).
 ok("2: the card, the big-screen figures and the i box say 'planned to date'",
-   "t planned to date · " in html and html.count("t planned up to this month. Whole plan") == 3 and "up to and including this month" in html)
-ok("2 (John's change): the card shows BOTH, to date as the headline, the whole plan beneath, the i box naming each",
-   '% <span className="text-[13px] font-normal">to date</span>' in html and "deliveredWholePct: pctOf(T.actualT, T.t)" in html
-   and "% of the whole plan (${bigNum(K.totT)} t)" in html and html.count("Whole plan: ÷ ${grp(K.totT)} t planned in view.") == 3
-   and "The second line gives the share of the whole plan in view" in html)
-ok("2: the headline's second line starts from the to-date figure", "t planned to date · " in html)
+   "t planned to date: " in html and html.count("t planned up to this month. Whole plan") == 2 and "up to and including this month" in html)
+ok("2 (John's change): the card shows BOTH, to date as the headline, the whole plan in its i box, the i box naming each",
+   "deliveredWholePct: pctOf(T.actualT, T.t)" in html
+   and "% of the whole plan in view (${grp(K.totT)} t)." in html and html.count("Whole plan: ÷ ${grp(K.totT)} t planned in view.") == 2
+   and "The second line gives the share of the whole plan in view" in html
+   and '% <span className="text-[13px] font-normal">to date</span>' not in html and "t planned to date · " not in html)
+ok("2: the strip's line under the figure starts from the to-date delivered tonnes", "`${bigNum(K.actualT)} t of ${bigNum(K.plannedToDate)} t`" in html)
 ok("3: a long series name is left off, never cut", 'if(String(ds.label || "").length > 20) return;' in html
    and 'm.label.slice(0, 19)' not in html)
 ok("4: the council headline names the top bar by the bars' measure",

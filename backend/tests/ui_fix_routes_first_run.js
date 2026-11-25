@@ -122,7 +122,8 @@ ok("...each route listed is a button that selects it and opens the Routes page; 
 ok("⭐ 17: a deployment with no forecast line at all (the unfiltered read is empty) opens on its first steps: firstRun, not a filter message",
    code.includes("const firstRun = !wall && !!data && rows.length === 0;")
    && code.includes("{firstRun && <DashFirstSteps locCount={locList ? locList.length : null} routeCount={(meta.routes || []).length} onOpen={onOpen} />}")
-   && code.includes("{!firstRun && <>\n          <div className=\"dash-cards\" data-guide=\"dash-figures\">"));
+   // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the strip opens with its size container, a comment above it
+   && /\{!firstRun && <>\n(\s*\{\/\*[\s\S]*?\*\/\}\n)?\s*<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">/.test(code));
 ok("...on its first steps the header drops the date kicker, the filters, the coverage line and the 'plan lines in view' count",
    code.includes("kicker={firstRun ? undefined : `${rangeLabel} ·") && code.includes("actions={firstRun ? null : <div className=\"flex flex-wrap gap-2 items-center\">")
    && code.includes("{!firstRun && <div className=\"text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1\">") && code.includes("count={firstRun ? null :"));

@@ -44,6 +44,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     --navy:#0B4EA2; --navy-deep:#1F2024; --blue:#0B4EA2; --navy-soft:rgba(11,78,162,.10); --navy-soft-col:rgba(11,78,162,.06);
     --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#C6C8CC;
     --ink:#1F2024; --muted:#62656B; --line:#E1E2E4; --bg:#FFFFFF;
+    --spark:#8E9197;     /* 24 Nov 2026 (Dashboard rethink A1): the small bars' other months, 3.2 to 1 on white */
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
     --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
     /* 5 Oct 2026 — APPEARANCE (the picker at the right of the header, html[data-theme]).
@@ -110,6 +111,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     --haul-text:#F0A838; --haul-soft:#3A2E1C;
     --line-2:#4B4D52;
     --st-none:#C9CACE;
+    --spark:#7E8187;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
     color-scheme:dark;
@@ -478,12 +480,29 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .fig-strip{display:grid;gap:0 !important;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);overflow:hidden;background:none;}
   .fig-strip>*{border:0 !important;border-radius:0 !important;background:none !important;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line) !important;margin:-1px 0 0 -1px;min-width:0;}
   /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
-  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;background:none;overflow:hidden;}
-  .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;padding-left:12px !important;padding-right:12px !important;}
-  .dash-cards .dash-card:first-child{padding-left:2px !important;}   /* 24 Nov 2026 (own look, B1 item 5): a strip cell keeps its own padding inside a ruled section (the third mockup: 10 px, the first 2 px) */
-  @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
-  @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
+  /* 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the strip's columns follow ITS OWN width (.dash-cards-box is a
+     size container): two below 560 px, three to 1,000 px, six from 1,000 px (his 1150 px window with the rail folded
+     gives 1,045). Each cell carries its own top edge: the 2 px ink line, or 4 px in the status's colour on a figure with
+     a status (.dc-ok / .dc-warn / .dc-bad). No wash, no coloured figure. The cell's left hairline is inset; the strip's
+     overflow clips the first column's. */
+  .dash-cards-box{container-type:inline-size;}
+  .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;overflow:hidden;}
+  .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 2px 0 var(--ink);margin:0 0 0 -1px;padding:13px 12px 11px !important;display:flex;flex-direction:column;}
+  .dash-cards .dash-card.dc-ok{box-shadow:inset 1px 0 0 var(--line),inset 0 4px 0 var(--green);}
+  .dash-cards .dash-card.dc-warn{box-shadow:inset 1px 0 0 var(--line),inset 0 4px 0 var(--gold);}
+  .dash-cards .dash-card.dc-bad{box-shadow:inset 1px 0 0 var(--line),inset 0 4px 0 var(--red);}
+  .dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}   /* 24 Nov 2026 (own look, B1 item 5): a strip cell keeps its own padding (the third mockup: 10 px, the first 2 px) */
+  @container (min-width:560px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));} .dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}
+  @container (min-width:1000px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));} .dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}
+    .dash-cards .dash-card-l{min-height:1.3em;white-space:nowrap;}}
   .dash-card{padding:14px 16px;}
+  .dash-cards .dc-nw{white-space:nowrap;}
+  .dash-cards .dc-bar{height:24px;margin:4px 0 5px;line-height:0;}
+  .dash-cards .dc-bars,.dash-cards .dc-plan{display:block;width:100%;max-width:150px;height:24px;}
+  .dash-cards .dc-cur{fill:var(--ink);} .dash-cards .dc-oth{fill:var(--spark);} .dash-cards .dc-mark{fill:var(--red);} .dash-cards .dc-track{fill:var(--line-2);}
+  .dash-cards .dc-plan-t{font:12px "IBM Plex Sans",sans-serif;fill:var(--muted);}
+  .dash-cards .dc-st{margin-top:1px;} .dash-cards .dc-st .row-st{white-space:normal;align-items:flex-start;} .dash-cards .dc-st .row-st i{margin-top:4px;}
+  .dash-cards .dc-unit{font-size:13px;font-weight:400;font-family:"IBM Plex Sans",sans-serif;}
   /* 13 Oct 2026 (W3) — the info box. An "i" in an 18 px ring with a 24 px hit area (44 px on a touch
      screen, by the ::after, so the layout does not grow); the panel is the popover look; below 640 px
      it opens as a sheet from the bottom. Opens on click / tap / Enter / Space, never on hover. */
@@ -510,9 +529,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .info-pop.is-sheet{left:0 !important;right:0 !important;bottom:0 !important;top:auto !important;max-width:none;width:auto;border-radius:6px 6px 0 0;max-height:70vh;overflow:auto;padding:16px 16px 20px;}
   .dash-wall .ibtn{display:none;}
   .dash-wall .rd-chev{display:none;}   /* 13 Oct 2026 (W6): a wall display is not clicked, like its info boxes */
-  .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;min-height:2.6em;}
-  .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
-  .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
+  .dash-card-l{font-size:13px;color:var(--muted);font-weight:500;line-height:1.3;min-height:2.6em;margin-bottom:3px;}
+  .dash-card-v{font-size:23px;font-weight:600;color:var(--navy-deep);line-height:1.15;margin:0;white-space:nowrap;}
+  .dash-card-s{font-size:12px;color:var(--muted);line-height:1.35;margin-top:2px;}
   .dash-more{background:none;border:0;border-top:1px solid var(--ink);border-radius:0;padding:0;}
   .dash-more>summary{cursor:pointer;list-style:none;padding:12px 0;font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px;}
   .dash-more>summary::-webkit-details-marker{display:none;}
@@ -1736,11 +1755,18 @@ const INFO = {
   // 11 Nov 2026 (card 3, John: yes): the "i" beside "Plan changed since Issue N" (its value: the first two changes)
   "clp.changed": { title: "Since the last issue", text: "What changed in the plan since this CLP's last issue, as the approve card shows it." },
   "dash.material": { title: "Material in view", text: "The planned quantity of every plan line in view, in tonnes. Cubic metres and lorry loads become tonnes through each line's own conversion.", guide: "3-1-filters-and-the-six-cards", tech: "t1-volume" },
-  "dash.deliveries": { title: "Lorry movements a day", text: "Deliveries in the months in view, divided by the working days in those months. A lorry coming and going is 2 movements, as councils count them (or 1 visit, if set so on Config → Planning).",
+  // REWORDED 24 Nov 2026 (the Dashboard rethink, A1): 30 words at most, and what the strip's status reads; the old "how"
+  // stays behind its fold. Used by the strip only (the big screen's figures have their own entries).
+  "dash.deliveries": { title: "Lorry movements a day", text: "Deliveries in view divided by their working days, counted as Config → Planning says. The status sets each month against the traffic limits on Data → Zones.",
     how: "Trips are worked out for each month of each line: tonnes ÷ the vehicle's payload, rounded up. The working days in a month are set on Config → Planning.", guide: "3-1-filters-and-the-six-cards", tech: "t1-trips" },
   "dash.vehicles": { title: "Vehicles needed", text: "The most vehicles any one month needs, adding up every line in view. A line whose route is not worked out yet has no figure, so it is left out, never guessed.",
     how: "For each line: its trips a day ÷ the trips one vehicle can do in a driver's day on its route (there, back and the time to load and unload): the shift less the break the UK drivers' hours rules require, with at most 9 hours of driving.", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
-  "dash.week": { title: "Planned this week", text: "The tonnes and loads planned for the commit week on the Look-ahead, and how many lines held their plan last week. It is the Look-ahead's own figure.", guide: "6-3-commit-view-this-week-by-day" },
+  // 24 Nov 2026 (the Dashboard rethink, A1): the strip's own "i" boxes, each at most 2 sentences and 30 words; the big
+  // screen keeps the older entries above and below
+  "dash.fig.vehicles": { title: "Vehicles needed", text: "The most vehicles any one month needs, adding up every line in view. A line with no route worked out yet is left out.", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
+  "dash.fig.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered against the tonnes planned to date. Within the shortfall share set on Config → Planning it is on plan; further under, it is flagged.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
+  "dash.fig.target": { title: "Carbon target", text: "How far the approved plan is under or over the carbon target with the agreed Carbon planner decisions, then as forecast. All-in: making the material, transport and waste disposal.", guide: "6-5-reading-the-carbon-target", tech: "t1-carbon" },
+  "dash.week": { title: "Planned this week", text: "The tonnes and loads planned for the Look-ahead's commit week. The status counts last week's lines short by more than the share set on Config → Planning.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned up to and including this month. The second line gives the share of the whole plan in view. A month nobody has reported counts as not yet delivered.",
     how: "Actuals are typed each week on Look-ahead → Account. A day's actual rolls into its week.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
   "dash.carbon": { title: "Transport carbon", text: "The lorry carbon of the routed lines in view, in tonnes of CO₂e: the loaded leg there, and as much of the empty way back as each route charges (Data → Routes). Lines with no route yet are left out.",
@@ -2838,7 +2864,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, initialLimits, onWall, onOpen, phone, canApprove }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -3006,6 +3032,21 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     fetch(`${API}/gates/queue-months`).then(okJSON).then(j => { if(live) setGaQueue(j); }).catch(() => {});
     return () => { live = false; };
   }, [tick, wall]);
+  // 24 Nov 2026 (the Dashboard rethink, A1): the traffic limits, read ONCE at the page's load for the range and sites in
+  // view, for the Lorry movements figure's status AND the Traffic limits fold (which read it only when opened). Planners
+  // and admins only (the read refuses a team login, whose figure then has no status). Kept on the server until the next
+  // write; not read on the big screen.
+  const tlQ = `from=${Math.min(fromM, toM)}&to=${Math.max(fromM, toM)}` + (sites.length ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
+  const [tl, setTl] = useState(initialLimits ? { ...initialLimits, _q: "initial" } : null);
+  const [tlErr, setTlErr] = useState(false);
+  useEffect(() => {
+    if(initialLimits || wall || !canApprove) return;
+    let live = true;
+    setTlErr(false);
+    fetch(`${API}/traffic-limits?${tlQ}`).then(okJSON).then(j => { if(live) setTl({ ...j, _q: tlQ }); })
+      .catch(() => { if(live) setTlErr(true); });
+    return () => { live = false; };
+  }, [tick, tlQ, wall, canApprove]);
   useEffect(() => {
     if(!wall) return;
     const id = setInterval(() => setTick(t => t + 1), REFRESH_MS);
@@ -3256,13 +3297,32 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);
   const wkTot = (weekShown && weekShown.commit && weekShown.commit.totals) || null;
   const acct = (weekShown && weekShown.account) || null;
-  const Card = ({ label, value, sub, info, tone }) => (
-    <div className="card dash-card min-w-0">
-      <div className="dash-card-l">{label}{info && <InfoTip id={info.id} label={label} value={info.value} />}</div>
-      <div className="dash-card-v kpi-num" style={tone ? { color: tone } : undefined}>{value}</div>
-      {sub && <div className="dash-card-s">{sub}</div>}
-    </div>
-  );
+  // 24 Nov 2026 (the Dashboard rethink, A1): the strip's statuses and this month's bar (none when this month is outside
+  // the range). The carbon target is the whole scheme's (or a team login's share) whatever the filters: said on the cell.
+  const dcNow = (() => { const d = new Date(); return (d.getFullYear() - months.start_year) * 12 + d.getMonth() + 1; })();
+  const dcCur = dcNow >= D.lo && dcNow <= D.hi ? dcNow - D.lo : null;
+  const dcLim = tl && tl._q !== undefined && (tl._q === "initial" || tl._q === tlQ) ? dashLimitStatus(tl, months.start_year) : null;
+  const dcWeek = dashWeekStatus(acct);
+  const dcDel = dashDeliveredStatus(K.deliveredPct, factors);
+  const dcCt = dashTargetCell(ct, ctErr, sites.length > 0 || ipt !== "All" || material !== "All" || vehicle !== "All" || discipline !== "All" || !!lineKey);
+  // 24 Nov 2026 (the Dashboard rethink, A1): a cell of the ONE ruled strip. Label (its last word tied to the "i"), the
+  // figure in ink, the small bar where it has one (not on a phone), then at most three short lines: a status (a shape and
+  // a word) and up to two lines of words. `edge` = the status the cell's top edge takes (ok / warn / bad), else the ink.
+  const Card = ({ k, label, value, info, bar, st, st2, lines, edge }) => {
+    const sp = String(label).lastIndexOf(" ");
+    const head = sp < 0 ? "" : String(label).slice(0, sp + 1), last = sp < 0 ? String(label) : String(label).slice(sp + 1);
+    const ed = edge === undefined ? (st && ["ok", "warn", "bad"].includes(st.tone) ? st.tone : null) : edge;
+    return (
+      <div className={"card dash-card min-w-0" + (ed ? " dc-" + ed : "")} data-dash-card={k} data-dash-edge={ed || "ink"}>
+        <div className="dash-card-l">{head}<span className="dc-nw">{last}{info && <InfoTip id={info.id} label={label} value={info.value} />}</span></div>
+        <div className="dash-card-v kpi-num">{value}</div>
+        {bar && !phone && <div className="dc-bar">{bar}</div>}
+        {st && <div className="dc-st"><RowStatus tone={st.tone} word={st.word} /></div>}
+        {st2 && <div className="dc-st"><RowStatus tone={st2.tone} word={st2.word} /></div>}
+        {(lines || []).filter(Boolean).map((l, i) => <div key={i} className="dash-card-s">{l}</div>)}
+      </div>
+    );
+  };
   const applied = [
     status !== "Approved" && { k: "status", label: `Status: ${status}` },
     ipt !== "All" && { k: "ipt", label: `${TEAM()}: ${ipt === "none" ? "none set" : teamText(ipt)}` },
@@ -3373,23 +3433,34 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         <>
           {firstRun && <DashFirstSteps locCount={locList ? locList.length : null} routeCount={(meta.routes || []).length} onOpen={onOpen} />}
           {!firstRun && <>
-          <div className="dash-cards" data-guide="dash-figures">
-            <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} plan line${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
+          {/* 24 Nov 2026 (the Dashboard rethink, A1; John: "Direction A with small bar + with the condition accent at the top
+              of the box"): ONE ruled strip, six across from about 1,000 px of its own width (.dash-cards-box is the
+              container), three on a tablet, two on a phone. A status on four figures only (Q2). Transport carbon left
+              the strip for the carbon target's answer (Q4); its figure moves to the carbon section (task B). */}
+          <div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">
+            <Card k="material" label="Material in view" value={`${bigNum(K.totT)} t`}
+                  bar={<DashBars values={D.tonnesM} cur={dcCur} />}
+                  lines={[`${D.lines} plan line${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`]}
                   info={{ id: "dash.material", value: `Exactly ${grp(K.totT)} t` }} />
             {/* 9 Nov 2026 (v2.1 2.1-11b, question E): the organisation's count, deliveries under it */}
-            <Card label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}
-                  sub={countPV(meta) === 2 ? `${grp(Math.round(loadsPerDay))} deliveries, each in and out` : `${grp(K.totTrips)} deliveries over ${grp(nMonths * wdPerMonth)} working days`}
+            <Card k="movements" label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}
+                  bar={<DashBars values={D.tripsM} cur={dcCur} mark={dcLim && dcLim.m != null && dcLim.tone === "bad" && dcLim.m >= D.lo && dcLim.m <= D.hi ? dcLim.m - D.lo : null} />}
+                  st={dcLim} lines={[dcLim && dcLim.line, countPV(meta) === 2 ? `${grp(Math.round(loadsPerDay))} deliveries in and out` : `${grp(K.totTrips)} deliveries over ${grp(nMonths * wdPerMonth)} working days`]}
                   info={{ id: "dash.deliveries", value: `${countPV(meta) === 2 ? "2 × " : ""}${grp(K.totTrips)} deliveries ÷ (${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days)` }} />
-            <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs routes worked out"}
-                  info={{ id: "dash.vehicles", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
-            <Card label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} sub={wkTot ? `${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · last week ${acct.delivered} of ${acct.lines} lines held` : ""}${sites.length ? " · at these sites" : ""}` : (weekErr ? "this week did not load" : "loading this week")}
+            <Card k="vehicles" label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"}
+                  bar={K.peakFleet ? <DashBars values={D.vehM} cur={dcCur} /> : null}
+                  lines={[K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs routes worked out"]}
+                  info={{ id: "dash.fig.vehicles", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
+            <Card k="week" label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} st={wkTot ? dcWeek : null}
+                  lines={wkTot ? [`${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · ${grp(acct.delivered)} of ${grp(acct.lines)} held` : ""}`, sites.length ? "at these sites" : null] : [weekErr ? "this week did not load" : "loading this week"]}
                   info={{ id: "dash.week" }} />
-            <Card label="Delivered against plan" value={K.deliveredPct == null ? "—" : <>{K.deliveredPct.toFixed(0)} % <span className="text-[13px] font-normal">to date</span></>} sub={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.plannedToDate)} t planned to date · ${K.deliveredWholePct == null ? "—" : K.deliveredWholePct.toFixed(0)} % of the whole plan (${bigNum(K.totT)} t)`}
-                  info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To date: ${grp(K.actualT)} t delivered ÷ ${grp(K.plannedToDate)} t planned up to this month. Whole plan: ÷ ${grp(K.totT)} t planned in view.` }} />
-            <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`}
-                  sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`}${K.totCo2 > 0 ? ` · loaded ${co2T(K.totCo2L)} · empty ${co2T(K.totCo2E)}` : " · DESNZ 2026"}`}
-                  info={{ id: "dash.carbon", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
-          </div>
+            <Card k="delivered" label="Delivered against plan" value={K.deliveredPct == null ? "—" : <>{K.deliveredPct.toFixed(0)} % <small className="dc-unit">to date</small></>}
+                  bar={K.deliveredPct == null ? null : <DashPlanBar pct={K.deliveredPct} />} st={dcDel}
+                  lines={[K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.plannedToDate)} t`]}
+                  info={{ id: "dash.fig.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered of ${grp(K.plannedToDate)} t planned to date: ${K.deliveredWholePct == null ? "—" : K.deliveredWholePct.toFixed(0)} % of the whole plan in view (${grp(K.totT)} t).` }} />
+            <Card k="target" label="Carbon target" value={dcCt.value} st={dcCt.st} st2={dcCt.st2} lines={dcCt.lines} edge={dcCt.edge === undefined ? null : dcCt.edge}
+                  info={{ id: "dash.fig.target", value: ctOk(ct) ? [ctTargetLine(ct), ...ctProgress(ct)].join(". ") + "." : `${CT_NONE} ${CT_WHO}` }} />
+          </div></div>
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />
       {D.empty && (pendingOnly
         ? <EmptyState kind="none" title="No approved lines yet" body="The plan is drawn from approved forecast lines."
@@ -3426,7 +3497,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {!wall && <RouteChoicesRecord phone={!!phone} />}
           {/* 5 Nov 2026 (group 6, PR 2): the concerns from the public, planners and admins only */}
           {/* 9 Nov 2026 (v2.1 task 2.1-1, Q9): traffic limits, planners and admins only */}
-          {canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} onOpen={onOpen} />}
+          {canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} onOpen={onOpen} shared={{ data: tl, err: tlErr }} />}
           {canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} tripsM={D.tripsM} pv={countPV(meta)} onOpen={onOpen} />}
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
@@ -4019,14 +4090,17 @@ const cnIdx = (ym, startYear) => (parseInt(ym.slice(0, 4), 10) - startYear) * 12
 // open; follows the month range and the Sites filter (the limit is unchanged, only the lorries counted)
 const TL_STATE = { over: "Over", near: "Near", ok: "Within" };
 const tlNum = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
-function TrafficDash({ months, lo, hi, sites, sitesLabel, onOpen }){
+function TrafficDash({ months, lo, hi, sites, sitesLabel, onOpen, shared }){
   const [open, setOpen] = useState(false);
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState(false);
+  const [own, setData] = useState(null);
+  const [ownErr, setErr] = useState(false);
+  // 24 Nov 2026 (A1): the Dashboard reads the limits once at load for its Lorry movements figure and hands the same read
+  // here (`shared`: { data, err }); the fold's own read is kept for a caller that gives none
+  const data = shared ? shared.data : own, err = shared ? shared.err : ownErr;
   const sy = (months && months.start_year) || 2026;
   const q = `from=${lo}&to=${hi}` + ((sites && sites.length) ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
   useEffect(() => {
-    if(!open) return;
+    if(!open || shared) return;
     if(data && data._q === q) return;
     let live = true;
     setErr(false);
@@ -8535,7 +8609,7 @@ function cutWeekBySites(week, routes){
   if(account){
     const rs = (account.rows || []).filter(r => routes.has(r.route_id));
     const tOf = (r) => (r.actual_qty != null && r.planned_qty > 0) ? (r.planned_t || 0) * r.actual_qty / r.planned_qty : 0;
-    account = { ...account, rows: rs, lines: rs.length, reported: rs.filter(r => r.actual_qty != null).length, delivered: rs.filter(r => r.held).length,
+    account = { ...account, rows: rs, lines: rs.length, reported: rs.filter(r => r.actual_qty != null).length, delivered: rs.filter(r => r.held).length, short_flagged: rs.filter(r => r.short_flag).length,
                 shortfall: rs.reduce((s, r) => s + (r.remaining_short || 0), 0), actual_t: rs.reduce((s, r) => s + tOf(r), 0) };
   }
   return { ...week, commit, account };
@@ -8594,6 +8668,118 @@ function PageHeader({ title, subtitle, actions, children, kicker }){
       {actions && <div className="flex items-center gap-2 shrink-0 ph-actions-box">{actions}</div>}
     </div>
   );
+}
+
+// ---- 24 Nov 2026 (the Dashboard rethink, task A1; John's answers of 24 Nov): the six top figures -------------------
+// One ruled strip. A figure with a status carries it as a shape and a word (RowStatus) and a 4 px top edge in the
+// status's colour (.dc-ok / .dc-warn / .dc-bad); one with none keeps the 2 px ink edge. Statuses on four figures only:
+// lorry movements (the traffic limits), planned this week (last week's lines), delivered against plan (the
+// organisation's shortfall share), the carbon target (the server's verdicts). Each helper returns null for "no status";
+// nothing here invents a verdict the data does not hold.
+// The small ink bars under a figure (a NEW part of the look, John 24 Nov): one bar a month of the range, this month in
+// ink, the rest in --spark; `mark` puts a small red square over a month's bar (a road limit over). Hidden from readers:
+// the words beside them say it.
+function DashBars({ values, cur, mark }){
+  const v = (values || []).map(x => +x || 0), n = v.length, mx = Math.max(0, ...v);
+  if(!n || mx <= 0) return null;
+  const w = 150, h = 24, bw = w / n, top = mark != null ? h - 8 : h - 1;
+  return (
+    <svg className="dc-bars" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true" focusable="false" data-dc-bars={n}>
+      {v.map((x, i) => { const bh = Math.max(1.5, x / mx * top);
+        return <g key={i}>
+          <rect x={(i * bw + 1).toFixed(1)} y={(h - bh).toFixed(1)} width={Math.max(1, bw - 2).toFixed(1)} height={bh.toFixed(1)} rx="1" className={i === cur ? "dc-cur" : "dc-oth"} />
+          {i === mark && <rect x={(i * bw + bw / 2 - 3).toFixed(1)} y={(h - bh - 7).toFixed(1)} width="6" height="6" className="dc-mark" data-dc-mark={i} />}
+        </g>; })}
+    </svg>
+  );
+}
+// Delivered against plan: one ink bar to a "plan" mark (the plan at 100 of a 110 scale; past it the bar stops at 110)
+function DashPlanBar({ pct }){
+  if(pct == null) return null;
+  const w = 118, at = 100 / 110 * w, len = Math.max(2, Math.min(110, pct) / 110 * w);
+  return (
+    <svg className="dc-plan" viewBox="0 0 150 24" aria-hidden="true" focusable="false" data-dc-plan={Math.round(pct)}>
+      <rect x="0" y="15.5" width={at.toFixed(1)} height="1" className="dc-track" />
+      <rect x="0" y="11" width={len.toFixed(1)} height="10" rx="3" className="dc-cur" />
+      <rect x={at.toFixed(1)} y="8" width="2" height="16" className="dc-cur" />
+      <text x={(at + 5).toFixed(1)} y="20" className="dc-plan-t">plan</text>
+    </svg>
+  );
+}
+// a limit's short name for the strip: its road number where the typed name has one ("B6047 Melton Road, …" → "B6047"),
+// else the name up to its first comma, dash or bracket, at most 24 characters
+function dashRoadShort(name){
+  const s = String(name || "").trim();
+  const m = s.match(/\b([AMB][0-9]{1,4})(\([Mm]\)|\b)/);
+  if(m) return m[1] + m[2];
+  const cut = s.split(/\s*[,(–—]\s*|\s+-\s+/)[0] || s;
+  return cut.length > 24 ? cut.slice(0, 23).trimEnd() + "…" : cut;
+}
+// Lorry movements a day against the traffic limits drawn on Zones (the read the Traffic limits fold shows): any month of
+// the range over a limit → square, the worst month (highest share of its limit) named; only near → diamond; neither →
+// dot. No limit drawn, a read not made or refused (a team login) → no status. Whole movements.
+function dashLimitStatus(tl, sy){
+  const lims = (tl && tl.limits) || [];
+  if(!lims.length) return null;
+  const worst = (state) => {
+    let best = null;
+    lims.forEach(L => Object.entries(L.months || {}).forEach(([m, r]) => {
+      if(!r || r.state !== state || !(L.limit && L.limit.value > 0)) return;
+      const share = r.value / L.limit.value;
+      if(!best || share > best.share) best = { share, m: +m, value: r.value, limit: L.limit.value, name: L.name };
+    }));
+    return best;
+  };
+  const line = (b) => `${dashRoadShort(b.name)} · ${grp(Math.round(b.value))}/${grp(Math.round(b.limit))} · ${monthAxis(b.m, sy)}`;
+  const over = worst("over");
+  if(over) return { tone: "bad", word: "Over a road limit", line: line(over), m: over.m };
+  const near = worst("near");
+  if(near) return { tone: "warn", word: "Near a road limit", line: line(near), m: near.m };
+  return { tone: "ok", word: "Within road limits", line: null, m: null };
+}
+// Planned this week against last week's lines (the Look-ahead's own account): the server's count of lines short past
+// the organisation's share (`short_flagged`, the Look-ahead's amber "Short") → diamond; every line held → dot; lines not
+// reported and none short → the ring; no last week → no status. NOT `lines − delivered`: that counts a line nobody has
+// reported as well as one short inside the share.
+function dashWeekStatus(acct){
+  if(!acct || !acct.lines) return null;
+  const short = +acct.short_flagged || 0, waiting = Math.max(0, (acct.lines || 0) - (acct.reported || 0));
+  if(short > 0) return { tone: "warn", word: `${grp(short)} short last week` };
+  if((acct.delivered || 0) >= acct.lines) return { tone: "ok", word: "Every line held last week" };
+  if(waiting > 0) return { tone: "none", word: `${grp(waiting)} not reported last week` };
+  return { tone: "ok", word: "None short last week" };
+}
+// Delivered against plan: within the organisation's shortfall share under plan (planning.short_flag_pct, absent = 10)
+// a dot; more than that under plan a diamond, never a square; ahead of plan a dot.
+function dashShortPct(factors){
+  const v = ((factors || {}).planning || {}).short_flag_pct;
+  return (v == null || v === "" || isNaN(+v) || +v < 0) ? 10 : +v;
+}
+function dashDeliveredStatus(pct, factors){
+  if(pct == null) return null;
+  const n = dashShortPct(factors);
+  if(pct > 100.5) return { tone: "ok", word: "Ahead of plan" };
+  if(pct >= 100 - n - 1e-9) return { tone: "ok", word: `Within ${grp(n, Number.isInteger(n) ? 0 : 1)} % of plan` };
+  return { tone: "warn", word: `More than ${grp(n, Number.isInteger(n) ? 0 : 1)} % under plan` };
+}
+// The carbon target's answer, from GET /api/carbon/target's verdicts only (nothing compared here). The figure is the gap
+// with the agreed decisions; its status (and the cell's edge) follows the FIGURE; the "as forecast" answer is under it.
+// Over the target is a diamond (John, Q11), never a square.
+function dashTargetCell(ct, err, scoped){
+  const scope = ctTeam(ct) ? `your ${TEAM().toLowerCase()}'s share` : (scoped ? "whole scheme" : null);
+  if(!ct) return { value: "—", lines: [err ? "did not load" : "loading"], st: null, st2: null };
+  if(!ctOk(ct)) return { value: "—", lines: ["none set yet"], st: null, st2: null, none: true };
+  const s = ct.status;
+  const verdict = (on, gap) => (on == null || gap == null) ? null : on ? "on" : (gap > 0 ? "over" : "under");
+  const v1 = verdict(s.on_target_with_decisions, s.gap_with_decisions_t), v2 = verdict(s.on_target_as_forecast, s.gap_as_forecast_t);
+  const asForecast = v2 && { tone: v2 === "over" ? "warn" : "ok", word: v2 === "on" ? "On target as forecast" : v2 === "over" ? "Over as forecast" : "Under as forecast" };
+  const by = v2 && v2 !== "on" ? `by ${ctT(Math.abs(s.gap_as_forecast_t))} t CO₂e` : null;
+  const tail = [by, scope].filter(Boolean).join(" · ") || null;
+  if(s.invalid || s.target_t == null || !v1)
+    return { value: "—", lines: [tail], st: { tone: "none", word: "Decisions no longer fit" }, st2: asForecast, edge: null };
+  const value = v1 === "on" ? "On target" : <>{ctT(Math.abs(s.gap_with_decisions_t))} t <small className="dc-unit">CO₂e {v1}</small></>;
+  const st = { tone: v1 === "over" ? "warn" : "ok", word: "With agreed decisions" };
+  return { value, lines: [tail], st, st2: asForecast, edge: st.tone };
 }
 
 // 10 Nov 2026 (UI critique 17): what a new deployment shows instead of empty figures and charts: the steps, each a control that

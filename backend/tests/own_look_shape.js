@@ -73,7 +73,9 @@ ok("4 figures: the Look-ahead's tiles and the Submit page's six figures are .fig
    code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">')
    && code.includes('<div className="px-4 py-3 min-w-0" data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
    && code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes("divide-x divide-slate-200 text-white kpi-num"));
-const ruled = sel => new RegExp("\\n  \\." + sel + "\\{[^}]*border-top:2px solid var\\(--ink\\);").test(css);
+// NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the Dashboard's ink line is each cell's top edge (2 px,
+// or 4 px in a status's colour), not the strip's border
+const ruled = sel => sel === "dash-cards" ? /\n  \.dash-cards \.dash-card\{[^}]*inset 0 2px 0 var\(--ink\)/.test(css) : new RegExp("\\n  \\." + sel + "\\{[^}]*border-top:2px solid var\\(--ink\\);").test(css);
 ok("4 figures: every other row of figures is ruled under the ink line (Dashboard, Routes tiles, lorry plan, abnormal loads, pours, the phone's day)",
    ["dash-cards", "rc-tiles", "lp-kpis", "al-stats", "pour-figs", "ph-figs"].every(ruled), ["dash-cards", "rc-tiles", "lp-kpis", "al-stats", "pour-figs", "ph-figs"].filter(x => !ruled(x)));
 ok("4 figures: no figure cell keeps a box (border + corner) of its own",

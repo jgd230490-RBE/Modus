@@ -584,7 +584,9 @@ if (loaded) {
     ok("...the 2 agreed decisions, collapsed, in the server's words",
       dSet.includes("<summary>The 2 agreed decisions</summary>") && dSet.includes("<li>Recycled content 30% — Small aggregate</li>"));
     ok("🔴 ...under the six cards (still six), above the charts; nothing undefined or NaN",
-      (dSet.match(/class="card dash-card min-w-0"/g) || []).length === 6 && dSet.indexOf(">Transport carbon<") < dSet.indexOf('data-carbon-target="set"')
+      // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): a cell may carry its status edge class; the sixth is the target's answer
+      (dSet.match(/class="card dash-card min-w-0( dc-(ok|warn|bad))?"/g) || []).length === 6 && dSet.indexOf('data-dash-card="target"') > 0
+      && dSet.indexOf('data-dash-card="target"') < dSet.indexOf('data-carbon-target="set"')
       && dSet.indexOf('data-carbon-target="set"') < dSet.indexOf("Material demand over time") && !/undefined|NaN/.test(dSet));
     const dNone = dash(NONE, { onOpen(){} }), dNoNav = dash(NONE);
     ok("⭐ ...no target: says so and who sets it, with a button to the Carbon planner (only when the page can switch)",
