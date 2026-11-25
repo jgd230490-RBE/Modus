@@ -425,7 +425,8 @@ ok("...the restriction popup gives no verdict against the vehicle: that is the r
 # REVERSED 27 Oct 2026 (F3 c): no token box; a planner reads the Data pages, an admin changes them
 ok("Data pages: no token box, only an admin changes them; More ▾ on Configuration; Make primary; Create & route; Clear all routes",
    "<strong>Admin token</strong> box" not in src and "Only an admin changes locations, routes and zones" in text
-   and "(under More ▾)" in src and "<strong>Make primary</strong>" in src
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the button reads "Use Alt 1 as the main route" (it read "Make primary")
+   and "(under More ▾)" in src and "<strong>Use Alt 1 as the main route</strong>" in src and "Make primary" not in src
    and "<strong>Create &amp; route</strong>" in src and "<strong>Clear all routes</strong>" in src
    and "its forecast lines are not deleted with it" in text)
 ok("...a route with no rate is priced at the target rate and marked target; rate not set only when neither exists",

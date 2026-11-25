@@ -571,7 +571,9 @@ def best(rid, ctx, factors):
         r = None
     if not r:
         return {"error": SUMMARY_UNAVAILABLE}
-    out = {"error": None, "answer": r["answer"], "option": r.get("option"), "why": r.get("why"),
+    # 24 Nov 2026 (Q7): the answer in today's words (route_best.answer_words: an older "A trade-off" reads "Planner to
+    # decide"; the rule writes the new words itself, so this changes nothing a fresh read gives)
+    out = {"error": None, "answer": route_best.answer_words(r["answer"]), "option": r.get("option"), "why": r.get("why"),
            "held_back": r.get("held_back"), "lorry": r.get("lorry"), "lorry_text": r.get("lorry_name") or r.get("lorry"),
            "lorry_basis": r.get("lorry_basis"),
            "others_text": [conversions.vehicle_label(factors, k) for k in (r.get("other_lorries") or [])],
@@ -593,7 +595,13 @@ def best(rid, ctx, factors):
             for leg, w in (("loaded", "out"), ("return", "back")):
                 L = iu.get(leg) or {}
                 until = _words_date(L.get("until")) if L.get("alt") and L.get("until") else None
-                parts.append(f"{L.get('label') or 'The main route'} {w}" + (f" (a diversion until {until})" if until else ""))
+                # 24 Nov 2026 (Q9): a line baked round the closure is labelled "Diversion" (it read "Way round"), so it
+                # is not called a diversion twice
+                lab = L.get('label') or 'The main route'
+                if lab.startswith(route_best.DIVERSION_LABEL):
+                    parts.append(f"the diversion {w}" + (f" (until {until})" if until else ""))
+                else:
+                    parts.append(f"{lab} {w}" + (f" (a diversion until {until})" if until else ""))
             out["in_use_words"] = "; ".join(parts)
     use = r.get("counts_in_use")
     if use:

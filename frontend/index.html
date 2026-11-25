@@ -1739,7 +1739,8 @@ const INFO = {
   "dash.busiest": { title: "Busiest hour", text: "Busiest clock hour, average working day. No pour.", guide: "ug-gate-busiest" },
   "submit.siblings": { title: "Other lines on this route", text: "Different disciplines can share a route. Check that the same loads are not entered twice.", guide: "ug-submit-siblings" },
   // 16 Nov 2026 (step 1b, John's yes to the third draft): the best option card on Data -> Routes
-  "routes.best": { title: "Best option", text: "Each option is compared with the route in use. One is suggested only when clearly ahead on one measure and behind on none.", guide: "ug-best-option" },
+  // 24 Nov 2026 (the Routes page rethink, Q9): "Route options" (it read "Best option"); Q8: no "ahead" or "behind"
+  "routes.best": { title: "Route options", text: "Each option is compared with the route in use. One is suggested only when clearly better on one measure and worse on none.", guide: "ug-best-option" },
   "routes.legs": { title: "Legs of a route", text: "A route is a loaded leg out and an empty leg back. Open a row for its cycle figures.", guide: "ug-routes-legs" },
   "cfg.veh.english": { title: "English name", text: "The name every screen shows for this vehicle.", guide: "ug-config-vehicles" },
   "cfg.veh.minutes": { title: "Load and unload minutes", text: "Left blank, a vehicle uses the Planning defaults, shown in grey.", guide: "ug-config-vehicles" },
@@ -16663,17 +16664,25 @@ function boInUseLimit(L, div){
 // waited 29 to 37 s on live behind an empty half panel).
 // 17 Nov 2026 (John: "Yes, drop it"): it ended "about half a minute after a change"; since the card answers its own
 // route first (PR #317) the wait after a change is a few seconds on live, so the line no longer says how long
-const BO_WAIT = "Working out the best option…";
+// 24 Nov 2026 (the Routes page rethink, Q9): the card is "Route options"; the waiting line follows
+const BO_WAIT = "Working out the route options…";
+// 24 Nov 2026 (Q7; John: "Yes, as recommended"): the rule's second answer reads "Planner to decide" (it read "A trade-off");
+// its mark "Mixed" (it read "Your call"). The card compares the rule's own words, never a word of its own.
+const BO_PLANNER = "Planner to decide";
+const BO_MARK = { "Suggested": ["Suggested", "ok"], [BO_PLANNER]: ["Mixed", "warn"] };
+// Q9: the rule's sentence about the HGV collisions ("… collisions involving an HGV on it …")
+const BO_HGV = "involving an HGV";
 // Q1: a reason the rule gives as a fragment ("it adds 7.5 t limits, except for access, on Syston Road…") is shown on a
 // row as a sentence. The words are the rule's; nothing here splits or rewrites them.
 function boSay(s){
   const t = String(s || "").trim();
   return t ? t.charAt(0).toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".") : "";
 }
-// Q6: the rule's `trade_also` (the other options that are trade-offs too) in at most six words
+// Q6: the rule's `trade_also` (the other options the planner decides on too) in at most six words. 24 Nov 2026 (Q8): "Alt 2
+// is mixed too." (it read "Alt 2 trades too: All figures.")
 function boAlso(list){
   const a = list || [];
-  return !a.length ? "" : `${a.length === 1 ? `${a[0]} trades too` : `${a.length} others trade too`}: All figures.`;
+  return !a.length ? "" : (a.length === 1 ? `${a[0]} is mixed too.` : `${a.length} others are mixed too.`);
 }
 function boDate(s){
   if(!s) return "";
@@ -16725,7 +16734,7 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
       onClick={(e) => { e.stopPropagation(); onAll(); }}>All figures {showAll ? "▴" : "▾"}</button>);
   if(best === null) return (
     <div className="bo-card" data-best-option="loading">
-      <div className="bo-eye"><span>Best option</span></div>
+      <div className="bo-eye"><span>Route options</span></div>
       <p className="bo-why text-slate-500" style={{ margin: "6px 0 0" }} data-bo-wait="1">{BO_WAIT}</p>
       {!frame && <div className="bo-acts">{allBtn}</div>}
     </div>);
@@ -16738,20 +16747,19 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
   const div = ["loaded", "return"].map(l => inUse[l]).find(x => x && x.why === "diversion" && x.status === "in_use");
   const counted = (r.checks || {}).community_all_options;
   const cu = r.counts_in_use || {};
-  const tone = r.answer === "Suggested" ? "ok" : r.answer === "A trade-off" ? "warn" : "none";
-  const tag = r.answer === "Suggested" ? "Suggested" : r.answer === "A trade-off" ? "Your call" : "No change";
+  const [tag, tone] = BO_MARK[r.answer] || ["No change", "none"];
   // the why: a Suggested or Keep line as the rule wrote it; a trade-off only in its short form (Q7: the long one is over
   // 25 words and stays for the table and the file); "Every other option is ruled out" with each option's reasons on rows
   let why = null;
   const allOut = (r.options || []).length > 0 && (r.options || []).every(x => (x.ruled_out || []).length);
-  if(r.answer === "A trade-off") why = r.trade_short || null;
+  if(r.answer === BO_PLANNER) why = r.trade_short || null;
   else if(r.answer === "Keep the route in use" && r.held_back)
     why = hist === "out_of_date" ? "Not suggested yet: the collision history is out of date." : `Not suggested yet: ${r.held_back}`;
   else if(allOut) why = "Every other option is ruled out.";
   else why = r.why;
   const sent = o ? (o.sentences || []) : [];
-  const colSent = sent.find(s => s.startsWith(o.label + " had") && !s.includes("goods vehicle"));
-  const goodsSent = sent.find(s => s.startsWith(o.label + " had") && s.includes("goods vehicle"));
+  const colSent = sent.find(s => s.startsWith(o.label + " had") && !s.includes(BO_HGV));
+  const goodsSent = sent.find(s => s.startsWith(o.label + " had") && s.includes(BO_HGV));
   const busySent = sent.find(s => s.startsWith("Setting off"));
   const c = o ? o.counts || {} : {};
   const colRow = (k, s, key) => {
@@ -16761,7 +16769,7 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
   };
   const pw = o ? o.part_words || {} : {}, hw = o ? o.head_words || {} : {}, p = o ? o.pct || {} : {};
   const cyc = o ? [
-    `Left turns ${c.left_turns} against ${cu.left_turns}${boPct(p.left_turns)}`,
+    `Left-hand turns ${c.left_turns} against ${cu.left_turns}${boPct(p.left_turns)}`,
     c.cycle_meets != null && cu.cycle_meets != null ? `met ${c.cycle_meets} against ${cu.cycle_meets}${boPct(p.cycle_meets)}` : null,
     c.cycle_beside_km != null && cu.cycle_beside_km != null ? `beside ${boNum(c.cycle_beside_km, 2)} km against ${boNum(cu.cycle_beside_km, 2)}${boPct(p.cycle_beside_km, "less", "more")}` : null,
   ].filter(Boolean).join(" · ") : "";
@@ -16784,11 +16792,12 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
   };
   const busyUse = (busyUses || []).find(u => u.status === "in_use");
   const inUseLimits = r.in_use_limits || [];
-  const also = r.answer === "A trade-off" ? boAlso(r.trade_also) : "";
+  const also = r.answer === BO_PLANNER ? boAlso(r.trade_also) : "";
   return (
     <div className="bo-card" data-best-option={r.answer} data-bo-route={routeId}>
-      <div className="bo-eye"><span>Best option{lorry ? ` · ${lorry}` : ""}</span><InfoTip id="routes.best" /></div>
-      {div && <p className="bo-state" data-bo-in-use="diversion">In use: {div.label}, the diversion{div.until ? `, until ${boDate(div.until)}` : ""}. Compared with it.</p>}
+      <div className="bo-eye"><span>Route options{lorry ? ` · ${lorry}` : ""}</span><InfoTip id="routes.best" /></div>
+      {/* 24 Nov 2026 (Q9): a line baked round the closure is "Diversion" (it read "Way round"), so it is not named twice */}
+      {div && <p className="bo-state" data-bo-in-use="diversion">In use: {/^Diversion\b/.test(div.label || "") ? "" : `${div.label}, `}the diversion{div.until ? `, until ${boDate(div.until)}` : ""}. Compared with it.</p>}
       {busyUse && <p className="bo-state" data-bo-in-use="busy">Busy hours: Alt {busyUse.alt} is in use on weekdays {busyUse.from}–{busyUse.to}.</p>}
       {inUseLimits.map((L, i) => <p key={i} className="bo-state bo-grey" data-bo-in-use-limit="1">{boInUseLimit(L, div)}</p>)}
       <div className="bo-ans">
@@ -16815,11 +16824,11 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
         </div>)}
       {o && !allOut && !oOut && (
         <div className="bo-heads" data-bo-option={o.label}>
-          <div className="bo-grp">People</div>
+          {/* 24 Nov 2026 (Q9): no "People" heading (the rows name themselves); "Involving an HGV" (it read "Goods vehicle") */}
           {colRow("Collisions", colSent, "collisions")}
-          {colRow("Goods vehicle", goodsSent, "goods")}
+          {colRow("Involving an HGV", goodsSent, "goods")}
           {boRow("Cycle routes", boChip(pw.cycle, !counted), cyc, { sub: true, grey: !counted, key: "cycle" })}
-          {boRow("Places", boChip(pw.community, !counted), `${c.places} against ${cu.places}${boPct(p.places)}`, { sub: true, grey: !counted, key: "places" })}
+          {boRow("Community", boChip(pw.community, !counted), `${c.places} against ${cu.places}${boPct(p.places)}`, { sub: true, grey: !counted, key: "places" })}
           {!counted && <p className="bo-state" data-bo-not-counted="community">Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.</p>}
           {boRow("Time", boChip(hw.time), <>{boNum(c.cycle_min)} min a round trip <small>· {boNum(cu.cycle_min)} now · {tripsWords}{o.n5 ? " · a shorter road that takes longer" : ""}</small></>)}
           {boRow("Busy hours", boChip(hw.busy), busySent || (hw.busy === "not counted" ? `No busy-hour times held for ${o.label}.` : "At 08:00 and 17:00."), { grey: hw.busy === "not counted" })}
@@ -16833,7 +16842,7 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
           disabled={promoting === `${r.lorry}|${o.alt}`}
           onClick={(e) => { e.stopPropagation(); onPromote(r.lorry, o.alt, "loaded",
             { legs: ownWayBack ? ["loaded", "return"] : ["loaded"], label: o.label, others: boOthers(r.other_lorries) }); }}>
-          {promoting === `${r.lorry}|${o.alt}` ? "…" : `Make ${o.label} primary`}</button>}
+          {promoting === `${r.lorry}|${o.alt}` ? "…" : `Use ${o.label} as the main route`}</button>}
         {((r.options || []).length > 0) && allBtn}
       </div>
       {lorry && <p className="bo-foot" data-bo-lorry="1">
@@ -17031,7 +17040,7 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
                     <td className="px-2 py-1 whitespace-nowrap">
                       {isActive && <span style={{ color: "var(--navy)" }} title="Shown on the map">● </span>}
                       {r.alt_index === 0
-                        ? <span className="font-semibold" style={{ color: "var(--navy)" }}>Primary</span>
+                        ? <span className="font-semibold" style={{ color: "var(--navy)" }}>Main</span>
                         : `Alt ${r.alt_index}`}
                     </td>
                     <td className={cell}>{fmtDist(r.loaded_km, 1)}</td>
@@ -17085,9 +17094,9 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
                         <button
                           onClick={(e) => { e.stopPropagation(); onPromote(r.profile, r.alt_index); }}
                           disabled={promoting === `${r.profile}|${r.alt_index}`}
-                          title="Use this option as the primary route for this vehicle"
+                          title="Use this option as the main route for this vehicle"
                           className="text-xs font-semibold px-1.5 py-0.5 rounded border border-slate-300 hover:bg-white disabled:opacity-40">
-                          {promoting === `${r.profile}|${r.alt_index}` ? "…" : "Make primary"}
+                          {promoting === `${r.profile}|${r.alt_index}` ? "…" : `Use Alt ${r.alt_index} as the main route`}
                         </button>
                       )}
                     </td>
@@ -17117,7 +17126,7 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
               </p>
             )}
             <p className="text-[13px] text-slate-400 mt-1">
-              Click a row to show that option on the map. “Make primary” makes an alternative the route the plan uses.
+              Click a row to show that option on the map. “Use … as the main route” makes an alternative the route the plan uses.
             </p>
             </>}
             {busy && busy.shown && (busy.offers || []).map(o => (
@@ -19342,7 +19351,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </select>
           {/* 8 Nov 2026 (task 2.1-7): the direction is the map's own Out · Back · Both switch now (the header select is gone) */}
           <select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which route option to draw" aria-label="Route option drawn">
-            <option value={0}>Primary route</option>
+            <option value={0}>Main route</option>
             <option value={1}>Alt 1</option>
             <option value={2}>Alt 2</option>
           </select>

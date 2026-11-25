@@ -346,7 +346,8 @@ w.ResizeObserver = function(){ this.observe = () => {}; this.disconnect = () => 
          && JSON.stringify(MAP.filt["route-arrows"]) === JSON.stringify(MAP.filt["route-line"])), JSON.stringify(MAP.filt["route-line"]));
     ok("⭐ DOM: the card shows the option the rule names (Alt 1) with a tab an option, Alt 1's selected, and Make primary on it",
        tabs().map(t => t.textContent + ":" + t.getAttribute("aria-selected")).join() === "Alt 1:true,Alt 2:false" && /Alt 1 had 39 collisions/.test(card())
-       && TRY(() => q("button[data-bo-promote]").textContent === "Make Alt 1 primary") && TRY(() => q("[role=tablist]").getAttribute("aria-label") === "Option shown"));
+       // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Use Alt 1 as the main route" (it read "Make Alt 1 primary")
+       && TRY(() => q("button[data-bo-promote]").textContent === "Use Alt 1 as the main route") && TRY(() => q("[role=tablist]").getAttribute("aria-label") === "Option shown"));
     ok("⭐ DOM R1: the tabs add the options' names only to the card (2 words an option), nothing else",
        TRY(() => q("[data-bo-tabs]").textContent === "Alt 1Alt 2"));
 

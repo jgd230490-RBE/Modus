@@ -488,7 +488,8 @@ ok("6. the user guide says it in plain words; the technical guide has the detail
 # 29 Oct 2026 (John: "please ensure full outline of this is in user and tech guide. try and include how here exactly ranks")
 _why = _ug.split('<li id="ug-why-primary">')[1].split("</li>")[0] if 'id="ug-why-primary"' in _ug else ""
 ok("⭐ 7. the user guide says why the Primary is not always the quickest, in plain words, naming no supplier",
-   "it prefers main roads" in _why and "That is a preference, not a restriction" in _why and "Make primary" in _why
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Use Alt 1 as the main route" (it read "Make primary")
+   "it prefers main roads" in _why and "That is a preference, not a restriction" in _why and "Use Alt 1 as the main route" in _why
    and "nothing re-ranks the options by time or distance" in _why and not re.search(r"\bHERE\b", _why))
 ok("7. ...and what a — in a busy-hour column means", "means that road was not one of its options at that hour" in _ug)
 _rk = _tg.split('<li id="t2-ranking">')[1].split("</li>")[0] if 'id="t2-ranking"' in _tg else ""
