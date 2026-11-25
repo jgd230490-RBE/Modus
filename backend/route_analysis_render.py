@@ -1115,10 +1115,15 @@ SUM_TITLE = "Route analysis · Summary"
 SUM_DECIDES = "The planner decides; nothing here changes the plan."
 SUM_NOT_COUNTED = "Not counted yet: not fetched along every option."
 SUM_SHOWN = "Cycle routes and community places are shown, not counted (*): not fetched along every option yet."
+#: 24 Nov 2026 (the Routes page rethink, Q7; John: "Yes, as recommended"): step 3 in the card 4 / 5 words ("A trade-off"
+#: is "Planner to decide"; nothing says ahead, behind or trade); step 2 names the measures (the "People" heading went)
 SUM_STEPS = [("1 · Rule out", "An option that adds a lorry limit below this lorry, or crosses a road closed on the day."),
-             ("2 · Compare", "Each option left against the route in use: people, time, busy hours, carbon."),
-             ("3 · Answer", "Ahead on one and behind on none: suggested. Pulling apart: a trade-off, no pick. "
+             ("2 · Compare", "Each option left against the route in use: collisions, cycle routes, community, time, busy "
+                             "hours, carbon."),
+             ("3 · Answer", "Clearly better on one measure and worse on none: suggested. Mixed: the planner decides. "
                             "Otherwise: keep.")]
+#: 24 Nov 2026 (Q9): a collision with a goods vehicle over 3.5 t is "involving an HGV" (CLOCS Standard v5, 2.7)
+SUM_HGV = "Involving an HGV"
 SUM_READ = [("Collisions", "Injury collisions the police recorded on the road. Counts only: never a percentage or a "
                            "rate. A count beside a road is not a risk."),
             ("Cycle, places", "What a lorry passes on a round trip, with each option's change against the route in use."),
@@ -1212,19 +1217,19 @@ def _sum_panels(B):
     if cur:
         goods = "; ".join(f"{c['label']} {_n(c['counts'].get('goods'))}" for c in B["cols"])
         P.append(("Collisions on the road", f"recorded, {B['period']}", [("bars", dict(key="collisions", grey_all=True))],
-                  f"With a goods vehicle over 3.5 t: {goods}"))
+                  f"{SUM_HGV}: {goods}"))
     else:
         P.append(("Collisions on the road", "recorded", [("none", "Not compared: the collision history is out of date for "
                   "this route." if B["history"] == "out_of_date" else "Not compared: the collision history has not been "
                   "fetched.")], ""))
     if B["counted"]:
-        items = [("sub", "Left turns"), ("bars", dict(key="left_turns", pct_key="left_turns"))]
+        items = [("sub", "Left-hand turns"), ("bars", dict(key="left_turns", pct_key="left_turns"))]
         if B.get("cycle_held"):
             items += [("sub", "Cycle routes met"), ("bars", dict(key="cycle_meets", pct_key="cycle_meets")),
                       ("sub", "km beside a cycle route"),
                       ("bars", dict(key="cycle_beside_km", pct_key="cycle_beside_km", less=True,
                                     fmt=lambda v: _n(v, 2)))]
-        P.append(("Left turns and cycle routes", "a round trip", items, ""))
+        P.append(("Left-hand turns and cycle routes", "a round trip", items, ""))
         shown = [c["counts"].get("shown") for c in B["cols"]]
         foot = ("Other places near, shown: " + "; ".join(f"{c['label']} {sum((s or {}).values())}"
                                                           for c, s in zip(B["cols"], shown))) if all(
@@ -1232,7 +1237,7 @@ def _sum_panels(B):
         P.append(("Schools, hospitals, health centres", "within 250 m, a round trip",
                   [("bars", dict(key="places", pct_key="places"))], foot))
     else:
-        P.append(("Left turns and cycle routes", "a round trip", [("none", SUM_NOT_COUNTED)], ""))
+        P.append(("Left-hand turns and cycle routes", "a round trip", [("none", SUM_NOT_COUNTED)], ""))
         P.append(("Schools, hospitals, health centres", "within 250 m", [("none", SUM_NOT_COUNTED)], ""))
     hw = lambda head: next((f"{c['label']}: {c['head_words'].get(head)}" for c in B["cols"]
                             if (c.get("chosen") or c.get("traded")) and c["head_words"].get(head)
@@ -1299,7 +1304,7 @@ def _sum_table(doc, x, y, w, B):
     rows = []
     if B["history"] == "current":
         rows.append((f"Collisions on the road, {B['period']}", lambda k: _n(k["counts"].get("collisions")), None))
-        rows.append(("   with a goods vehicle over 3.5 t", lambda k: _n(k["counts"].get("goods")), None))
+        rows.append(("   " + SUM_HGV[0].lower() + SUM_HGV[1:], lambda k: _n(k["counts"].get("goods")), None))
     else:
         rows.append(("Collisions on the road", lambda k: "not compared", None))
 
@@ -1308,7 +1313,7 @@ def _sum_table(doc, x, y, w, B):
             v = k["counts"].get(key)
             return (_n(v, d) + star) if v is not None else "–"
         return f, (lambda k: _pct_words(k["pct"].get(key), less) if not k["in_use"] else "")
-    for lab, key, d, less in (("Left turns, a round trip", "left_turns", 1, False),
+    for lab, key, d, less in (("Left-hand turns, a round trip", "left_turns", 1, False),
                               ("Cycle routes met", "cycle_meets", 1, False),
                               ("km beside a cycle route", "cycle_beside_km", 2, True),
                               ("Schools, hospitals, health centres, 250 m", "places", 1, False)):
@@ -1532,7 +1537,7 @@ def _sum_lower(doc, y, B):
 
 
 SUMMARY_SHEET_HEAD = ["Route", "Option", "Answer", "Why", "Ruled out by", "Collisions on the road",
-                      "With a goods vehicle over 3.5 t", "Left turns", "Left turns, % against in use", "Cycle routes met",
+                      SUM_HGV, "Left-hand turns", "Left-hand turns, % against in use", "Cycle routes met",
                       "Cycle routes met, %", "km beside a cycle route", "km beside, %",
                       "Schools, hospitals, health centres (250 m)", "Those places, %", "Other places near (shown)",
                       "Round trip with loading, min", "Trips a day", "Setting off 08:00, min", "Setting off 17:00, min",

@@ -34,8 +34,9 @@ ok("⭐ SRC Q3: the open route's panel shows the card's frame while it reads (it
 // REVERSED 17 Nov 2026 (claude/best-option-wait-line; John: "Yes, drop it"): the line no longer says how long. Since the
 // card answers its own route first (PR #317) the wait after a change is a few seconds on live, so "about half a minute
 // after a change" was no longer true. It read: the wait says how long.
-ok("⭐ SRC Q3: the wait line is 'Working out the best option…' and no longer says 'half a minute' (the screen and the guide)",
-   html.includes('const BO_WAIT = "Working out the best option…";') && !/BO_WAIT = "[^"]*half a minute/.test(html)
+// REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Working out the route options…" (it read "Working out the best option…")
+ok("⭐ SRC Q3: the wait line is 'Working out the route options…' and no longer says 'half a minute' (the screen and the guide)",
+   html.includes('const BO_WAIT = "Working out the route options…";') && !html.includes("Working out the best option") && !/BO_WAIT = "[^"]*half a minute/.test(html)
    && !read("frontend", "help", "index.html").includes("half a minute")
    && read("frontend", "help", "index.html").includes("After a change the card takes a few seconds to work out again."));
 ok("⭐ SRC Q2: the press is ONE request with every leg it moves, and its reply's answer goes to the open panel",
@@ -53,8 +54,10 @@ ok("⭐ SRC Q7: the record's trip minutes are the rule's halves (min_half), its 
   const guide = read("frontend", "help", "index.html"), tech = read("frontend", "help", "technical", "index.html");
   const a = guide.indexOf('<li id="ug-best-option">'), li = a > 0 ? guide.slice(a, guide.indexOf("</li>", a)) : "";
   ok("⭐ GUIDE: the user guide's Best option entry says 'measure' (no 'head'), names the roads a ruled-out option adds, 'trades too', and the message under the card",
-     li.includes("clearly ahead on one measure") && !/\bheads?\b/.test(li) && li.includes("section A lists every stretch")
-     && li.includes("another option trades too") && li.includes("says so under the card") && !/\/api\/|HERE/.test(li));
+     // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "clearly better on one measure", "another option is mixed too" (they read "clearly
+     // ahead on one measure", "another option trades too"); NARROWED: no "ahead", "behind" or "trade"
+     li.includes("clearly better on one measure") && !/\bheads?\b/.test(li) && li.includes("section A lists every stretch")
+     && li.includes("another option is mixed too") && !/\b(ahead|behind|trades?|trade-off)\b/.test(li) && li.includes("says so under the card") && !/\/api\/|HERE/.test(li));
   const t = tech.indexOf('id="t2-best-option"'), tl = t > 0 ? tech.slice(t, tech.indexOf("</li>", t)) : "";
   ok("⭐ GUIDE: the technical guide's t2-best-option names added_words, the four-line cut, half_min, _whole, trade_also and promote-alt's legs",
      ["route_best.added_words", "cut_lines", "_sum_lower_h", "route_best.half_min", "route_record._whole", "trade_also",
@@ -125,13 +128,14 @@ function answer(o){
   const m = mountCard(null, { frame: true });
   const wait = m.host.querySelector("[data-bo-wait]");
   // REVERSED 17 Nov 2026 (claude/best-option-wait-line): the wait words alone, no time
-  ok("⭐ Q3: the frame names the card and shows the wait words ('Best option', 'Working out the best option…')",
-     txt(m.host).startsWith("Best option") && txt(wait) === "Working out the best option…", txt(m.host));
+  // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Route options" and its wait words (they read "Best option", "Working out the best option…")
+  ok("⭐ Q3: the frame names the card and shows the wait words ('Route options', 'Working out the route options…')",
+     txt(m.host).startsWith("Route options") && txt(wait) === "Working out the route options…", txt(m.host));
   ok("⭐ Q3: the frame has no 'All figures' button (nothing to fold yet)", !m.host.querySelector("button[data-bo-all]"));
   m.done();
   const m2 = mountCard(null);
   ok("Q3: a card re-reading after a change keeps its 'All figures' button with the same wait words",
-     !!m2.host.querySelector("button[data-bo-all]") && txt(m2.host.querySelector("[data-bo-wait]")).startsWith("Working out the best option"));
+     !!m2.host.querySelector("button[data-bo-all]") && txt(m2.host.querySelector("[data-bo-wait]")).startsWith("Working out the route options"));
   m2.done();
 }
 
@@ -153,19 +157,23 @@ function answer(o){
 
 // Q6: trades too
 {
-  const B = answer({ answer: "A trade-off", why: "Alt 1 has 5 fewer left turns, but 8 kg CO₂e more a trip.",
-                     trade: "Alt 1 has 5 fewer left turns, but 8 kg CO₂e more a trip.", trade_short: "Alt 1 is ahead on cycle routes, behind on carbon.",
+  // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the rule's answer "Planner to decide" (it read "A trade-off"), its lines in the new words
+  const B = answer({ answer: "Planner to decide", why: "Alt 1: 5 fewer left-hand turns; 8 kg CO₂e more a trip.",
+                     trade: "Alt 1: 5 fewer left-hand turns; 8 kg CO₂e more a trip.", trade_short: "Alt 1: fewer cycle routes; more carbon.",
                      trade_also: ["Alt 2"], options: [opt(1, { traded: true }), opt(2)] });
   const m = mountCard(B);
   const also = m.host.querySelector("[data-bo-also]");
-  ok("⭐ Q6: the card says when another option trades too: 'Alt 2 trades too: All figures.' (six words or fewer)",
-     txt(also) === "Alt 2 trades too: All figures." && txt(also).split(" ").length <= 6, txt(m.host));
+  // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): 'Alt 2 is mixed too.' (it read 'Alt 2 trades too: All figures.'); the mark reads 'Mixed'
+  ok("⭐ Q6: the card says when another option is mixed too: 'Alt 2 is mixed too.' (six words or fewer)",
+     txt(also) === "Alt 2 is mixed too." && txt(also).split(" ").length <= 6 && /Planner to decide.?Mixed/.test(txt(m.host))
+     && !/trade|Your call/.test(txt(m.host)), txt(m.host));
   m.done();
-  const m2 = mountCard(answer({ answer: "A trade-off", why: "Alt 1 has 5 fewer left turns, but 8 kg CO₂e more a trip.",
-                                trade_short: "Alt 1 is ahead on cycle routes, behind on carbon.", trade_also: ["Alt 2", "Alt 3"], options: [opt(1, { traded: true }), opt(2), opt(3)] }));
-  ok("⭐ Q6: two more: '2 others trade too: All figures.'", txt(m2.host.querySelector("[data-bo-also]")) === "2 others trade too: All figures.", txt(m2.host));
+  const m2 = mountCard(answer({ answer: "Planner to decide", why: "Alt 1: 5 fewer left-hand turns; 8 kg CO₂e more a trip.",
+                                trade_short: "Alt 1: fewer cycle routes; more carbon.", trade_also: ["Alt 2", "Alt 3"], options: [opt(1, { traded: true }), opt(2), opt(3)] }));
+  // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): '2 others are mixed too.' (it read '2 others trade too: All figures.')
+  ok("⭐ Q6: two more: '2 others are mixed too.'", txt(m2.host.querySelector("[data-bo-also]")) === "2 others are mixed too.", txt(m2.host));
   m2.done();
-  const m3 = mountCard(answer({ answer: "A trade-off", why: "Alt 1 has 5 fewer left turns, but 8 kg CO₂e more a trip.",
+  const m3 = mountCard(answer({ answer: "Planner to decide", why: "Alt 1: 5 fewer left-hand turns; 8 kg CO₂e more a trip.",
                                 options: [opt(1, { traded: true })] }));
   ok("Q6: no other trade-off, no 'trades too'", !m3.host.querySelector("[data-bo-also]"));
   m3.done();
@@ -190,7 +198,7 @@ function answer(o){
   try { if (okMount) render({ promoted: null }); } catch (e) { okMount = false; }
   await flush();
   ok("⭐ Q3: the panel shows the card's frame while the route's figures are still being read",
-     okMount && txt(host.querySelector('[data-best-option="loading"] [data-bo-wait]')).startsWith("Working out the best option")
+     okMount && txt(host.querySelector('[data-best-option="loading"] [data-bo-wait]')).startsWith("Working out the route options")
      && !txt(host).includes("Loading analysis"), txt(host).slice(0, 200));
   // the figures arrive; then a press: promoting, then its reply
   ROUTES["/routes/R050/analysis$"] = { rows: [ROW(0), ROW(1)], planning: { shift_hours_per_day: 10, working_days_per_month: 22, shift_note: "" } };

@@ -733,7 +733,9 @@ def build_xlsx(R):
     ab = wb.create_sheet("About")
     lines = [("Document", "Route choices: what each saved or added"), ("Scheme", export._tenant_name()),
              ("As at", _sheet_date(R.get("day"))),
-             ("Kept", "Another main route (Make primary) and a road for the busy hours. A dated diversion is a closure, "
+             # 24 Nov 2026 (the Routes page rethink, Q9): the Routes page's button reads "Use Alt 1 as the main route"
+             ("Kept", "Another main route (chosen on the Routes page) and a road for the busy hours. A dated diversion "
+                      "is a closure, "
                       "not a choice, so not counted here."),
              ("A trip", "The figures saved on the day of the choice, before and after."),
              ("Fair cost (model)", "The model's fuel, time and running cost at each month's diesel price, not the rate "

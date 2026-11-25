@@ -427,7 +427,8 @@ ok("...the restriction popup gives no verdict against the vehicle: that is the r
 # REVERSED 27 Oct 2026 (F3 c): no token box; a planner reads the Data pages, an admin changes them
 ok("Data pages: no token box, only an admin changes them; More ▾ on Configuration; Make primary; Create & route; Clear all routes",
    "<strong>Admin token</strong> box" not in src and "Only an admin changes locations, routes and zones" in text
-   and "(under More ▾)" in src and "<strong>Make primary</strong>" in src
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the button reads "Use Alt 1 as the main route" (it read "Make primary")
+   and "(under More ▾)" in src and "<strong>Use Alt 1 as the main route</strong>" in src and "Make primary" not in src
    and "<strong>Create &amp; route</strong>" in src and "<strong>Clear all routes</strong>" in src
    and "its forecast lines are not deleted with it" in text)
 ok("...a route with no rate is priced at the target rate and marked target; rate not set only when neither exists",
@@ -1509,9 +1510,19 @@ ok("2.1-13: the Look-ahead's week map no longer reads as team colours with a dar
 _ug25 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
 _tg25 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
 _i25 = _ug25.find('<li id="ug-routes-map">'); _m25 = _ug25[_i25:_ug25.find("</li>", _i25)] if _i25 >= 0 else ""
-ok("ROUTES PAGE (2.1-7): 9.2 says out green, back amber side by side, Out · Back · Both, the blue halo, and the table's Out / Back minutes",
-   all(w in _m25 for w in ("out (laden) in green and back (empty) in amber", "<strong>Out &middot; Back &middot; Both</strong>",
-                           "blue halo", "distance and minutes, <strong>Out</strong> and <strong>Back</strong>")))
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q2 to Q4; John: "Yes, as recommended"): dark grey out, light grey back (was green
+# and amber); a route picked in the list a soft blue halo; an open route alone, the pick a solid blue line, "Other routes"
+ok("ROUTES PAGE (2.1-7, REVERSED 24 Nov): 9.2 says out dark grey, back light grey side by side, Out · Back · Both, the soft blue halo, and the table's Out / Back minutes",
+   all(w in _m25 for w in ("out (laden) in dark grey and back (empty) in light grey", "<strong>Out &middot; Back &middot; Both</strong>",
+                           "soft blue halo", "distance and minutes, <strong>Out</strong> and <strong>Back</strong>"))
+   and "in green and back (empty) in amber" not in _m25)
+ok("ROUTES PAGE (24 Nov, Routes rethink Q2 and Q4): 9.2 says an open route is shown alone with its ends and its own closures, the pick a solid blue line, and Other routes",
+   all(w in _m25 for w in ("the map shows that route alone", "its two ends", "The option you pick is a solid blue line",
+                           "Tick <strong>Other routes</strong> under <strong>Layers</strong>", "off each time you open a route")))
+ok("ROUTES PAGE (24 Nov, Routes rethink): the technical guide names the pair, the open route's filters and the solid pick, and no longer the green, amber or the translucent halo",
+   all(w in _tg25 for w in ("out ink <code>#3A3C41</code>, back grey <code>#8E9197</code>", "<code>olZonesOver</code>", "<code>olOthers</code>", "<code>sel-halo</code>",
+                            "solid <code>#0B4EA2</code>", "The line in use is in neither source, so it is drawn once"))
+   and "a translucent <code>#1D4ED8</code> halo" not in _tg25 and "(out <code>#059669</code>, back <code>#F59E0B</code>, the public map's)" not in _tg25)
 ok("ROUTES PAGE (2.1-5): 9.2 names the five layers, all off each visit, from what was last fetched",
    all(w in _m25 for w in ("planned road closures, lorry limits, community places, collisions and cycle routes", "all are off each time you open the page",
                            "Config &rarr; Map and bulletin")))

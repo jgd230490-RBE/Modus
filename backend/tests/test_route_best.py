@@ -174,8 +174,10 @@ ok("1. parts mix: one ahead and one behind is mixed; parts not counted are left 
    (RB.MIXED, 1, -1, None, RB.MIXED))
 ok("⭐ 1. 4f: a percentage only where the base is 5 or more; a zero base or a small one gives the counts alone",
    RB.pct(3, 0, 5) is None and RB.pct(4, 4, 5) is None and RB.pct(10, 20, 5) == -50 and RB.pct(6, 5, 5) == 20)
-ok("1. labels: the main route, Alt n, a way round", (RB.label(0), RB.label(2), RB.label(10), RB.label(11)) ==
-   ("The main route", "Alt 2", "Way round", "Way round 2"))
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): a line baked round a closure is "Diversion" (it read "Way round")
+ok("1. labels: the main route, Alt n, a diversion", (RB.label(0), RB.label(2), RB.label(10), RB.label(11)) ==
+   ("The main route", "Alt 2", "Diversion", "Diversion 2") and RB.DIVERSION_LABEL == "Diversion"
+   and "Way round" not in __import__("inspect").getsource(RB.label))
 _doc = read("backend/route_analysis_doc.py")
 ok("⭐ 1. 4d: the deciding places are the Route analysis's named kinds, within 250 m; the other kinds are shown only",
    'NAMED_KINDS = ("schools", "hospitals", "health")' in _doc and RB.DECIDING_KINDS == ("schools", "hospitals", "health")
@@ -443,7 +445,8 @@ ok("3. ...and so the why says it once for both legs", _why_all["why"] == "Every 
 ok("3. ...and Alt 1 itself is not offered as a change", opt(R2, 1) is None)
 ok("⭐ 3. Alt 2 has clearly fewer collisions than the diversion (5 against 20) but is slower: A trade-off, no pick",
    R2["answer"] == RB.TRADE_OFF and R2["option"] is None and o22["heads"]["people"] == 1 and o22["heads"]["time"] == -1
-   and R2["trade"].startswith("Alt 2 has fewer collisions on it (5 against 20)") and ", but " in R2["trade"], str(R2["trade"]))
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the long line is "<option>: gains; losses" (it read "Alt 2 has …, but …")
+   and R2["trade"].startswith("Alt 2: fewer collisions on it (5 against 20); ") and " but " not in R2["trade"], str(R2["trade"]))
 R2_out = run("R2", day=datetime.date(2027, 6, 1))
 ok("3. after the closure ends the route in use is option 0 again and Alt 1 is an option like any other",
    R2_out["in_use"]["pair"] == [0, 0] and opt(R2_out, 1) is not None and opt(R2_out, 0) is None)
@@ -456,9 +459,10 @@ keep_words(R3)
 o31 = opt(R3, 1)
 ok("⭐ 4. N5: R3's Alt 1 is shorter but slower; ahead on people and carbon, behind on nothing: still not Suggested",
    o31 and o31["n5"] and o31["heads"]["people"] == 1 and o31["heads"]["time"] == 0 and R3["answer"] == RB.TRADE_OFF
-   and "but it is a shorter road that takes longer" in R3["trade"], f"{R3['answer']} {R3['trade']}")
-ok("⭐ 4. (reversed 16 Nov evening) the trade line says 'but' ONCE: never '…, but it is shorter but slower'",
-   R3["trade"].count(" but ") == 1 and "shorter but slower" not in R3["trade"], R3["trade"])
+   and "; it is a shorter road that takes longer" in R3["trade"], f"{R3['answer']} {R3['trade']}")
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the gains and losses are joined by "; " (it read ", but "); NARROWED: never "but" at all
+ok("⭐ 4. (reversed 16 Nov evening) the trade line says no 'but': never '…, but it is shorter but slower'",
+   R3["trade"].count(" but ") == 0 and R3["trade"].count("; ") == 1 and "shorter but slower" not in R3["trade"], R3["trade"])
 ok("4. its sentences say so", any("is a shorter road that takes longer" in s and "so it is never suggested" in s
                                   for s in o31["sentences"]) and not any("shorter but slower" in s for s in o31["sentences"]))
 
@@ -467,8 +471,9 @@ ok("4. its sentences say so", any("is a shorter road that takes longer" in s and
 # =========================================================================== #
 ok("⭐ 5. goods-vehicle collisions on the road per option (route_best)",
    (R1["counts_in_use"]["goods"], o2["counts"]["goods"]) == (3, 1) and o2["parts"]["goods"] == 0, str(o2["counts"]))
-ok("5. the goods sentence names the goods vehicle and gives the two counts",
-   f"Alt 2 had 1 collision involving a goods vehicle over 3.5 t on it against 3 on the route in use, {PERIOD}."
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "involving an HGV" (it read "involving a goods vehicle over 3.5 t")
+ok("5. the goods sentence says 'involving an HGV' and gives the two counts",
+   f"Alt 2 had 1 collision involving an HGV on it against 3 on the route in use, {PERIOD}."
    in o2["sentences"], str(o2["sentences"]))
 _cmp = {(r["route"], r["alt"]): r for r in route_compare.compare()["rows"]}
 ok("⭐ 5. ...and route_compare.compare carries them too (all lorry types, the stored key)",
@@ -620,9 +625,10 @@ def demo(use, alts, community_all=False):
 D003 = demo(M(23, 0, 5, 3, 2.07, 6, 14.79, 20.3, 1.356, 6, 9.6),
             [(1, M(11, 0, 5, 6, 0.87, 5, 13.31, 23.3, 1.405, 6, 8.0)), (2, M(8, 0, 3, 3, 0.73, 4, 12.84, 21.4, 1.374, 6, 7.5))])
 ok("⭐ 10. R003 (demo: 'Suggested Alt 2') is now 'A trade-off': Alt 2 is shorter (12.84 against 14.79 km) but slower "
-   "(21.4 against 20.3 min), N5", D003["answer"] == RB.TRADE_OFF and D003["trade"].startswith("Alt 2 has fewer collisions on it "
-   "(8 against 23)") and "but it is a shorter road that takes longer" in D003["trade"]
-   and D003["trade"].count(" but ") == 1, f"{D003['answer']} {D003['trade']}")
+   "(21.4 against 20.3 min), N5", D003["answer"] == RB.TRADE_OFF and D003["trade"].startswith("Alt 2: fewer collisions on it "
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Alt 2: …; it is …" (it read "Alt 2 has …, but it is …")
+   "(8 against 23)") and "; it is a shorter road that takes longer" in D003["trade"]
+   and D003["trade"].count(" but ") == 0, f"{D003['answer']} {D003['trade']}")
 D027 = demo(M(151, 0, 7, 20, 8.61, 9, 73.6, 88.0, 88.0 / 60 + 0.667, 4, 53.5),
             [(1, M(196, 0, 10, 21, 8.98, 8, 82.68, 104.2, 104.2 / 60 + 0.667, 3, 56.3)),
              (2, M(101, 0, 8, 17, 6.21, 8, 92.21, 106.7, 106.7 / 60 + 0.667, 3, 62.8))])
@@ -638,8 +644,9 @@ ok("⭐ 10. R031: 'Keep the route in use' as in the demo", D031["answer"] == RB.
 D003g = demo(M(23, 0, 5, 3, 2.07, 6, 14.79, 20.3, 1.356, 6, 9.6),
              [(1, M(11, 0, 5, 6, 0.87, 5, 13.31, 23.3, 1.405, 6, 8.0)), (2, M(8, 0, 3, 3, 0.73, 4, 12.84, 21.4, 1.374, 6, 7.5))],
              community_all=True)
-ok("10. R003 with the cycle and community parts counted: still 'A trade-off' (N5), with 2 fewer left turns and 2 fewer places",
-   D003g["answer"] == RB.TRADE_OFF and "2 fewer left turns" in D003g["trade"]
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "left-hand turns" (it read "left turns")
+ok("10. R003 with the cycle and community parts counted: still 'A trade-off' (N5), with 2 fewer left-hand turns and 2 fewer places",
+   D003g["answer"] == RB.TRADE_OFF and "2 fewer left-hand turns" in D003g["trade"]
    and "2 fewer schools, hospitals and health centres passed" in D003g["trade"], str(D003g["trade"]))
 
 # =========================================================================== #
@@ -737,10 +744,11 @@ def wc(s):
 # the card's words (John's yes to the third draft, card 10): "Alt 2 is ahead on cycle routes and carbon, behind on places
 # and time."; collisions said first as a fact, never ahead / behind (R5). Reversed 16 Nov night from the first wording
 # ("Alt 2: fewer collisions, but slower.").
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): said as facts, "Alt 2: fewer collisions; slower." (it read "Alt 2 had fewer collisions and is behind on time.")
 ok("⭐ 10c. trade_short: R2's trade in one line naming the heads only, in the card's words",
-   R2["trade_short"] == "Alt 2 had fewer collisions and is behind on time." and wc(R2["trade"]) > wc(R2["trade_short"]),
+   R2["trade_short"] == "Alt 2: fewer collisions; slower." and wc(R2["trade"]) > wc(R2["trade_short"]),
    f"{R2.get('trade_short')!r} / {R2['trade']!r}")
-ok("⭐ 10c. ...R3's: the N5 words once, last, no counts and no 'but'", R3["trade_short"].startswith("Alt 1 had fewer collisions")
+ok("⭐ 10c. ...R3's: the N5 words once, last, no counts and no 'but'", R3["trade_short"].startswith("Alt 1: fewer collisions; ")
    and R3["trade_short"].endswith("; a shorter road that takes longer.") and " but " not in R3["trade_short"]
    and R3["trade_short"].count("a shorter road") == 1,
    R3.get("trade_short"))
@@ -755,14 +763,17 @@ ok("⭐ 10c. every trade_short the harness makes is at most 25 words, holds no '
 ok("10c. ...about 20 words: the middle one of every trade_short the harness makes is 20 words or under (19 on 16 Nov, "
    "over the typed combinations, which load many heads at once)",
    sorted(wc(s) for s in _shorts)[len(_shorts) // 2] <= 20, str(sorted(wc(s) for s in _shorts)[len(_shorts) // 2]))
-_LABEL_RE = re.compile(r"^(The main route|Alt \d+|Way round(?: \d+)?) ")
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the option's name and a colon (it read "<option> had … / is ahead …"); "Diversion" for "Way round"
+_LABEL_RE = re.compile(r"^(The main route|Alt \d+|Diversion(?: \d+)?): ")
 
 
 def _after_label(s):
     return _LABEL_RE.sub("", s or "", count=1)
 
 
-_BANNED_SHORT = ("better", "safer", "mixed by", "less by", "%", " rate", "ratio", "risk", " but ")
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): NARROWED: no "ahead", "behind" or "trade" either (Q8)
+_BANNED_SHORT = ("better", "safer", "mixed by", "less by", "%", " rate", "ratio", "risk", " but ", "ahead", "behind", "trade",
+                 "worse")
 ok("⭐ 10c. heads only: no figure in trade_short but the option's own name; never 'better', 'safer', 'mixed by', "
    "'less by', 'but', a percentage, a rate or a ratio",
    all(_LABEL_RE.match(s) for s in _shorts)
@@ -771,18 +782,29 @@ ok("⭐ 10c. heads only: no figure in trade_short but the option's own name; nev
    [s for s in _shorts if re.search(r"\d", _after_label(s)) or any(b in s.lower() for b in _BANNED_SHORT)][:2])
 # the card's pattern: "<option> [had fewer|more collisions and] is ahead on <heads>, behind on <heads>[; mixed on <heads>]
 # [; a shorter road that takes longer]." with the five plain head names only
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the card 6 pattern, "<option>: <collisions>; <fewer …, less carbon>; <more …>; <quicker|slower>; <… mixed>; <N5>."
+# (it read "<option> had fewer collisions and is ahead on …, behind on …; mixed on …")
+def _hl(names):
+    return rf"{names}(?:, {names})*(?: and {names})?"
+
+
 _HEAD_NAMES = r"(?:cycle routes|places|time|busy hours|carbon)"
-_HEAD_LIST = rf"{_HEAD_NAMES}(?:, {_HEAD_NAMES})*(?: and {_HEAD_NAMES})?"
-_COLL = r"(?:fewer|more) (?:goods-vehicle )?collisions"
-_SHORT_RE = re.compile(rf"^(?:The main route|Alt \d+|Way round(?: \d+)?) "
-                       rf"(?:had {_COLL}(?:(?:,| and) {_COLL})*(?:,? and is |$|(?=;)|(?=\.$))|is (?=ahead|behind)|is (?=mixed))"
-                       rf"(?:ahead on {_HEAD_LIST})?(?:,? ?behind on {_HEAD_LIST})?"
-                       rf"(?:(?:; |(?<=is ))mixed on {_HEAD_LIST})?(?:; a shorter road that takes longer)?\.$")
-ok("⭐ 10c. every trade_short is in the card's pattern: '<option> is ahead on …, behind on ….' with the plain head names; "
+_HEAD_LIST = _hl(_HEAD_NAMES)
+_TW = r"(?:quicker|slower)"
+_SHORT_RE = re.compile(rf"^(?:The main route|Alt \d+|Diversion(?: \d+)?): (?:"
+                       rf"(?:(?:fewer|more) collisions(?: involving an HGV)?(?: and (?:fewer|more) involving an HGV)?)?"
+                       rf"(?:(?:^|(?<=: )|; )(?:fewer {_hl('(?:cycle routes|places)')}(?:, less carbon)?|less carbon))?"
+                       rf"(?:(?:(?<=: )|; )more {_hl('(?:cycle routes|places|carbon)')})?"
+                       rf"(?:(?:(?<=: )|; )(?:{_TW}(?:, {_TW} in the busy hours)?|{_TW} in the busy hours))?"
+                       rf"(?:(?:(?<=: )|; ){_HEAD_LIST} mixed)?"
+                       rf"(?:(?:(?<=: )|; )a shorter road that takes longer)?"
+                       rf"|the same on every measure)\.$")
+ok("⭐ 10c. every trade_short is in the card's pattern: '<option>: fewer …; more …; slower; … mixed.' with the plain head names; "
    "collisions first as a fact; a mixed head last; the N5 words last of all",
    all(_SHORT_RE.match(s) for s in _shorts), [s for s in _shorts if not _SHORT_RE.match(s)][:3])
-ok("⭐ 10c. collisions are never 'ahead' or 'behind' (R5: plain words): no 'collisions' after 'ahead on' or 'behind on'",
-   not [s for s in _shorts if re.search(r"(ahead|behind|mixed) on [^;.]*collision", s)])
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): nothing is "ahead" or "behind" now; collisions are still never better or worse, and never "mixed"
+ok("⭐ 10c. collisions are never 'ahead' or 'behind' (R5: plain words): no 'ahead', 'behind' or 'collisions mixed' in any line",
+   not [s for s in _shorts if re.search(r"ahead|behind|collisions[^;.]* mixed", s)] and _shorts)
 ok("10c. a mixed head is in neither list: no head named twice in one line",
    not [s for s in _shorts if any(len(re.findall(rf"\b{h}\b", s)) > 1 for h in ("cycle routes", "places", "time",
                                                                               "busy hours", "carbon"))])
@@ -808,21 +830,23 @@ L036 = demo(M(10, 1, 4, 1, 0.6, 1, 17.48, 19.9, 63.9 / 60, 8, 16.3),
              (2, M(6, 0, 12, 4, 1.73, 1, 16.15, 22.0, 66.0 / 60, 8, 14.8))], community_all=True)
 _live = {"R001": L001, "R003": L003, "R036": L036}
 ok("⭐ 10c. live's own figures give live's own long lines, word for word (so the shapes are live's)",
-   L001["trade"] == "Alt 1 has fewer collisions on it (97 against 165), 13 fewer cycle routes met and 1.55 km less beside "
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Alt 1: gains; losses." (it read "Alt 1 has gains, but losses."); "left-hand turns"
+   L001["trade"] == "Alt 1: fewer collisions on it (97 against 165), 13 fewer cycle routes met and 1.55 km less beside "
    # 17 Nov 2026 (Q7, Q5): REVERSED in two places. "24 min more a round trip" is "23.5 min more" (halves); and the
    # rule writes CO₂e, as the card's own rows do (it wrote "CO2e").
-   "a cycle route, but 13 more left turns, 5 more schools, hospitals and health centres passed, 23.5 min more a round trip, "
+   "a cycle route; 13 more left-hand turns, 5 more schools, hospitals and health centres passed, 23.5 min more a round trip, "
    "a lorry fits 3 trips a day, not 4 and 15.6 kg CO₂e more a trip."
-   and L003["trade"] == "Alt 2 has 2 fewer left turns, 1.32 km less beside a cycle route and 2.1 kg CO₂e less a trip, but "
+   and L003["trade"] == "Alt 2: 2 fewer left-hand turns, 1.32 km less beside a cycle route and 2.1 kg CO₂e less a trip; "
    "3 more schools, hospitals and health centres passed and it is a shorter road that takes longer."
-   and L036["trade"] == "Alt 1 has fewer collisions on it (2 against 10), 2 min quicker a round trip and 4.6 kg CO₂e less "
-   "a trip, but 1.19 km more beside a cycle route."
+   and L036["trade"] == "Alt 1: fewer collisions on it (2 against 10), 2 min quicker a round trip and 4.6 kg CO₂e less "
+   "a trip; 1.19 km more beside a cycle route."
    and not any("CO2e" in str(x.get("trade")) for x in (L001, L003, L036)),
    " | ".join(str(x.get("trade")) for x in _live.values()))
 ok("⭐ 10c. ...and their short lines in the card's words (R006 typed from its heads)",
-   L001["trade_short"] == "Alt 1 had fewer collisions and is behind on places, time and carbon; mixed on cycle routes."
-   and L003["trade_short"] == "Alt 2 is ahead on cycle routes and carbon, behind on places; a shorter road that takes longer."
-   and L036["trade_short"] == "Alt 1 had fewer collisions and is ahead on time and carbon, behind on cycle routes."
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the card 6 words; R001's is the card's own example word for word
+   L001["trade_short"] == "Alt 1: fewer collisions; more places and carbon; slower; cycle routes mixed."
+   and L003["trade_short"] == "Alt 2: fewer cycle routes, less carbon; more places; a shorter road that takes longer."
+   and L036["trade_short"] == "Alt 1: fewer collisions; less carbon; more cycle routes; quicker."
    and all(_SHORT_RE.match(x["trade_short"]) and wc(x["trade_short"]) <= RB.SHORT_MAX
            and not any(b in x["trade_short"].lower() for b in _BANNED_SHORT)
            and not re.search(r"\d", _after_label(x["trade_short"]))
@@ -835,17 +859,20 @@ ok("⭐ 10c. the live shapes: each a trade-off whose long line runs long, and wh
 ok("10c. the live shapes read as written in the card's words (reversed 16 Nov night from 'Alt 2: fewer collisions and "
    "less carbon, but a shorter road that takes longer.' and 'Alt 1: fewer collisions, quicker and less carbon, but fewer "
    "trips a day.')",
-   D003["trade_short"] == "Alt 2 had fewer collisions and is ahead on carbon; a shorter road that takes longer."
-   and D036["trade_short"] == "Alt 1 had fewer collisions and is ahead on carbon; mixed on time."
-   and D001["trade_short"] == "Alt 1 had fewer collisions and is behind on cycle routes, places and carbon; mixed on time."
-   and D006["trade_short"] == "Alt 1 is ahead on cycle routes, behind on time and carbon."
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the card 6 words (they read "… had fewer collisions and is ahead on …")
+   D003["trade_short"] == "Alt 2: fewer collisions; less carbon; a shorter road that takes longer."
+   and D036["trade_short"] == "Alt 1: fewer collisions; less carbon; time mixed."
+   and D001["trade_short"] == "Alt 1: fewer collisions; more cycle routes, places and carbon; time mixed."
+   and D006["trade_short"] == "Alt 1: fewer cycle routes; more carbon; slower."
    and wc(D001["trade"]) > 40,
    f"{D003.get('trade_short')} | {D036.get('trade_short')} | {D001.get('trade_short')} | {D006.get('trade_short')}")
 _big = dict(D001["options"][0], parts={"collisions": 1, "goods": -1, "cycle": -1, "community": -1},
             heads={"people": RB.MIXED, "time": 1, "busy": -1, "carbon": -1}, n5=False)
 _bs = RB.trade_short(_big)
 ok("10c. every head and part at once still fits (the levels take over past 25)", wc(_bs) <= RB.SHORT_MAX
-   and "had fewer collisions" in _bs and _SHORT_RE.match(_bs), f"{wc(_bs)} {_bs}")
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "fewer collisions and more involving an HGV" (it read "had fewer collisions")
+   and _bs == "Alt 1: fewer collisions and more involving an HGV; more cycle routes, places and carbon; quicker, slower in "
+   "the busy hours." and _SHORT_RE.match(_bs), f"{wc(_bs)} {_bs}")
 # the mixed words live in ONE place (SHORT_MIXED): changed or emptied there, every line follows
 _mx = dict(D001["options"][0], parts={"collisions": 0, "goods": 0, "cycle": RB.MIXED, "community": -1},
            heads={"people": RB.MIXED, "time": 1, "busy": None, "carbon": RB.MIXED}, n5=False)
@@ -855,22 +882,25 @@ RB.SHORT_MIXED = ""
 _mx_off = RB.trade_short(_mx)
 RB.SHORT_MIXED = _keep_mixed
 ok("⭐ 10c. a mixed head is said last ('; mixed on cycle routes and carbon'); the words sit in SHORT_MIXED alone",
-   _mx_on == "Alt 1 is ahead on time, behind on places; mixed on cycle routes and carbon."
-   and _mx_off == "Alt 1 is ahead on time, behind on places." and RB.SHORT_MIXED == "mixed on"
-   and read("backend/route_best.py").count('"mixed on') == 1, f"{_mx_on!r} / {_mx_off!r}")
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "; cycle routes and carbon mixed" (it read "; mixed on cycle routes and carbon")
+   _mx_on == "Alt 1: more places; quicker; cycle routes and carbon mixed."
+   and _mx_off == "Alt 1: more places; quicker." and RB.SHORT_MIXED == "mixed"
+   and read("backend/route_best.py").count('SHORT_MIXED = "mixed"') == 1, f"{_mx_on!r} / {_mx_off!r}")
 # a mixed time head (quicker a round trip, a trip a day fewer) is said as mixed, not "slower"
 _mt = dict(D001["options"][0], parts={"collisions": 1, "goods": 1, "cycle": 0, "community": 0},
            heads={"people": 1, "time": RB.MIXED, "busy": None, "carbon": 1}, n5=True)
 ok("10c. a mixed time is said as mixed, and the N5 words are left out where time is not ahead or level",
-   RB.trade_short(_mt) == "Alt 1 had fewer collisions and is ahead on carbon; mixed on time.", RB.trade_short(_mt))
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended")
+   RB.trade_short(_mt) == "Alt 1: fewer collisions; less carbon; time mixed.", RB.trade_short(_mt))
 # goods-vehicle collisions that go the other way from all collisions are said, and dropped first when the line runs long
 _gd = dict(D001["options"][0], parts={"collisions": 1, "goods": -1, "cycle": 0, "community": 0},
            heads={"people": RB.MIXED, "time": -1, "busy": None, "carbon": 0}, n5=False)
 _gd2 = dict(_gd, parts={"collisions": 0, "goods": 1, "cycle": 0, "community": 0},
             heads={"people": 1, "time": -1, "busy": None, "carbon": 0})
-ok("10c. goods-vehicle collisions said where they go their own way",
-   RB.trade_short(_gd) == "Alt 1 had fewer collisions and more goods-vehicle collisions, and is behind on time."
-   and RB.trade_short(_gd2) == "Alt 1 had fewer goods-vehicle collisions and is behind on time.",
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "involving an HGV" (it read "goods-vehicle collisions")
+ok("10c. HGV collisions said where they go their own way",
+   RB.trade_short(_gd) == "Alt 1: fewer collisions and more involving an HGV; slower."
+   and RB.trade_short(_gd2) == "Alt 1: fewer collisions involving an HGV; slower.",
    f"{RB.trade_short(_gd)!r} / {RB.trade_short(_gd2)!r}")
 
 ok("⭐ 10c. in_use_limits: the limit the line in use itself meets, with its name, on both legs (R1: the quarry gate's bridge)",
@@ -989,7 +1019,8 @@ ok("12. the card: the frontend reads /best-option, not the admin table, and 'Cou
 
 ok("⭐ 12. every row of the admin table carries trade_short and in_use_limits (the card is built to these names)",
    all("trade_short" in r and "in_use_limits" in r for r in TAB["rows"])
-   and _rows[("R2", "Alt 2")]["trade_short"] == "Alt 2 had fewer collisions and is behind on time."
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended")
+   and _rows[("R2", "Alt 2")]["trade_short"] == "Alt 2: fewer collisions; slower."
    and _rows[("R1", "Alt 2")]["trade_short"] is None
    and [x["legs"] for x in _rows[("R4", None)]["in_use_limits"]] == ["both"]
    and [x["short"] for x in _rows[("R4", None)]["in_use_limits"]] == ["7.5 t limit"]
@@ -1145,6 +1176,82 @@ for _c15 in (_c14, _c14w):
        and _r15["lines"][0]["words"].endswith(" min")
        and [x["alt"] for x in _r15["lines"][1:1 + len(_r15["options"])]] == sorted(o["alt"] for o in _r15["options"])
        and all(set(x) == {"alt", "return_alt", "name", "words", "state"} for x in _r15["lines"]), _r15.get("lines"))
+
+# 16. 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the WORDS changed and no DECISION
+# did. Every case this harness makes (R1 to R5, the typed combinations, the demo and live shapes, the admin table) is
+# reduced to what the rule decided: the answer's kind, the option, its alt, and for every option its heads, parts,
+# chosen / traded / n5 and whether it was ruled out. The digest was written by this same section running on the rule
+# as it stood before the rewording (`main` 87c52b7, its route_best.py put in place for one run with
+# WS_WRITE_DECISIONS=1), and is compared here; a change to the rule's DECISIONS is a change to this fixture, made on
+# purpose and said in its PR.
+_KIND = {RB.SUGGESTED: "suggested", RB.KEEP: "keep", "A trade-off": "planner", "Planner to decide": "planner"}
+
+
+def _decided(x):
+    if not isinstance(x, dict) or "answer" not in x:
+        return None
+    return {"route": x.get("route"), "answer": _KIND.get(x["answer"], x["answer"]), "option": x.get("option"),
+            "alt": x.get("alt"),
+            "options": [{"alt": o.get("alt"), "label": (o.get("label") or "").replace("Way round", "Diversion"),
+                         "heads": {k: o["heads"].get(k) for k in sorted(o.get("heads") or {})},
+                         "parts": {k: o["parts"].get(k) for k in sorted(o.get("parts") or {})},
+                         "chosen": bool(o.get("chosen")), "traded": bool(o.get("traded")), "n5": bool(o.get("n5")),
+                         "ruled_out": bool(o.get("ruled_out"))} for o in (x.get("options") or [])]}
+
+
+_cases16 = {"R1": R1, "R2": R2, "R2_out": R2_out, "R3": R3, "R1g": R1g, "R5": R5, "D003": D003, "D027": D027,
+            "D031": D031, "D003g": D003g, "D001": D001, "D036": D036, "D006": D006, "L001": L001, "L003": L003,
+            "L036": L036}
+_cases16.update({f"GEN{i}": g for i, g in enumerate(GEN)})
+_cases16.update({f"TAB:{r['route']}": r for r in TAB["routes"]})
+_dig16 = {k: _decided(v) for k, v in _cases16.items() if _decided(v) is not None}
+_fx16 = os.path.join(ROOT, "backend", "tests", "fixtures", "route_best_decisions_1124.json")
+if os.environ.get("WS_WRITE_DECISIONS") == "1":
+    with open(_fx16, "w", encoding="utf-8", newline="\n") as f_:
+        f_.write("{\n" + ",\n".join(json.dumps(k) + ": " + json.dumps(v, sort_keys=True, ensure_ascii=False,
+                                                                       separators=(",", ":"))
+                                       for k, v in sorted(_dig16.items())) + "\n}\n")
+_old16 = json.load(open(_fx16, encoding="utf-8")) if os.path.exists(_fx16) else {}
+_moved16 = [k for k in sorted(set(_old16) | set(_dig16)) if _old16.get(k) != _dig16.get(k)]
+ok("⭐ 16. the rewording moved no decision: every case's answer, option and every option's heads and parts are the "
+   "rule's before the words changed (the fixture, written on main 87c52b7)",
+   len(_old16) > 200 and not _moved16, f"{len(_old16)} cases; moved: {_moved16[:5]}")
+ok("16. ...the answer keys still total as before (the admin table's totals are keyed by the new words)",
+   sorted({v["answer"] for v in _dig16.values()}) == ["keep", "planner", "suggested"]
+   and TAB["totals"].get("Planner to decide") == 2 and "A trade-off" not in TAB["totals"], str(TAB["totals"]))
+ok("⭐ 16. an answer kept in the older words is read in the new ones (route_best.answer_words); the rule writes only the "
+   "new ones",
+   RB.answer_words("A trade-off") == "Planner to decide" and RB.answer_words(RB.SUGGESTED) == RB.SUGGESTED
+   and RB.TRADE_OFF == "Planner to decide" and RB.ANSWERS == (RB.SUGGESTED, "Planner to decide", RB.KEEP)
+   and not [k for k, v in _cases16.items() if isinstance(v, dict) and v.get("answer") == "A trade-off"])
+# the old words are gone from every sentence the rule writes (comments may still quote them)
+_said16 = []
+for _v in _cases16.values():
+    if not isinstance(_v, dict):
+        continue
+    _said16 += [_v.get("why") or "", _v.get("trade") or "", _v.get("trade_short") or "", _v.get("held_back") or ""]
+    _said16 += list(_v.get("sentences") or [])
+    for _o in _v.get("options") or []:
+        _said16 += list(_o.get("sentences") or []) + list(_o.get("ruled_out") or []) + [_o.get("label") or ""]
+    _said16 += [f"{x.get('name')} · {x.get('words')}" for x in (_v.get("lines") or [])]
+_GONE16 = ("A trade-off", "trade-off", "trades too", "ahead on", "behind on", "Way round", "goods vehicle", "goods-vehicle",
+           "Make primary", "Best option", " left turn")
+ok("⭐ 16. GONE: no sentence, label or reason the rule writes says 'A trade-off', 'trades', 'ahead on', 'behind on', "
+   "'Way round', 'goods vehicle', 'Make primary', 'Best option' or 'left turns' (Q7 to Q9)",
+   len(_said16) > 1000 and not [s for s in _said16 if any(g in s for g in _GONE16)],
+   [s for s in _said16 if any(g in s for g in _GONE16)][:3])
+ok("16. GONE: no long reason joins its gains and losses with ', but' (it is '; ')",
+   not [s for s in _said16 if ", but " in s], [s for s in _said16 if ", but " in s][:2])
+# the one place the old answer is still written: OLD_ANSWERS, which reads an older copy's words as the new ones
+_rbc16 = "\n".join(l.split("#")[0] for l in read("backend/route_best.py").splitlines()
+                   if not l.startswith("OLD_ANSWERS = ") and '"""An answer in today' not in l)
+ok("16. GONE (source): the rule's code holds none of the old words outside its comments, docstrings and OLD_ANSWERS",
+   'OLD_ANSWERS = {"A trade-off": TRADE_OFF}' in read("backend/route_best.py") and not re.search(r'"[^"\n]*(A trade-off|trades too|ahead on|behind on|Way round|goods vehicle over|goods-vehicle)[^"\n]*"',
+                 _rbc16.split('"""', 2)[-1]))
+_all_short16 = [x["trade_short"] for x in _cases16.values() if isinstance(x, dict) and x.get("trade_short")]
+ok("⭐ 16. Q8: every short line this harness makes is at most SHORT_MAX (25) words; the longest is said",
+   _all_short16 and max(len(s.split()) for s in _all_short16) <= RB.SHORT_MAX,
+   max(_all_short16, key=lambda s: len(s.split())) if _all_short16 else "")
 
 print()
 for f_ in FAIL:

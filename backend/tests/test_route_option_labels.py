@@ -157,7 +157,8 @@ ok("⭐ 5. a diversion in use: 'In use · 147.7 min' on the diversion's own line
    and (R027["lines"][0]["alt"], R027["lines"][0]["return_alt"]) == (2, 2) and R027["lines"][1]["alt"] == 0, said(R027))
 ok("⭐ 5. the main route's name on a line has no article (the rule's label() keeps 'The main route' for its sentences)",
    HAS and RB.line_name(0) == "Main route" and RB.label(0) == "The main route" and RB.line_name(2) == "Alt 2"
-   and RB.line_name(10) == "Way round")
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Diversion" (it read "Way round")
+   and RB.line_name(10) == "Diversion")
 SPLIT = demo(M(10, 0, 5, 5, 1.0, 2, 30.0, 40.0, 80.0, 6, 30.0), [(0, M(10, 0, 5, 5, 1.0, 2, 30.0, 40.0, 80.0, 6, 30.0))],
              use_pair=(2, 0), lines=stored(0, extra=[("loaded", 2)]))
 ok("5. a diversion on the way out only: the line in use is option 2 out and option 0 back, said once",
@@ -166,8 +167,9 @@ ok("5. a diversion on the way out only: the line in use is option 2 out and opti
 # 6. not compared: a way round that is not in use, and a line stored on the way back only
 NC = demo(M(39, 4, 10, 6, 0.24, 7, 66.65, 70.0, 104.0, 5, 57.7), [(1, M(39, 1, 9, 4, 0.17, 2, 64.71, 66.5, 100.5, 5, 56.0))],
           lines=stored(0, 1, 10, extra=[("return", 3)]))
-ok("⭐ 6. a stored line the rule does not judge reads 'not compared': 'Way round · not compared', and a way back of its own",
-   said(NC) == ["In use · 104 min", "Alt 1 · 3.5 min quicker", "Way round · not compared", "Alt 3 · not compared"]
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Diversion · not compared" (it read "Way round · not compared")
+ok("⭐ 6. a stored line the rule does not judge reads 'not compared': 'Diversion · not compared', and a way back of its own",
+   said(NC) == ["In use · 104 min", "Alt 1 · 3.5 min quicker", "Diversion · not compared", "Alt 3 · not compared"]
    and (NC["lines"][2]["alt"], NC["lines"][2]["return_alt"]) == (10, 10)
    and (NC["lines"][3]["alt"], NC["lines"][3]["return_alt"]) == (None, 3), NC["lines"])
 ok("6. another lorry's stored line is never in the card's lines", all(x["alt"] != 7 for x in NC["lines"]))
@@ -199,9 +201,10 @@ LONG = demo(M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1447.7, 1, 30.0),
             [(0, M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1335.2, 1, 30.0)), (1, M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1560.4, 1, 30.0)),
              (3, M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1447.9, 1, 30.0))],
             use_pair=(2, 2), lines=stored(0, 1, 2, 3, 10, 11), ruled={3: [ZONE]})
-ok("⭐ 9b. the longest labels: 'Main route · 112.5 min quicker' (30 letters), 'Way round 2 · not compared', a four-figure 'In use'",
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Diversion 2 · not compared" (it read "Way round 2 · not compared"; 26 letters, it was 26)
+ok("⭐ 9b. the longest labels: 'Main route · 112.5 min quicker' (30 letters), 'Diversion 2 · not compared', a four-figure 'In use'",
    said(LONG) == ["In use · 1447.7 min", "Main route · 112.5 min quicker", "Alt 1 · 112.5 min longer", "Alt 3 · ruled out",
-                  "Way round · not compared", "Way round 2 · not compared"], said(LONG))
+                  "Diversion · not compared", "Diversion 2 · not compared"], said(LONG))
 ok("⭐ 9b. at its longest a label is 30 letters, 4 words with the name as one, 5 pieces",
    max(len(x) for x in said(LONG)) == 30 and all(1 + len(x["words"].split()) <= 4 and len(x["name"].split()) + len(x["words"].split()) <= 5
                                                   for x in LONG["lines"]), max(len(x) for x in said(LONG)) if HAS else "")
