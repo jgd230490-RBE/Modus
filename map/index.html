@@ -5325,7 +5325,10 @@
             // Track C review: two carbon ramps can be on the map at once; this one is not the route / section legend's
             + (mode === 'carbon' ? '<div class="area-note">District bands differ from the route carbon bands.</div>' : '');
     }
-    function areaCardHTML(a, payload, when) {
+    // 24 Nov 2026 (found by card 7's build): renamed from areaCardHTML. The "Select an area" card (2.1-4) declared a second
+    // global areaCardHTML() later in the page, which won: a click on a council opened "Selected area · Loading…", never this
+    // card. No function name is declared twice in this page (parse_map pins it).
+    function councilCardHTML(a, payload, when) {
         const esc = s => String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         const fmt = (n, d) => (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('en-GB');
         const tot = (payload && payload.totals) || {};
@@ -5701,7 +5704,7 @@
             const a = (AREAS.data.areas || []).find(x => x.area_id === id);
             if (!a) return;
             const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
-            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(areaCardHTML(a, AREAS.data, when)).addTo(map);
+            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(councilCardHTML(a, AREAS.data, when)).addTo(map);
         });
         map.on('mouseenter', 'area-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
         map.on('mouseleave', 'area-fill', () => { map.getCanvas().style.cursor = ''; });
@@ -5716,7 +5719,7 @@
             const a = (AREAS.data.areas || []).find(x => x.area_id === id);
             if (!a) return;
             const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
-            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(areaCardHTML(a, AREAS.data, when)).addTo(map);
+            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(councilCardHTML(a, AREAS.data, when)).addTo(map);
         });
     }
 

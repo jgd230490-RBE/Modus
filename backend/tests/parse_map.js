@@ -3040,7 +3040,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   const end = code.indexOf("\n    }\n", code.indexOf("map.on('mouseleave', 'area-fill'", start)) + 7;
   const blk = start >= 0 && end > start ? code.slice(start, end) : "";
   ok("§2.2b: the council block is in the page (AREAS, the ramp, the layers, the card)", blk.length > 2000
-     && /function areaFillExpr\(mode\)/.test(blk) && /function areaCardHTML\(a, payload, when\)/.test(blk)
+     && /function areaFillExpr\(mode\)/.test(blk) && /function councilCardHTML\(a, payload, when\)/.test(blk)   // NARROWED 24 Nov 2026: renamed (areaCardHTML was declared twice)
      && /function ensureAreaLayers\(\)/.test(blk) && /function setupAreaCard\(\)/.test(blk));
   // its OWN group and boxes, outside "Disruption zones", off by default
   const gStart = html.indexOf('<div class="control-group" id="council-group" hidden>');
@@ -3175,7 +3175,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // 24 Nov 2026 (John's "Yes, both", the A2 addition to card 7): the council card shares its in / out by the page's
   // wholeWords (section_select.share_whole's rule), which lives beside the road-load block
   const WHOLE_SRC = (html.match(/function wholeShare\(cells, total\) \{[\s\S]*?\n    \}\n    function wholeWords\(cells, total\) \{[\s\S]*?\n    \}/) || [""])[0];
-  const card = new Function(WHOLE_SRC + "\n" + (blk.match(/function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaCardHTML;")();
+  const card = new Function(WHOLE_SRC + "\n" + (blk.match(/function councilCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return councilCardHTML;")();   // NARROWED 24 Nov 2026: renamed
   const A = { area_id: "E07000131", name: "Harborough", tier: "district", tier_words: "local authority district",
               source: "ONS Local Authority Districts (May 2026) Boundaries UK BSC", highway_authority: "Leicestershire County Council",
               movements_per_day: 12.34, routes: ["R001", "R002"], return_only_routes: ["R009"], co2_t: 30.5, co2_t_per_day: 1.39,
@@ -3213,6 +3213,11 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
                      if (t.reduce((a, b) => a + b, 0) !== Math.floor(tot + 0.5) || t.some((v, i) => Math.abs(v - c[i]) >= 1)) return false; }
                    return true; })(), JSON.stringify(W.wholeShare([59.56, 59.56], 119.12)));
   }
+  ok("⭐🔴 24 Nov 2026 (found by card 7's build): a click on a council opens the council's own card; no function name is declared twice in the map page (a second global areaCardHTML() from 2.1-4 won, and a council click opened 'Selected area · Loading…')",
+     (() => { const names = (html.match(/^ *function [A-Za-z0-9_$]+\(/gm) || []).map(x => x.trim());
+              const seen = {}, twice = names.filter(n => (seen[n] = (seen[n] || 0) + 1) === 2); return twice.length === 0; })()
+     && (html.match(/setHTML\(councilCardHTML\(a, AREAS\.data, when\)\)/g) || []).length === 2
+     && !/setHTML\(areaCardHTML\(/.test(html), "");
   ok("§2.2b: ...the planning-estimate stamp from the server, and every name escaped",
      ch.includes(P.carbon.stamp) && ch.includes("&lt;b>x&lt;/b>") && !ch.includes("<b>x</b>"));
   ok("§2.2b: ...a carbon the server could not give reads 'no figure', never 0 t",
@@ -3270,7 +3275,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("⭐ §2.2b: the county answers a click with its own card — a fill with no paint under it, on while its box is",
      /const AREA_COUNTY_LAYERS = \['area-county-outline', 'area-county-fill', 'area-county-label'\];/.test(blk)
      && /id: 'area-county-fill', type: 'fill', source: 'areas-source',\s*filter: \['==', \['get', 'tier'\], 'county'\],\s*layout: \{ visibility: cVis \}, paint: \{ 'fill-color': AREA_INK, 'fill-opacity': 0 \} \}, before\);/.test(blk)
-     && /map\.on\('click', 'area-county-fill', \(e\) => \{[\s\S]*?setHTML\(areaCardHTML\(a, AREAS\.data, when\)\)/.test(blk));
+     && /map\.on\('click', 'area-county-fill', \(e\) => \{[\s\S]*?setHTML\(councilCardHTML\(a, AREAS\.data, when\)\)/.test(blk));   // NARROWED 24 Nov 2026: renamed
   ok("🔴 §2.2b: ...but never over a district: a district (or a route, site or zone) under the click answers instead",
      /f\.layer\.id === 'area-fill' \|\| \(!String\(f\.layer\.id\)\.startsWith\('area-'\)[\s\S]*?if \(above\.length\) return;/.test(
        blk.slice(blk.indexOf("map.on('click', 'area-county-fill'"))));
@@ -4587,13 +4592,13 @@ function qrRead(mod) {
   {
     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): areaJoin takes a third argument, `loading`
     const fj = /function areaJoin\(shapes, figs(, loading)?\) \{[\s\S]*?\n    \}/.exec(ab), ft = /function areaFigureText\(a, mode, when\) \{[\s\S]*?\n    \}/.exec(ab);
-    const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function councilCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);   // NARROWED 24 Nov 2026: renamed
     let J = null, T = null, F = null, C = null;
     try {
       J = new Function(fj[0] + "\nreturn areaJoin;")();
       T = new Function(ft[0] + "\nreturn areaFigureText;")();
       F = new Function("areaFigureText", ff[0] + "\nreturn areaFeatures;")(T);
-      C = new Function("AREAS", (html.match(/function wholeShare\(cells, total\) \{[\s\S]*?\n    \}\n    function wholeWords\(cells, total\) \{[\s\S]*?\n    \}/) || [""])[0] + "\n" + fcard[0] + "\nreturn areaCardHTML;")({ mode: 'movements' });   // 24 Nov 2026: + the page's wholeWords
+      C = new Function("AREAS", (html.match(/function wholeShare\(cells, total\) \{[\s\S]*?\n    \}\n    function wholeWords\(cells, total\) \{[\s\S]*?\n    \}/) || [""])[0] + "\n" + fcard[0] + "\nreturn councilCardHTML;")({ mode: 'movements' });   // 24 Nov 2026: + the page's wholeWords
     } catch (e) {}
     const shapes = { areas: [{ area_id: "A", name: "Alpha", tier: "district", geometry: { type: "Polygon", coordinates: [] }, label_point: [0, 0] },
                              { area_id: "B", name: "Beta", tier: "district", geometry: { type: "Polygon", coordinates: [] } }], attribution: ["L1"] };
