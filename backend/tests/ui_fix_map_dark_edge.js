@@ -47,7 +47,11 @@ ok("B1 HEAT_EDGE_DARK is a pale colour that parts from the dark ground and from 
    EDGE && contrast(EDGE, DARK_GROUND) >= 3 && contrast(EDGE, RAMP[4]) >= 3 && contrast(EDGE, RAMP[3]) >= 3,
    EDGE && [contrast(EDGE, DARK_GROUND).toFixed(2), contrast(EDGE, RAMP[4]).toFixed(2)]);
 // sandbox: heatEdgeColour / restyleHeatEdge with a stub map (heatEdgeColour's slice carries the `let HEAT_LINES_ON` after it)
-const sb = { CONFIG: { COLORS: { forecastCasing: "#1F2024" } }, DARK: false, set: [],
+// NARROWED 24 Nov 2026 (John, the route lines rethink, card 2): the light ground's edge is the map config's own
+// forecastCasing, now WHITE (it was the near-black ink); read from map/config.js, not assumed
+const CFG = fs.readFileSync(path.join(ROOT, "map", "config.js"), "utf8");
+const LIGHT_EDGE = (CFG.match(/forecastCasing:\s+"(#[0-9A-Fa-f]{6})"/) || [])[1];
+const sb = { CONFIG: { COLORS: { forecastCasing: LIGHT_EDGE } }, DARK: false, set: [],
              map: { getLayer: () => true, setPaintProperty: (l, p, v) => sb.set.push([l, p, v]) } };
 sb.labelsDark = () => sb.DARK;
 vm.createContext(sb);
@@ -58,9 +62,11 @@ try {
 const hec = sb.heatEdgeColour || (() => null);
 sb.DARK = true;
 ok("B2 a heat map on a dark ground: the edge is pale", !!EDGE && hec(true) === EDGE);
-ok("B3 no heat map on a dark ground: the edge stays near-black (the plain routes keep their look)", hec(false) === "#1F2024");
+// REVERSED 24 Nov 2026 (card 2): the sign-blue line (heat map Off) takes the pale edge on a dark ground too
+ok("B3 no heat map on a dark ground: the edge is pale too (REVERSED 24 Nov 2026: was near-black)", !!EDGE && hec(false) === EDGE);
 sb.DARK = false;
-ok("B4 a heat map on a light ground: the edge stays near-black (paper and the light map unchanged)", hec(true) === "#1F2024");
+// NARROWED 24 Nov 2026 (card 2): the edge on a light ground is WHITE, heat map on or off
+ok("B4 a heat map on a light ground: the edge is white (NARROWED 24 Nov 2026: was near-black)", LIGHT_EDGE === "#FFFFFF" && hec(true) === "#FFFFFF" && hec(false) === "#FFFFFF");
 sb.DARK = true; sb.set = [];
 if (sb.setOn) { sb.setOn(true); sb.restyleHeatEdge(); }
 ok("B5 restyleHeatEdge paints both casings (the route lines' and the shared roads') pale while a heat map is on",
@@ -68,8 +74,9 @@ ok("B5 restyleHeatEdge paints both casings (the route lines' and the shared road
    && sb.set.some(s => s[0] === "road-load-casing" && s[1] === "line-color" && s[2] === EDGE), sb.set);
 sb.set = [];
 if (sb.setOn) { sb.setOn(false); sb.restyleHeatEdge(); }
-ok("B6 the heat map off: the route lines' edge goes back to near-black",
-   sb.set.some(s => s[0] === "forecast-casing" && s[2] === "#1F2024"), sb.set);
+// REVERSED 24 Nov 2026 (card 2): on a dark ground the edge stays pale with the heat map off (was: back to near-black)
+ok("B6 the heat map off on a dark ground: the route lines' edge stays pale (REVERSED 24 Nov 2026)",
+   sb.set.some(s => s[0] === "forecast-casing" && s[2] === EDGE) && !sb.set.some(s => s[2] === "#1F2024"), sb.set);
 
 console.log("C. Re-applied wherever the ground or the heat map changes");
 ok("C1 applyCarbonMode records whether a heat map colours the lines (not the council view) and restyles the edge",

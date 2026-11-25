@@ -1416,13 +1416,16 @@ _CFGJS = read("map/config.js")
 _mvs = re.search(r"const VOLUME_STOPS = \[([^\]]+)\];", MAP)
 _mcr = re.search(r"const CARBON_RAMP = \[([^\]]+)\];", MAP)
 _mcs = re.search(r'forecastCasing:\s*"(#[0-9A-Fa-f]{6})"', _CFGJS)
+# NARROWED 25 Nov 2026 (the public map's route lines rethink, John's yes 24 Nov, Q12): the stops and the five blues are
+# still ONE list (held equal); the casing no longer is. The public map's forecast line sits on a WHITE casing on light
+# grounds since 24 Nov; the printed bulletin keeps its own ink casing until the printed maps get their own mockup.
 ok("⭐ W11 held equal: the bulletin's VOLUME_STOPS and VOLUME_RAMP are the map's VOLUME_STOPS and the CARBON_RAMP volumeColor() "
-   "paints with; the casing is the map's forecastCasing",
+   "paints with; the casing is the bulletin's own ink in print, the map's white on light grounds (NARROWED 25 Nov 2026)",
    bool(_mvs and _mcr and _mcs)
    and list(bulletin_doc.VOLUME_STOPS) == [int(x) for x in _mvs.group(1).split(",")]
    and list(bulletin_doc.VOLUME_RAMP) == [x.strip().strip("'") for x in _mcr.group(1).split(",")]
    and "const s = stops, c = CARBON_RAMP;" in MAP and "volumeColor('f_avg', ROUTE_VOLUME_STOPS)" in MAP
-   and bulletin_doc.ROUTE_CASING == _mcs.group(1))
+   and bulletin_doc.ROUTE_CASING == "#1F2024" and _mcs.group(1).upper() == "#FFFFFF")
 ok("⭐ W11 held equal: the legend's five labels are the map's stepRanges() wording, the function read off the map",
    "return ['under ' + s[0] + unit, s[0] + ' to ' + s[1] + unit, s[1] + ' to ' + s[2] + unit, s[2] + ' to ' + s[3] + unit, s[3] + unit + ' and over'];" in MAP
    # REVERSED 9 Nov 2026 (2.1-11b question B): the stops in movements, the visit stops doubled
@@ -1463,7 +1466,11 @@ ok("🔴 W11 source: no line width is worked out from a volume in the bulletin's
 ok("🔴 W11 source: the schematic and the page draw the casing then the colour, at fixed widths",
    'c.setLineWidth(3.4)' in _EXB and 'c.setLineWidth(2.2)' in _EXB and "_hex_rgb(r[\"color\"])" in _EXB
    and "ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5" in read("backend/bulletin_doc.py")
-   and "const CARBON_LINE_WIDTH = 6, CARBON_CASING_WIDTH = 8.5;" in MAP)
+   # NARROWED 25 Nov 2026 (John: one width, "Keep 4 px"): the map's carbon width constants are gone; every forecast line
+   # is FORECAST_LINE_WIDTH 4 px on a FORECAST_CASING_WIDTH 6.6 px casing, casing drawn first. The bulletin keeps 5 / 7.5.
+   and "const FORECAST_LINE_WIDTH = 4;" in MAP and "const FORECAST_CASING_WIDTH = 6.6;" in MAP
+   and "CARBON_LINE_WIDTH = 6" not in MAP
+   and MAP.index("id: 'forecast-casing'") < MAP.index("id: 'forecast-layer'"))
 
 # W11 — the shared road sections, each by its routes summed (the map's Volume heat map: routes by their own figure,
 # shared sections summed on top). R1 and R2 run the same road in the fixture, so after the index is built it is ONE shared
