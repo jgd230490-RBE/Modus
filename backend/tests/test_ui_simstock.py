@@ -218,8 +218,12 @@ i1 = html.index("function SimDashLine(")
 sim_page = html[i0:i1]
 ok("2. the Simulation reads the busiest month before its first day", "sim/busiest-month" in sim_page and "if(!ready) return;" in sim_page and "setMonth(b.month_index)" in sim_page)
 ok("2. a failed read opens on this month as before", ".catch(() => { if(live) setReady(true); })" in sim_page)
+# RE-PINNED 25 Nov 2026 (claude/simulation-full-screen): the headline's words are worked out once in `headWords` (a
+# template literal the full-screen bar shares), so the same sentence may read "${peak.name}"; the words are unchanged.
 ok("2. the headline comes first, from the reply's own peak, in the sentence the card drew",
-   "simPeak(D, site)" in sim_page and "waiting at {peak.name} at {simHM(peak.at)}" in sim_page and "the busiest point of this day." in sim_page
+   "simPeak(D, site)" in sim_page and ("waiting at {peak.name} at {simHM(peak.at)}" in sim_page
+                                      or ("waiting at ${peak.name} at ${simHM(peak.at)}" in sim_page and "<b>{headWords}</b>" in sim_page))
+   and "the busiest point of this day." in sim_page
    and sim_page.index('data-sim-head="queue"') < sim_page.index('data-sim-lead="1"'))
 ok("2. no queue: one line says so and offers the busiest day", 'data-sim-head="none"' in sim_page and "Nothing queues on this day (" in sim_page
    and "Show the busiest day (" in sim_page and 'data-sim-busiest="1"' in sim_page)

@@ -762,10 +762,26 @@ else:
     ok("9: pdftotext missing: the file starts with more pages than before (a summary a route)", D["pages"] >= 9)
 # at source: the collision rows and panel take no percentage, and the words never say "safer" / "better"
 _sumsrc = _ren.split("#  The summary (16 Nov 2026")[1].split("def page_assessor(")[0] if "#  The summary (16 Nov 2026" in _ren else ""
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): NARROWED: step 3 of "How the answer was reached" says "Clearly better on one measure and worse on none" (the
+# rule's test, card 4 / 5 words); no other string in the summary says safer or better, and none sits by a collision
+_sumsrc_nostep = _sumsrc.replace('"Clearly better on one measure and worse on none: suggested. Mixed: the planner decides. "', '')
 ok("9 source: the summary's code exists, collisions drawn grey with no pct_key, no 'safer' / 'better' word",
    _sumsrc and 'dict(key="collisions", grey_all=True)' in _sumsrc and 'pct_key="collisions"' not in _sumsrc
-   and not re.search(r'"[^"\n]*\b(safer|better|safest)\b[^"\n]*"', _sumsrc, re.I)
+   and _sumsrc_nostep != _sumsrc
+   and not re.search(r'"[^"\n]*\b(safer|better|safest)\b[^"\n]*"', _sumsrc_nostep, re.I)
    and 'p.get("collisions")' not in _sumsrc, str(len(_sumsrc)))
+# 24 Nov 2026 (the Routes page rethink, Q7 to Q9): the summary page's words follow the card's; the old ones are GONE
+_sumcode = "\n".join(l.split("#")[0] for l in _sumsrc.splitlines())
+ok("⭐ 9 source: the summary page's step 3 reads as card 6 draws it, 'Involving an HGV' and 'Left-hand turns', and none "
+   "of 'trade-off', 'Ahead on', 'People', 'With a goods vehicle' or 'Left turns' is left in its code",
+   '("3 · Answer", "Clearly better on one measure and worse on none: suggested. Mixed: the planner decides. "' in _sumsrc
+   and 'SUM_HGV = "Involving an HGV"' in _sumsrc and '"Left-hand turns"' in _sumsrc
+   and not re.search(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode),
+   re.findall(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode))
+ok("9 source: the figures table's row keeps HGV in capitals ('involving an HGV'; a .lower() printed 'involving an hgv')",
+   'rows.append(("   " + SUM_HGV[0].lower() + SUM_HGV[1:], ' in _sumsrc and "SUM_HGV.lower()" not in _sumsrc)
+ok("9 source: an answer kept in older words is read in the new ones before the page draws it (route_best.answer_words)",
+   '"answer": route_best.answer_words(r["answer"])' in _doc)
 ok("9 source: stored data only: the summary is gathered through route_best (no fetch), inside gather",
    "R[\"best\"] = best(rid, best_ctx, factors)" in _doc and "route_best.Context(day=day)" in _doc
    and not re.search(r"urlopen|requests\.|httpx|\.refresh\(|fetch_all", _sumsrc))
