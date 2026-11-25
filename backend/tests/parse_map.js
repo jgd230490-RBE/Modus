@@ -2785,8 +2785,8 @@ ok("reduced motion: no motion while playing when it matches — the arrowheads s
   // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): ONE width in EVERY mode again, 5 on
   // 7.6 px; LINE_BAND_WIDTHS, LINE_BAND_PAD and bandWidthExpr are GONE; the shared sections take the same two widths at
   // their adder (three uses of the line width, four of the casing)
-  ok("⭐ width by volume (NARROWED 25 Nov 2026): one width in every mode (5 / 7.6 px); no width step by band, no interpolation, the band helpers gone",
-     code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
+  ok("⭐ width by volume (NARROWED 25 Nov 2026): one width in every mode (4 / 6.6 px; 25 Nov, John: 'TRY 4 PX'); no width step by band, no interpolation, the band helpers gone",
+     code.includes("const FORECAST_LINE_WIDTH = 4;") && code.includes("const FORECAST_CASING_WIDTH = 6.6;")
      && !code.includes("LINE_BAND_WIDTHS") && !code.includes("LINE_BAND_PAD") && !code.includes("bandWidthExpr")
      && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
      && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv|f_co2)'\]/.test(code)
@@ -5922,8 +5922,8 @@ ok("🔴 D115 / 23 Oct: no butt cap anywhere on the page; the frame's dots go th
   // NARROWED 24 Nov 2026 (John, Q4 = Direction 2): one width with the heat map Off (5 / 7.6 px); Volume, Carbon and the
   // shared sections by band (3 to 10 px). NARROWED again 24 Nov 2026 (card 3): no lane width to set on them any more
   // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width in every mode; with the lanes gone (card 3) there is no lane width to set at all
-  ok("⭐ D115: the blue under the marks is the road, NOT offset; one width in every mode (5 / 7.6 px), and no lane width (flowWidthExpr gone) (NARROWED 24 Nov 2026, card 3; NARROWED 25 Nov 2026, one width)",
-     code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
+  ok("⭐ D115: the blue under the marks is the road, NOT offset; one width in every mode (4 / 6.6 px; 25 Nov, John: 'TRY 4 PX', then 'Keep 4 px'), and no lane width (flowWidthExpr gone) (NARROWED 24 Nov 2026, card 3; NARROWED 25 Nov 2026, one width)",
+     code.includes("const FORECAST_LINE_WIDTH = 4;") && code.includes("const FORECAST_CASING_WIDTH = 6.6;")
      && !code.includes("CARBON_LINE_WIDTH") && !code.includes("ROAD_LOAD_LINE_WIDTH")
      && !code.includes("flowWidthExpr") && !/hideFirst/.test(code)
      && !/id:'forecast-(layer|casing)'[^\n]*line-offset/.test(code));
