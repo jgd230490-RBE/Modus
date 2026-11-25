@@ -985,9 +985,11 @@ ok("6b. ⭐ a session touch and the sign-in throttle (NO_DATA_TABLES) leave the 
 # NARROWED 16 Nov 2026 (claude/tools-route-check-request): + tool_leads, the public tools' leads (untenanted, like demo_requests)
 # NARROWED 5 Nov 2026 (group 6): + concerns, the public's reports (no kept read is built from them, and a public send
 # must not end every kept map read)
+# NARROWED 23 Nov 2026 (claude/working-list): + working_jobs, the "Working" list's record of the long job running (written
+# at every batch of a Route all: a bump there would empty every kept read at each one; no figure is built from it)
 ok("6b. the tables that do not bump are exactly the account / audit / lead tables, the CLP notes, the reviewers, the pinned pictures and the concerns",
    db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests", "clp_notes",
-                         "clp_review_groups", "clp_reviews", "site_layout_pictures", "concerns", "tool_leads"})
+                         "clp_review_groups", "clp_reviews", "site_layout_pictures", "concerns", "tool_leads", "working_jobs"})
 ok("6b. ⭐ written_table(): INSERT / INSERT OR REPLACE / REPLACE / UPDATE / DELETE name their table; anything else is None (and bumps)",
    db.written_table("INSERT INTO forecasts (a) VALUES (?)") == "forecasts"
    and db.written_table("  insert or replace into Audit_Log (a) values (?)") == "audit_log"

@@ -794,7 +794,11 @@ ok("...skipping only the POSTs that change nothing and the paths that log themse
    # NARROWED 16 Nov 2026 (claude/tools-shell): + "/api/tools/": a public tool's open call works something out from typed
    # figures, writes no audit row of the middleware's and does not empty the kept reads (tools_public, rule 6); a tool
    # call that stores something writes its own row
-   and main.AUDIT_SKIP_PREFIXES == ("/api/auth/", "/api/concerns/", "/api/tools/")
+   # NARROWED 23 Nov 2026 (claude/working-list): + "/api/working/": the "Working" list's own writes (a job's row started,
+   # ended, closed) change no figure, so they write no audit row and empty no kept read; the jobs themselves (a batch,
+   # a fetch, an import) are audited on their own paths as before
+   and main.AUDIT_SKIP_PREFIXES == ("/api/auth/", "/api/concerns/", "/api/tools/", "/api/working/")
+   and main._audited("/api/admin/bake-routes") and not main._audited("/api/working/start")
    and not main._audited("/api/concerns/C-0001/reply") and not main._audited("/api/public/concerns")
    and main._audited("/api/locations/L1/site-layout/place")
    and main._audited("/api/forecasts/bulk") and main._audited("/api/admin/config/factors")
