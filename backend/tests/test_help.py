@@ -409,9 +409,11 @@ ok("...Play: the timeline runs through the months of the programme; Conditions o
 ok("19 Oct: the guide describes the month picker, the info buttons, the badges and the council labels as built",
    "press a year, then a month, to show that month on the map" in text
    and "A small <strong>i</strong> beside a heading opens a short explanation" in src
-   and "a small white badge with a double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
+   # NARROWED 24 Nov 2026 (John, card 4b of the route lines mockup): the badges are grey-edged plates (the arrow grey, no
+   # green edge on the carbon one), under Labels All; the number, its floor and the unit are said as before
+   and "a small white badge with a grey double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
    # NARROWED 10 Nov 2026 (UI critique 18, claude/ui-fix-map-card): the badge carries its unit ("6.8 t CO₂e"), grey explained
-   and "a green badge on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
+   and "the same badge without the arrow on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
    and "a grey route has nothing in that month, or is not routed yet" in text and 'the labels say "reading…"' in text
    and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
@@ -849,9 +851,12 @@ ok("⭐ W10: the guide offers the CLP pack beside the month and says what it hol
 
 # 17 Oct 2026: both route legs are drawn left of their own travel (map OFFSET_OUT = OFFSET_IN), so a route
 # that comes back the same road shows its green and amber side by side; the guide's legend row says so.
-ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, green and amber side by side",
+# NARROWED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q1): the legs are dark and grey, not green and
+# amber; each is still left of the way its lorries drive
+ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, the two side by side (NARROWED 24 Nov 2026: was green and amber)",
    "Each line sits just to the left of the way its lorries drive, so where a route comes back along the same road "
-   "its green and amber run side by side; they close onto the road as you zoom right in." in src)
+   "its two lines run side by side; they close onto the road as you zoom right in." in src
+   and "its green and amber run side by side" not in src)
 ok("17 Oct: ...and no longer says that nothing shows direction",
    "Nothing shows direction — the colours do." not in src)
 # 17 Oct 2026 (UI audit #17, claude/ui-fix-keyboard): the 27 lazy figure images had no size, so a figure grew from 2 px to
