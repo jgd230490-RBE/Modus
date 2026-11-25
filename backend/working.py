@@ -49,8 +49,8 @@ BUSY_STATUS = 423
 # may: who may start it (admin = an admin LOGIN, planner = a planner or an admin, staff = any staff sign-in);
 # kept: what a stopped line says is kept
 # 25 Nov 2026 (the Routes page rethink, Q9: "Make primary" is gone from what a person reads; the button is "Use Alt 1
-# as the main route"): the "Working" list's name for that job. Card 6 did not draw it: proposed to John, ONE constant
-# so his word changes it in one place (the line reads "R050: main route change stopped"). The key stays make_primary.
+# as the main route"): the "Working" list's name for that job, John's word (25 Nov 2026, about 09:40 UTC: "Yes, that
+# name"). ONE constant (the line reads "R050: main route change stopped"). The key stays make_primary.
 MAIN_ROUTE_JOB = "Main route change"
 
 KINDS = {

@@ -306,7 +306,7 @@ const SENT = "Busy-hour times are running. Route all can start when they finish.
   ok("⭐ 7. the Look-ahead's closures check reads '<its name>: checking' (card 2), and its refusal shows beside its button",
      code.includes('{ttRunning ? `${ttName.split(" (")[0]}: checking`') && code.includes('{ttBusy && !ttRunning && <span role="status" data-work-busy="closures">{ttBusy}</span>}')
      && code.includes("const b = workBusy(e); if(b) setTtBusy(b); else setErr(errSay(\"Couldn't start the road-restriction check.\", e));"));
-  ok("⭐ 7. the refusal is shown alone where each second job is pressed: Zones (save, delete), Make primary, a haul road, the Organisation file",
+  ok("⭐ 7. the refusal is shown alone where each second job is pressed: Zones (save, delete), Use Alt 1 as the main route (it read Make primary; John, 25 Nov: "Yes, that name"), a haul road, the Organisation file",
      code.includes('catch(e){ setZoneMsg(workBusy(e) || errSay("Not saved.", e)); }') && code.includes('catch(e){ setZoneMsg(workBusy(e) || errSay("Not deleted.", e)); }')
      && code.includes('const w = workBusy(e) || errSay("Couldn\'t use this alternative.", e);') && code.includes('catch(e){ setMsg(workBusy(e) || errSay("Not done.", e)); }')
      && code.includes('.catch(e => setMsg({ ok: false, text: workBusy(e) || errSay("Not replaced.", e) }))'));

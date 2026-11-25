@@ -691,7 +691,7 @@ if working:
        'id="t4-working"' in TG and "working_jobs" in TG and "working.GAP" in TG and "423" in TG
        and "db.NO_DATA_TABLES" in TG[TG.index('id="t4-working"'):TG.index('id="t4-working"') + 1200])
 
-# 25 Nov 2026 (the Routes page rethink, Q9): the job's name is ONE constant (proposed to John: "Main route change"),
+# 25 Nov 2026 (the Routes page rethink, Q9): the job's name is ONE constant, "Main route change" (John: "Yes, that name"),
 # and no line the list can write says "Make primary"
 if working:
     ok("⭐ Q9. the main-route job's name is working.MAIN_ROUTE_JOB, its stopped line follows it, and 'Make primary' is gone",
