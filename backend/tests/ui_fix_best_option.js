@@ -26,6 +26,7 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), "utf8").replace(/\r\n?/g, "\n");
 const html = read("frontend", "index.html");
 const guide = read("frontend", "help", "index.html");
+const tech = read("frontend", "help", "technical", "index.html");
 const mainPy = read("backend", "main.py");
 const src = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[1].replace(/^ReactDOM\.createRoot\([\s\S]*?\);\s*$/m, "");
 const js = ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText;
@@ -122,6 +123,9 @@ ok("⭐ GUIDE: the user guide's Routes section has the Best option entry, names 
      && ug.includes("<strong>Use Alt 1 as the main route</strong>") && !/trade|\bahead\b|\bbehind\b|People|primary/i.test(ug), ug.slice(0, 300));
   ok("GONE: the user guide says 'Make primary' nowhere and the glossary row is 'Main route / alternative'",
      !guide.includes("Make primary") && guide.includes('<td class="k">Main route / alternative</td>'));
+  // 25 Nov 2026 (Q9, after main took in the "Working" list, PR #320): the technical guide too, in any case
+  ok("GONE: the technical guide says 'make primary' nowhere, in any case",
+     !/make primary/i.test(tech), (tech.match(/.{60}make primary.{20}/i) || [""])[0]);
 }
 
 // ---------------- the card in a DOM ----------------
