@@ -5325,7 +5325,10 @@
             // Track C review: two carbon ramps can be on the map at once; this one is not the route / section legend's
             + (mode === 'carbon' ? '<div class="area-note">District bands differ from the route carbon bands.</div>' : '');
     }
-    function areaCardHTML(a, payload, when) {
+    // 24 Nov 2026 (found by card 7's build): renamed from areaCardHTML. The "Select an area" card (2.1-4) declared a second
+    // global areaCardHTML() later in the page, which won: a click on a council opened "Selected area · Loading…", never this
+    // card. No function name is declared twice in this page (parse_map pins it).
+    function councilCardHTML(a, payload, when) {
         const esc = s => String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         const fmt = (n, d) => (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('en-GB');
         const tot = (payload && payload.totals) || {};
@@ -5339,8 +5342,10 @@
         const carbonFirst = typeof AREAS !== 'undefined' && AREAS.mode === 'carbon';   // lead with what the map is coloured by
         let mv = '', co = '';
         // 9 Nov 2026 (2.1-11b question A): each leg that enters counts (in = loaded, out = empty)
-        mv += row(CW().label, a.movements_per_day > 0 ? fmt(a.movements_per_day, 1) : '0',
-                 (PV() === 2 && a.in_per_day != null ? fmt(a.in_per_day, 1) + ' in, ' + fmt(a.out_per_day || 0, 1) + ' out · ' : '')
+        // 24 Nov 2026 (John's "Yes, both", card 7's rule): whole movements (it read one decimal), in and out adding up to it
+        const amv = Number(a.movements_per_day) || 0, aio = wholeWords([a.in_per_day, a.out_per_day], amv);
+        mv += row(CW().label, amv > 0 && amv < 1 ? 'under 1' : Math.round(amv).toLocaleString('en-GB'),
+                 (PV() === 2 && a.in_per_day != null ? aio[0] + ' in, ' + aio[1] + ' out · ' : '')
                  + nRoutes + ' of the ' + nAll + ' routes with approved volume' + (when ? ' in ' + esc(when) : '') + ' enter it laden'
                  + ((a.return_only_routes || []).length ? ' · ' + a.return_only_routes.length + ' more run back through it empty' : '')
                  + ((a.edge_routes || []).length ? ' · ' + a.edge_routes.length + ' more only cross its edge (under 200 m inside): their km and carbon count here, not their movements' : '')
@@ -5699,7 +5704,7 @@
             const a = (AREAS.data.areas || []).find(x => x.area_id === id);
             if (!a) return;
             const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
-            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(areaCardHTML(a, AREAS.data, when)).addTo(map);
+            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(councilCardHTML(a, AREAS.data, when)).addTo(map);
         });
         map.on('mouseenter', 'area-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
         map.on('mouseleave', 'area-fill', () => { map.getCanvas().style.cursor = ''; });
@@ -5714,7 +5719,7 @@
             const a = (AREAS.data.areas || []).find(x => x.area_id === id);
             if (!a) return;
             const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
-            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(areaCardHTML(a, AREAS.data, when)).addTo(map);
+            new mapboxgl.Popup({ offset: 8, maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(councilCardHTML(a, AREAS.data, when)).addTo(map);
         });
     }
 
@@ -7855,6 +7860,35 @@
     // no filter is set, which is the server's own run figure): two-way movements a day (loaded leg, never doubled) and
     // the run's t CO2e share. A run none of whose routes pass is not drawn.
     const rlN = x => (x > 0 && x < 1 ? 'under 1' : String(Math.round(x || 0)));
+    // 24 Nov 2026 (John's "Yes, both", the brief's A2 addition to card 7): the council area card and the shared road
+    // section card sum their own figures on the page, so they share them here by the road card's rule
+    // (section_select.share_whole): each cell to its nearest whole number, then the cell rounding moved furthest gives or
+    // takes one until they add to the figure as shown (a tie: the bigger cell; going up the earlier, coming down the
+    // later). A figure shown "under 1" has 0 to share; a cell above nothing that reads 0 says "under 1".
+    function wholeShare(cells, total) {
+        const c = cells.map(v => Number(v) || 0), n = c.length;
+        const want = Math.floor(Math.max(0, Number(total) || 0) + 0.5);
+        const t = c.map(v => Math.floor(v + 0.5));
+        for (let k = 0; k < 2 * n + Math.floor(c.reduce((a, b) => a + b, 0)) + 10; k++) {
+            const got = t.reduce((a, b) => a + b, 0);
+            if (got === want || !n) break;
+            let b = -1;
+            if (got > want) {
+                for (let i = 0; i < n; i++) if (t[i] > 0 && (b < 0 || (t[i] - c[i]) > (t[b] - c[b]) || ((t[i] - c[i]) === (t[b] - c[b]) && c[i] >= c[b]))) b = i;
+                if (b < 0) break;
+                t[b] -= 1;
+            } else {
+                for (let i = 0; i < n; i++) if (b < 0 || (c[i] - t[i]) > (c[b] - t[b]) || ((c[i] - t[i]) === (c[b] - t[b]) && c[i] > c[b])) b = i;
+                t[b] += 1;
+            }
+        }
+        return t;
+    }
+    function wholeWords(cells, total) {
+        const tot = Number(total) || 0;
+        return wholeShare(cells, tot > 0 && tot < 1 ? 0 : tot)
+            .map((v, i) => (v === 0 && (Number(cells[i]) || 0) > 0 ? 'under 1' : v.toLocaleString('en-GB')));
+    }
     function roadLoadFeatures(data, passing){
         const feats = [];
         ((data && data.runs) || []).forEach(r => {
@@ -7875,8 +7909,9 @@
                 properties: { id: r.id, rl_km: (r.length_km == null ? null : Number(r.length_km)),
                               rl_mv: mv, rl_mv_text: (mv > 0 && mv < 1) ? 'under 1' : String(Math.round(mv)),
                               // no split when the reply carries none (an older answer): never "0 in, 0 out"
-                              rl_in_text: (r.in_per_day == null && !shares.some(sh => sh.in_per_day != null)) ? null : rlN(rin),
-                              rl_out_text: rlN(rout),
+                              // 24 Nov 2026 (John's "Yes, both"): in and out add up to the figure (wholeWords), not rounded apart
+                              rl_in_text: (r.in_per_day == null && !shares.some(sh => sh.in_per_day != null)) ? null : wholeWords([rin, rout], mv)[0],
+                              rl_out_text: wholeWords([rin, rout], mv)[1],
                               rl_routes: n, rl_routes_text: n + (n === 1 ? ' route' : ' routes'),
                               rl_co2: (co2 == null ? null : Math.round(co2 * 10) / 10),
                               rl_co2_text: (co2 == null ? 'no carbon figure' : fmtTonnes(co2) + ' CO₂e') } });
@@ -8192,7 +8227,8 @@
         const rows = shares.map(sh => {
             const info = (typeof ROUTEINFO !== 'undefined' && ROUTEINFO[(sh.route_id || '').toString().trim().toLowerCase()]) || {};
             const mv = Number(sh.movements_per_day) || 0;
-            const io = PV() === 2 && sh.in_per_day != null ? '<div style="color:var(--muted);">' + rlN(Number(sh.in_per_day)) + ' in, ' + rlN(Number(sh.out_per_day)) + ' out</div>' : '';
+            const shw = wholeWords([sh.in_per_day, sh.out_per_day], mv);   // 24 Nov 2026: a row's in and out add to its figure
+            const io = PV() === 2 && sh.in_per_day != null ? '<div style="color:var(--muted);">' + shw[0] + ' in, ' + shw[1] + ' out</div>' : '';
             return '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">' + rlEsc(sh.route_id) + '</td>' +
                 '<td style="padding:2px 8px 2px 0;">' + rlEsc(info.origin || '—') + ' → ' + rlEsc(info.dest || '—') +
                 '<div style="color:var(--muted);">' + rlEsc(teamText((sh.teams || []).join(', ')) || '—') + '</div></td>' +
@@ -11174,6 +11210,8 @@
     // figure is not (5.3 against 5 reads "5.3 / 5", never "5 / 5" on a red edge)
     const tlimV = (v, lim) => (v != null && Math.round(Number(v)) === Math.round(Number(lim)) && Math.abs(Number(v) - Number(lim)) > 1e-9)
         ? (Math.round(Number(v) * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : tlimN(v);
+    // the limit card's in / out: the server's split that adds up to the shown figure (in_shown / out_shown), else as before
+    const tlimIO = (r, k) => (r[k + '_shown'] != null ? Number(r[k + '_shown']).toLocaleString('en-GB') : tlimN(r[k + '_per_day']));
     function tlimUnit(L) { return L.limit.counts === 'movements' ? 'movements' : 'visits'; }
     function tlimPoint(g) {
         // the badge's place: the middle point of a line, the middle of an area's box
@@ -11266,10 +11304,12 @@
             const rp = routePropsById();
             const rows = (r.routes || []).map(x => {
                 const p = rp[x.route_id] || {};
-                return `<tr><td style="padding:1px 6px 1px 0">${escHtml(x.route_id)}</td><td style="padding:1px 6px 1px 0">${escHtml((p.origin || '') + ' → ' + (p.dest || ''))}</td><td style="text-align:right">${tlimN(x.a_day)}</td></tr>`;
+                return `<tr><td style="padding:1px 6px 1px 0">${escHtml(x.route_id)}</td><td style="padding:1px 6px 1px 0">${escHtml((p.origin || '') + ' → ' + (p.dest || ''))}</td><td style="text-align:right">${x.small ? 'under 1' : tlimN(x.a_day)}</td></tr>`;
             }).join('');
             body = `<span style="color:${col};font-weight:700">${tlimV(r.value, L.limit.value)} lorry ${u} a day</span> in ${monthLabel(m)} · limit ${tlimN(L.limit.value)}<br>` +
-                (u === 'movements' ? `<span style="color:var(--ink-2)">${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out · in and out counted separately · daily average</span><br>`
+                // 24 Nov 2026 (seen on live: "159 … 81 in, 77 out", which adds to 158): in and out are the server's split of the
+                // figure AS SHOWN (traffic_limits.split_shown, the bulletin's own rule), so they add up to it
+                (u === 'movements' ? `<span style="color:var(--ink-2)">${tlimIO(r, 'in')} in, ${tlimIO(r, 'out')} out · in and out counted separately · daily average</span><br>`
                                    : `<span style="color:var(--ink-2)">daily average</span><br>`) +
                 (L.limit.basis === 'busiest_day' ? '<span style="color:var(--ink-2)">The limit is for the busiest day; this is the month\'s daily average.</span><br>' : '') +
                 (rows ? `<table style="margin-top:4px;font-size:13px;border-collapse:collapse"><thead><tr><th style="text-align:left">Route</th><th style="text-align:left">From → to</th><th style="text-align:right">A day</th></tr></thead><tbody>${rows}</tbody></table>` : '');
@@ -11345,23 +11385,31 @@
         res = res || {}; rp = rp || {};
         const all = res.routes || [], fig = res.a_day != null;
         const inF = all.filter(r => !passing || passing[r.route_id]), outF = all.filter(r => passing && !passing[r.route_id]);
-        // 10 Nov 2026 (road card polish, Q1 = A): the server's figures are whole TENTHS that add up; they are summed as
-        // tenths here too, so the Total is the shown rows added, never 0.30000000000000004
-        const sum = k => inF.reduce((s, r) => s + Math.round((Number(r[k]) || 0) * 10), 0) / 10;
+        // REVERSED 24 Nov 2026 (public map lines rethink, card 7, John's Q11 = (a); was 10 Nov's Q1 = A, one decimal): the
+        // server's figures are WHOLE numbers that add up (section_select.share_whole); the Total is the shown rows added
+        const sum = k => inF.reduce((s, r) => s + (Number(r[k]) || 0), 0);
         const rows = inF.map(r => { const p = rp[r.route_id] || {};
             return { id: r.route_id, from: p.origin || '—', to: p.dest || '—', team: p.ipt && p.ipt !== 'Unknown_IPT' ? teamText(p.ipt) : '',
                      small: r.small || [],
                      inn: fig ? Number(r.in) || 0 : null, out: fig ? Number(r.out) || 0 : null, aday: fig ? Number(r.a_day) || 0 : null }; });
         // Q2 / Q3: the routes on this ground with nothing approved that month (inside the filters)
         const idle = (res.idle || []).filter(id => !passing || passing[id]);
-        return { rows, left: outF.map(r => r.route_id), n: rows.length, fig, idle, here: rows.length + idle.length,
+        // a total that reads 0 over rows that run ("under 1" there) reads "under 1" too, never a bare 0 (card 7)
+        const tsmall = fig ? ['in', 'out', 'a_day'].filter(k => !sum(k) && inF.some(r => (r.small || []).indexOf(k) >= 0)) : [];
+        return { rows, left: outF.map(r => r.route_id), n: rows.length, fig, idle, here: rows.length + idle.length, small: tsmall,
                  inn: fig ? sum('in') : null, out: fig ? sum('out') : null, aday: fig ? sum('a_day') : null };
     }
-    // the headline and the hover tip: whole movements (the figure the bar and a traffic limit show)
+    // REVERSED 24 Nov 2026 (card 7, John's Q11 = (a); was 10 Nov's Q1 = A: one decimal in the table, whole headline): EVERY
+    // figure on the card is a whole number (the 12 Oct rule: public pages show whole movements). The headline, the in / out
+    // line, the table, the Total, Copy and the hover tip all read the server's whole numbers that add up; a figure above
+    // nothing that reads 0 says "under 1" (`small`), never a bare 0 for a route that runs
     const secN = x => (x > 0 && x < 1 ? 'under 1' : Math.round(x || 0).toLocaleString('en-GB'));
-    // the table, the in / out line and Copy: one decimal, so a row's In + Out is its A day and the rows add to the Total
-    const sec1 = x => (x ? (Math.round(x * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0');
-    const secCell = (r, k, key) => ((r.small || []).indexOf(key) >= 0 ? 'under 0.1' : sec1(r[k]));
+    const secCell = (r, k, key) => ((r.small || []).indexOf(key) >= 0 ? 'under 1' : secN(r[k]));
+    // the Total row, the in / out line and the headline: the rows added, "under 1" where they add to 0 over a route that runs
+    const secTot = (v, k, key) => ((v.small || []).indexOf(key) >= 0 ? 'under 1' : secN(v[k]));
+    // the hover tip's words for a count: "1 movement a day", "under 1 movement a day" in the singular (as cwN on the card)
+    const secShort = t => (String(t) === 'under 1' || String(t) === '1'
+        ? CW().short.replace('movements a day', 'movement a day').replace('visits a day', 'visit a day') : CW().short);
     const secRoutes = n => n + (n === 1 ? ' route' : ' routes');
     // "1 of 12 routes": some routes on this ground carry nothing that month
     const secRoutesOf = v => (v.fig && v.here > v.n ? v.n + ' of ' + secRoutes(v.here) : secRoutes(v.n));
@@ -11369,7 +11417,10 @@
     function secselTipText(res, passing) {
         const v = secselView(res, passing, {});
         if (!v.n) return v.fig ? 'Nothing approved on this road' : 'No route here';
-        return v.fig ? secN(v.aday) + ' ' + CW().short + ' · ' + secRoutes(v.n) : secRoutes(v.n);
+        // 24 Nov 2026 (seen on live: "under 1 movements a day · 1 route"): the count's words follow the count
+        if (!v.fig) return secRoutes(v.n);
+        const t = secTot(v, 'aday', 'a_day');
+        return t + ' ' + secShort(t) + ' · ' + secRoutes(v.n);
     }
     // a traffic limit (2.1-1) under the click: its line on the road card, as on the limit's own popup
     function secselLimitLines(point) {
@@ -11406,8 +11457,8 @@
                  + '</p>' + secselButtons(res, opts, v) + '</div>';
         }
         if (v.fig) {
-            h += '<div class="secsel-sum"><b>' + escHtml(cwN(secN(v.aday))) + '</b> · ' + secRoutesOf(v) + '</div>'
-               + (two ? '<div class="secsel-sub">' + sec1(v.inn) + ' in, ' + sec1(v.out) + ' out</div>' : '');
+            h += '<div class="secsel-sum"><b>' + escHtml(cwN(secTot(v, 'aday', 'a_day'))) + '</b> · ' + secRoutesOf(v) + '</div>'
+               + (two ? '<div class="secsel-sub">' + secTot(v, 'inn', 'in') + ' in, ' + secTot(v, 'out', 'out') + ' out</div>' : '');
         } else {
             h += '<div class="secsel-sum">' + secRoutes(v.n) + (res && res.kind === 'area' ? ' enter it.' : ' use it.')
                + ' Pick a month for ' + escHtml(CW().short) + '.</div>';
@@ -11435,8 +11486,8 @@
                + (!v.fig ? '' : two ? '<td class="num">' + secCell(r, 'inn', 'in') + '</td><td class="num">' + secCell(r, 'out', 'out') + '</td><td class="num">' + secCell(r, 'aday', 'a_day') + '</td>'
                                     : '<td class="num">' + secCell(r, 'aday', 'a_day') + '</td>') + '</tr>';
         });
-        if (v.fig && v.n > 1) h += '<tr class="secsel-total"><td colspan="2">Total</td>' + (two ? '<td class="num">' + sec1(v.inn) + '</td><td class="num">' + sec1(v.out) + '</td>' : '')
-                                 + '<td class="num">' + sec1(v.aday) + '</td></tr>';
+        if (v.fig && v.n > 1) h += '<tr class="secsel-total"><td colspan="2">Total</td>' + (two ? '<td class="num">' + secTot(v, 'inn', 'in') + '</td><td class="num">' + secTot(v, 'out', 'out') + '</td>' : '')
+                                 + '<td class="num">' + secTot(v, 'aday', 'a_day') + '</td></tr>';
         h += '</tbody></table></div>';
         // Q2: the line clicked belongs to a route with nothing approved that month — said in one line
         // REVERSED 11 Nov 2026 (card A-X1, John's yes): it says it is the clicked line ("R045: no loads in Apr 2027." under a
@@ -12034,7 +12085,7 @@
         const basis = v.fig ? 'Approved plan, ' + CW().lower + (two ? ' (a visit = 2 movements, in and out).' : ' (each lorry once).') : 'Approved plan. No month picked: routes only.';
         const head = ['Route', 'From', 'To'].concat(v.fig ? (two ? ['In', 'Out', 'A day'] : ['A day']) : []);
         const body = v.rows.map(r => [r.id, r.from, r.to].concat(v.fig ? (two ? [secCell(r, 'inn', 'in'), secCell(r, 'out', 'out'), secCell(r, 'aday', 'a_day')] : [secCell(r, 'aday', 'a_day')]) : []));
-        if (v.fig && v.n > 1) body.push(['Total', '', ''].concat(two ? [sec1(v.inn), sec1(v.out), sec1(v.aday)] : [sec1(v.aday)]));
+        if (v.fig && v.n > 1) body.push(['Total', '', ''].concat(two ? [secTot(v, 'inn', 'in'), secTot(v, 'out', 'out'), secTot(v, 'aday', 'a_day')] : [secTot(v, 'aday', 'a_day')]));
         const foot = 'From the Wayscope public map, ' + when + '. ' + link;
         const tsv = [title, basis, head.join('\t')].concat(body.map(r => r.join('\t'))).concat([foot]).join('\n');
         const td = (x, n) => '<td style="padding:2px 8px;border:1px solid #ccc;' + (n ? 'text-align:right;' : '') + '">' + escHtml(x) + '</td>';
