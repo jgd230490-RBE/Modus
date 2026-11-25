@@ -378,7 +378,48 @@ ok("4: ...each page names the yard, the lorry type, 'lorry n of N', the day and 
    and "Wednesday 25 November 2026" in txt and "round trip" in txt)
 ok("4: ...the break is a row in words, the route sheets are named, the not-modelled sentence and 'sends nothing' are printed",
    "Break, 45 min" in txt or "Break, 30 min" in txt)
-ok("4: ...the rule's caveats", "not a check of anyone" in txt and "Wayscope sends nothing" in txt and "Driving at most 9 h" in txt)
+# 25 Nov 2026 (the Look-ahead rethink, card 4, John's "Yes, as recommended" to Q12 to Q16): REVERSED. The sheet no longer
+# prints "Wayscope sends nothing" (a note for the planner, kept on the screen in data["words"]) nor "Driving at most 9 h"
+# and the not-modelled list (to the guide); "a planning figure, not a check of anyone's hours" stays.
+ok("4: ...the rule's caveat on the sheet: 'a planning figure, not a check of anyone's hours'; NOT 'Wayscope sends nothing', "
+   "'Driving at most 9 h' or the not-modelled list (25 Nov, reversed)",
+   "not a check of anyone" in re.sub(r"\s+", " ", txt) and "Wayscope sends nothing" not in txt and "Driving at most 9 h" not in txt
+   and dh.NOT_MODELLED_WORDS[:40] not in re.sub(r"\s+", " ", txt))
+ok("4: ...'Wayscope sends nothing' and the not-modelled list stay in the plan's words for the screen",
+   D["words"]["sends_nothing"] == lp.SENDS_NOTHING and D["words"]["not_modelled"] == dh.NOT_MODELLED_WORDS)
+_t1 = re.sub(r"\s+", " ", txt)
+ok("4 (card 4): the sheet's top line names the fleet operator and the driver",
+   "A planning sheet for the fleet operator and the driver · not a delivery note · planning payloads, not plated weights" in _t1
+   and "for the haulier" not in _t1, _t1[:300])
+ok("4 (card 4): 'leave about … · back about …', never 'the yard'", "leave about " in _t1 and "the yard" not in _t1)
+ok("4 (card 4): the small print: the route sheet(s) to follow and the planning-times line, then who made it",
+   re.search(r"Roads and turns: route sheets? R\d{3}", _t1) is not None and "not a sat-nav. Planning times: a planning figure, "
+   "not a check of anyone's hours." in _t1 and f"Made {D['made_at']} by {D['made_by']}." in _t1)
+ok("4 (card 4): every page carries a 'Take care on this route' block and 'Road signs come first'",
+   _t1.count("Take care on this route") >= n_lorries and _t1.count("Road signs come first") >= n_lorries,
+   str((_t1.count("Take care on this route"), n_lorries)))
+ok("4 (card 4): the break's row: 'Break, 45 min, about here. It may be taken as 15 + 30.' (the split only for 45 min)",
+   lp.break_words(45) == "Break, 45 min, about here. It may be taken as 15 + 30." and lp.break_words(30) == "Break, 30 min, about here."
+   and ("Break, 45 min, about here. It may be taken as 15 + 30." in _t1 or "Break, 30 min, about here." in _t1))
+ok("4 (card 4): 'load point' for 'yard' in the sentences a person reads",
+   "one load point." in lp.RULE_WORDS and lp.ONE_YARD_WORDS == "One load point and one kind of lorry a lorry-day."
+   and "yard" not in (lp.RULE_WORDS + lp.ONE_YARD_WORDS).lower())
+SP = lp.driver_pages(D, "chained", DAY)
+ok("4 (card 4): driver_pages: one page a lorry, the same heads the PDF prints",
+   len(SP["pages"]) == n_lorries and all(pg["head"] in _t1 for pg in SP["pages"]) and SP["sub"] in _t1)
+_b0 = C["days"][DAY][0]
+SP1 = lp.driver_pages(D, "chained", DAY, yard=_b0["yard_id"], vehicle=_b0["vehicle"], lorry=1)
+ok("4 (card 4): narrowed to one load point, one lorry type and one lorry: one page, that lorry",
+   len(SP1["pages"]) == 1 and SP1["pages"][0]["lorry"] == 1 and SP1["pages"][0]["yard_id"] == _b0["yard_id"])
+_one = pdf_text(lp.build_pdf(D, "chained", DAY, yard=_b0["yard_id"], vehicle=_b0["vehicle"], lorry=1))
+ok("4 (card 4): ...and its PDF is that one page", _one.count("\f") <= 1 and SP1["pages"][0]["head"] in re.sub(r"\s+", " ", _one))
+for _kw, _want in ((dict(yard="L999"), "No lorry from that load point"), (dict(vehicle="Nope"), "No lorry of that type"),
+                   (dict(yard=_b0["yard_id"], vehicle=_b0["vehicle"], lorry=99), "No such lorry")):
+    try:
+        lp.driver_pages(D, "chained", DAY, **_kw)
+        ok(f"4 (card 4): a filter that leaves nothing is refused: {_kw}", False)
+    except lp.PlanError as e:
+        ok(f"4 (card 4): a filter that leaves nothing is refused in words: {_kw}", _want in str(e), str(e))
 ok("4: ...never 'compliant', 'utilisation', 'fill rate' or 'movement'", not re.search(r"compliant|utilisation|fill rate|movement", txt, re.I))
 ok("4: the stamp: DRAFT when the week is not all confirmed, else CONFIRMED", ("CONFIRMED" in txt) == D["week_confirmed"] or "DRAFT" in txt)
 try:

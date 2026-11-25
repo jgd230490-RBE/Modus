@@ -464,6 +464,11 @@ ok("4: the second route's shared limit and shared places are not printed again; 
    str([(L["limits"], [i["text"] for i in L["places"]], L["shared"]) for L in b2]))
 ok("4: ...the first route keeps all of its own", blocks[0]["legs"][0]["limits"] and blocks[0]["legs"][0]["places"])
 ok("4: the shared words", rp.shared_words(3, "R012") == "3 more shown under R012 above" and rp.shared_words(0, "R012") == "")
+ok("4: ...the second route's leg names the route it was printed under", b2[0]["shared_from"] == ["R012"], str(b2[0].get("shared_from")))
+ok("4: ...printed under several routes: no route named", rp.shared_words(5, ["R012", "R044"]) == "5 more shown above"
+   and rp.shared_words(2, ["R044"]) == "2 more shown under R044 above")
+ok("4: a block whose every limit was printed above loses the at-limit sentence (nothing 'below' is left)",
+   blocks[1]["sentences"] == [] and blocks[0]["sentences"] == A["sentences"], str(blocks[1]["sentences"]))
 
 # --------------------------------------------------------------------------- 5. every demo route, stand-in lines: no banned word
 import math  # noqa: E402

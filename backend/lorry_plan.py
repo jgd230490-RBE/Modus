@@ -52,15 +52,16 @@ import drivers_hours as dh
 VIEWS = ("booked", "chained", "compressed")
 DEFAULT_VIEW = "chained"
 #: the panel's and the sheet's one-sentence rule
+# 25 Nov 2026 (the Look-ahead rethink, card 4): "load point", not "yard", in every sentence a person reads
 RULE_WORDS = ("Each lorry's day: its trips as routed, the break the UK drivers' hours rules require, driving at most "
-              "9 h, inside the shift. Chained only for lorries of one type leaving one yard.")
+              "9 h, inside the shift. Chained only for lorries of one type leaving one load point.")
 PLANNING_WORDS = ("A planning figure: the loads, their routes and the week's plan do not change; a haulier may fill "
                   "the spare with other work.")
 COMPRESS_WORDS = ("A suggestion until Apply: a load moves only within its own line and this week; a pour's mixers stay "
                   "on the pour's day; road limits are not checked again.")
 SENDS_NOTHING = "Wayscope sends nothing: download the sheets and hand them to the haulier."
 #: Q2: never chained across yards or lorry types
-ONE_YARD_WORDS = "One yard and one kind of lorry a lorry-day."
+ONE_YARD_WORDS = "One load point and one kind of lorry a lorry-day."
 #: PR 2 (card 9): the panel's words when a saved arrangement is in use, and the refusals
 ARRANGED_WORDS = ("Your arrangement, kept for this week until its loads change; Reset puts Wayscope's plan back. "
                   "A dropped trip is checked against the same rule first.")
@@ -471,7 +472,7 @@ def move(page, body, by=None, now=None, factors=None):
     key = (body.get("yard_id"), body.get("vehicle"))
     y = yards.get(key)
     if y is None:
-        raise PlanError("That yard is not in this week's plan.")
+        raise PlanError("That load point is not in this week's plan.")
     fd, td = body.get("from_day"), body.get("to_day")
     if fd not in days_ or td not in days_:
         raise PlanError("That day is not in this week.")
@@ -789,15 +790,117 @@ def _veh(key):
     return conversions.vehicle_label(conversions.load_factors(), key) or key
 
 
-def build_pdf(data, view, day):
-    """Driver sheets: one A4 page a lorry for the day, in the driver's order (export.page_frame)."""
+#: 25 Nov 2026 (the Look-ahead rethink, card 4): the Driver sheet's words. The list of what the hours figure leaves out
+#: (dh.NOT_MODELLED_WORDS) and "Wayscope sends nothing" left the sheet (they stay in data["words"] for the screen).
+SHEET_SUB = "A planning sheet for the fleet operator and the driver · not a delivery note · planning payloads, not plated weights"
+SHEET_TIMES = "Planning times: a planning figure, not a check of anyone's hours."
+
+
+def break_words(minutes):
+    """The break's row on the sheet (card 4): "Break, 45 min, about here. It may be taken as 15 + 30." The split is the
+    rules' own and is said only for the 45-minute break."""
+    m = int(round(_f(minutes)))
+    return f"Break, {m} min, about here." + (" It may be taken as 15 + 30." if m == 45 else "")
+
+
+def small_print(routes):
+    """The sheet's first line of small print: the route sheets to follow, then the planning-times line."""
+    rs = ", ".join(routes)
+    return (f"Roads and turns: route sheet{'s' if len(routes) != 1 else ''} {rs}. Follow {'it' if len(routes) == 1 else 'them'}, "
+            f"not a sat-nav. {SHEET_TIMES}")
+
+
+def driver_pages(data, view, day, yard=None, vehicle=None, lorry=None, ctx=None):
+    """
+    25 Nov 2026 (the Look-ahead rethink, card 4): the Driver sheet as data, one page a lorry, the SAME words the PDF
+    prints (build_pdf draws this and nothing else; GET /api/forecast-weeks/lorry-plan/sheet returns it). `yard` (a load
+    point's id, the plan's yard_id), `vehicle` (its lorry type key) and `lorry` (n) narrow it to one load point, one
+    type, one lorry; a filter that leaves nothing is refused in words. Each page carries, after its trips, a "Take care on
+    this route" block a route of the lorry's day (route_points: stored data only, the line in use that day, cut to three
+    places each way), a point two of its routes share printed once under the first.
+    """
+    import route_points as rp
+    import export
+    blocks = day_view(data, view, day)
+    sel = [b for b in blocks if (yard in (None, "") or str(b.get("yard_id")) == str(yard))
+           and (vehicle in (None, "") or b.get("vehicle") == vehicle)]
+    if not sel:
+        raise PlanError("No lorry from that load point on that day." if yard not in (None, "") else
+                        "No lorry of that type on that day.")
+    ctx = ctx or rp.Context(day)
+    pages, routes_all = [], []
+    for blk in sel:
+        lorries = [r for r in blk["lorries"] if lorry in (None, "") or str(r["n"]) == str(lorry)]
+        for r in lorries:
+            routes, rows = [], []
+            for b in r["blocks"]:
+                if b["kind"] == "break":
+                    rows.append({"kind": "break", "about": b["start"], "text": break_words(b["minutes"])})
+                    continue
+                rows.append({"kind": "trip", "about": b["start"], "route_id": b["route_id"],
+                             "from": short_name(blk["name"]), "to": short_name(b.get("dest_name")),
+                             "material": b.get("material") or None,
+                             "load": (f"{round(b['qty'], 1):g} {supplier_orders_unit(b.get('unit'))}" if b.get("qty") is not None else "—"),
+                             "round_trip": f"{int(round(b['minutes']))} min"})
+                if b["route_id"] not in routes:
+                    routes.append(b["route_id"])
+            take = []
+            for rid in routes:
+                try:
+                    take.append(rp.points(rid, blk["vehicle"], day, ctx=ctx))
+                except LookupError:
+                    continue
+            rp.drop_shared(take)
+            take = [rp.cut(P) for P in take]
+            gates_seen = set()
+            for P in take:                     # a destination's gate line once a page
+                if P.get("gate") in gates_seen:
+                    P["gate"] = None
+                elif P.get("gate"):
+                    gates_seen.add(P["gate"])
+                for L in P["legs"]:
+                    L["shared_words"] = rp.shared_words(L["shared"], L.get("shared_from")) if L["shared"] else ""
+                    L["more_words"] = rp.more_words(L["more"]) if L["more"] else ""
+            routes_all += [x for x in routes if x not in routes_all]
+            pages.append({
+                "yard_id": blk.get("yard_id"), "load_point": short_name(blk["name"]), "vehicle": blk["vehicle"],
+                "vehicle_text": _veh(blk["vehicle"]), "lorry": r["n"], "of": len(blk["lorries"]),
+                "head": f"{short_name(blk['name'])} · {_veh(blk['vehicle'])} · lorry {r['n']} of {len(blk['lorries'])}",
+                "day_words": _day_words(day),
+                "line": (f"{r['trips']} round trip{'' if r['trips'] == 1 else 's'} · leave about {r['start']} · "
+                         f"back about {r['end']} · {r['free_words'].lower()}"),
+                "team": (f"{data['team_only']}'s lines only" if data.get("team_only") else None),
+                "gate": (f"Load at {short_name(blk['name'])}, leave by {blk['gate']}." if blk.get("gate") else None),
+                "rows": rows, "routes": routes, "take_care": take,
+                "small": [small_print(routes) if routes else SHEET_TIMES,
+                          " ".join(x for x in [f"Made {data['made_at']} by {data['made_by']}.", rp.credit(ctx),
+                                               _limits_credit(routes)] if x)],
+            })
+    if not pages:
+        raise PlanError("No such lorry on that day.")
+    return {"title": f"Driver sheets · {_day_words(day)}", "day": day, "view": view,
+            "stamp": "CONFIRMED" if data.get("week_confirmed") else "DRAFT · not confirmed",
+            "sub": SHEET_SUB, "pages": pages, "routes": routes_all}
+
+
+def _limits_credit(routes):
+    try:
+        import limits
+        return limits.credit_for(routes)
+    except Exception:                                                # noqa: BLE001 — a credit that fails claims nothing
+        return None
+
+
+def build_pdf(data, view, day, yard=None, vehicle=None, lorry=None, sheet=None):
+    """Driver sheets: one A4 page a lorry for the day, in the driver's order (export.page_frame), drawn from
+    driver_pages() (25 Nov 2026: the same data the sheet read returns)."""
     import export
     from export import (rl_canvas, A4, mm, colors, ParagraphStyle, Paragraph, Spacer, LongTable, TableStyle,
                         NAVY_RGB, GREY, DEMO_FG_RGB, MISSING)
     if rl_canvas is None:
         raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
-    from reportlab.platypus import PageBreak
-    blocks = day_view(data, view, day)
+    from reportlab.platypus import PageBreak, KeepTogether, Table
+    S = sheet or driver_pages(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry)
     safe = export._pdf_safe
     buf = io.BytesIO()
     W, H = A4
@@ -805,69 +908,115 @@ def build_pdf(data, view, day):
     tenant = export._tenant_name() or "Wayscope"
     notice = export._demo_notice() or None
     top, bottom = (27 if notice else 22) * mm, 14 * mm
-    title = f"Driver sheets · {_day_words(day)}"
-    stamp = "CONFIRMED" if data.get("week_confirmed") else "DRAFT · not confirmed"
     on_page = export.page_frame(
-        W, H, lm, rm, safe(title), rule_y=H - 9 * mm, title_font=("Helvetica-Bold", 13), title_y=H - 15 * mm,
-        right=(stamp, "Helvetica-Bold", 9, NAVY_RGB),
-        sub=("A planning sheet for the haulier · not a delivery note · planning payloads, not plated weights",
-             "Helvetica", 8, GREY, H - 19.5 * mm),
+        W, H, lm, rm, safe(S["title"]), rule_y=H - 9 * mm, title_font=("Helvetica-Bold", 13), title_y=H - 15 * mm,
+        right=(S["stamp"], "Helvetica-Bold", 9, NAVY_RGB),
+        sub=(S["sub"], "Helvetica", 8, GREY, H - 19.5 * mm),
         notice=((safe(notice), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 24.5 * mm) if notice else None),
         foot=("Wayscope · " + safe(tenant), "Helvetica", 7, GREY))
-    doc = export.frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page)
+    doc = export.frame_doc(buf, W, H, lm, rm, top, bottom, S["title"], on_page)
     st = ParagraphStyle("b", fontName="Helvetica", fontSize=8.5, leading=10.5)
     st_h = ParagraphStyle("h", parent=st, fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.Color(*NAVY_RGB))
     st_g = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.5, textColor=colors.Color(*GREY))
     st_big = ParagraphStyle("d", parent=st, fontName="Helvetica-Bold", fontSize=15, leading=18, textColor=colors.Color(*NAVY_RGB))
     st_f = ParagraphStyle("f", parent=st, fontSize=10, leading=13)
+    st_tk = ParagraphStyle("tk", parent=st, fontName="Helvetica-Bold", fontSize=10.5, leading=13)
+    st_s = ParagraphStyle("s", parent=st, fontSize=8, leading=10)
+    st_sb = ParagraphStyle("sb", parent=st_s, fontName="Helvetica-Bold")
+    ink = colors.Color(0.09, 0.10, 0.12)
+    rule = colors.Color(0.78, 0.78, 0.80)
 
     def E(v):
         return safe(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    def P(t, style=st):
+    def Pp(t, style=st):
         return Paragraph(str(t), style)
 
+    usable = W - lm - rm
+
+    def take_care(P):
+        """One route's block: the heading and the route, its sentences and closures, the two ways side by side, the
+        holding area, the gate and the foot. Ruled, no box (the 23 Nov look: a section is a 1 px line and its title)."""
+        head = (f"{E(P['head'])} <font size=8 color='#62656B'>&nbsp;&nbsp;{E(P['route_id'])} · "
+                f"{E(short_name(P['origin']))} – {E(short_name(P['dest']))}</font>")
+        out = [Pp(head, st_tk)]
+        for i, x in enumerate(P.get("sentences") or []):
+            out.append(Pp(E(x), st_sb if i == 0 else st_s))
+        for c in P.get("closures") or []:
+            out.append(Pp(E(c["text"]), st_sb))
+        if P.get("nothing"):
+            out.append(Pp(E(P["nothing"]), st_s))
+        cols = []
+        for L in P.get("legs") or []:
+            if not (L["limits"] or L["places"] or L.get("more_words") or L.get("shared_words")):
+                cols.append([Pp(E(f"{L['title']} · {L['length'] or ''}".rstrip(" ·")), st_h),
+                             Pp(E("Nothing held this way."), st_g)])
+                continue
+            rows_ = [[Pp(E(f"{L['title']} · {L['length'] or ''}".rstrip(" ·")), st_h), ""]]
+            for it in L["limits"]:
+                rows_.append([Pp(f"<b>{E(it['w'])}</b>", st_s), Pp(E(it["text"]), st_s)])
+            for it in L["places"]:
+                rows_.append([Pp(E(it["w"]), st_s), Pp(f"<b>{E(it['text'])}</b>", st_s)])
+            for extra in (L.get("more_words"), L.get("shared_words")):
+                if extra:
+                    rows_.append([Pp(""), Pp(E(extra), st_g)])
+            cw = (usable - 6 * mm) / 2.0
+            t = Table(rows_, colWidths=[17 * mm, cw - 17 * mm])
+            t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("SPAN", (0, 0), (1, 0)),
+                                   ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 1.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.2)]))
+            cols.append([t])
+        if cols:
+            two = Table([cols], colWidths=[(usable - 6 * mm) / 2.0 + 6 * mm, (usable - 6 * mm) / 2.0])
+            two.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                     ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 2)]))
+            out.append(two)
+        if P.get("holding"):
+            out.append(Pp(E(P["holding"]), st_s))
+        if P.get("gate"):
+            g = P["gate"]
+            name, _, rest = g.partition(":")
+            out.append(Pp(f"<b>{E(name)}:</b>{E(rest)}" if rest else E(g), st_s))
+        out.append(Pp(E(P["foot"]), st_g))
+        box = Table([[x] for x in out], colWidths=[usable])
+        box.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, 0), 1.0, ink), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                 ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+                                 ("LINEBELOW", (0, len(out) - 2), (-1, len(out) - 2), 0.4, rule)]))
+        return box
+
     story = []
-    first = True
-    for blk in blocks:
-        for r in blk["lorries"]:
-            if not first:
-                story.append(PageBreak())
-            first = False
-            story.append(P(E(f"{short_name(blk['name'])} · {_veh(blk['vehicle'])} · lorry {r['n']} of {len(blk['lorries'])}"), st_big))
-            story.append(P(f"<b>{E(_day_words(day))}</b> · {r['trips']} round trip{'' if r['trips'] == 1 else 's'} · "
-                           f"leave the yard about {r['start']} · back about {r['end']} · {E(r['free_words'].lower())}", st_f))
-            if data.get("team_only"):
-                story.append(P(E(f"{data['team_only']}'s lines only"), st_g))
-            if blk.get("gate"):
-                story.append(P(E(f"Load at {short_name(blk['name'])}, leave by {blk['gate']}."), st))
-            story.append(Spacer(1, 2 * mm))
-            rows = [[P("About", st_h), P("Trip", st_h), P("Load, average", st_h), P("Round trip", st_h)]]
-            routes_named = []
-            for b in r["blocks"]:
-                if b["kind"] == "break":
-                    rows.append([P(b["start"]), P(f"<i>Break, {int(b['minutes'])} min, about here: the rules require it before "
-                                                 f"4½ h of driving or 6 h of work pass; it may be taken as 15 + 30.</i>", st_g), P(""), P("")])
-                else:
-                    rows.append([P(b["start"]),
-                                 P(f"<b>{E(b['route_id'])}</b> {E(short_name(blk['name']))} → {E(short_name(b.get('dest_name')))}"
-                                   + (f"<br/><font size=7 color='#64748B'>{E(b.get('material') or '')}</font>" if b.get("material") else "")),
-                                 P(f"{round(b['qty'], 1):g} {E(supplier_orders_unit(b.get('unit')))}" if b.get("qty") is not None else "—"),
-                                 P(f"{int(round(b['minutes']))} min")])
-                    if b["route_id"] not in routes_named:
-                        routes_named.append(b["route_id"])
-            usable = W - lm - rm
-            t = LongTable(rows, colWidths=[14 * mm, usable - 14 * mm - 26 * mm - 20 * mm, 26 * mm, 20 * mm], repeatRows=1)
-            t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.Color(*NAVY_RGB)),
-                                   ("LINEBELOW", (0, 1), (-1, -1), 0.3, colors.Color(0.89, 0.91, 0.94)),
-                                   ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.945, 0.961, 0.976)),
-                                   ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-            story.append(t)
+    for i, pg in enumerate(S["pages"]):
+        if i:
+            story.append(PageBreak())
+        story.append(Pp(E(pg["head"]), st_big))
+        story.append(Pp(f"<b>{E(pg['day_words'])}</b> · {E(pg['line'])}", st_f))
+        if pg.get("team"):
+            story.append(Pp(E(pg["team"]), st_g))
+        if pg.get("gate"):
+            story.append(Pp(E(pg["gate"]), st))
+        story.append(Spacer(1, 2 * mm))
+        rows = [[Pp("About", st_h), Pp("Trip", st_h), Pp("Load, average", st_h), Pp("Round trip", st_h)]]
+        for b in pg["rows"]:
+            if b["kind"] == "break":
+                rows.append([Pp(b["about"]), Pp(f"<i>{E(b['text'])}</i>", st_g), Pp(""), Pp("")])
+            else:
+                rows.append([Pp(b["about"]),
+                             Pp(f"<b>{E(b['route_id'])}</b> {E(b['from'])} → {E(b['to'])}"
+                                + (f"<br/><font size=7 color='#64748B'>{E(b['material'])}</font>" if b.get("material") else "")),
+                             Pp(E(b["load"])), Pp(E(b["round_trip"]))])
+        t = LongTable(rows, colWidths=[14 * mm, usable - 14 * mm - 26 * mm - 20 * mm, 26 * mm, 20 * mm], repeatRows=1)
+        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.Color(*NAVY_RGB)),
+                               ("LINEBELOW", (0, 1), (-1, -1), 0.3, colors.Color(0.89, 0.91, 0.94)),
+                               ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.945, 0.961, 0.976)),
+                               ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
+        story.append(t)
+        for P in pg["take_care"]:
             story.append(Spacer(1, 3 * mm))
-            story.append(P(E(f"Route sheet{'s' if len(routes_named) != 1 else ''} {', '.join(routes_named)} give the roads, the turns "
-                             "and the gate hours: follow them, not a sat-nav. Times are planning times; a queue at a gate moves "
-                             f"them. Driving at most 9 h today. {dh.NOT_MODELLED_WORDS}"), st_g))
-            story.append(P(E(f"Made {data['made_at']} by {data['made_by']}. {SENDS_NOTHING}"), st_g))
+            story.append(KeepTogether([take_care(P)]))
+        story.append(Spacer(1, 3 * mm))
+        for line in pg["small"]:
+            story.append(Pp(E(line), st_g))
     doc.build(story)
     return buf.getvalue()
 

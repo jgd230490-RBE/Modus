@@ -597,6 +597,7 @@ def points(route_id, vehicle=None, day=None, alts=None, ctx=None, see_map=True):
                           "length": leg_length(km, ctx.unit), "km": km, "limits": items, "places": places,
                           "more": 0, "shared": 0})
         all_items += items + places
+    P["vehicle_values"] = {k: sorted(v for v in vs if v is not None) for k, vs in vehicle_values.items()}
     P["sentences"] = _sentences(all_items, vehicle_values)
     if state == "not_checked":
         P["sentences"].insert(0, NOT_CHECKED + ".")
@@ -632,15 +633,22 @@ def cut(P, places=CUT_PLACES):
 
 def drop_shared(blocks):
     """A point two of the day's routes share (the same limit, the same place) is printed once, under the first block
-    that has it (Q13). Works in place on the blocks (each from points()); `shared` counts what a leg left out."""
-    seen = set()
+    that has it (Q13). Works in place on the blocks (each from points()); `shared` counts what a leg left out and
+    `shared_from` the routes it was printed under. A block that lost limits says its sentence again over what is left
+    (a sentence never speaks of a limit "below" that is printed above)."""
+    seen = {}
     for P in blocks:
         mine = set()
+        lost = False
         for L in P.get("legs") or []:
+            L.setdefault("shared_from", [])
             keep_l = []
             for it in L["limits"]:
                 if it["key"] in seen:
                     L["shared"] += 1
+                    lost = True
+                    if seen[it["key"]] not in L["shared_from"]:
+                        L["shared_from"].append(seen[it["key"]])
                 else:
                     keep_l.append(it)
                     mine.add(it["key"])
@@ -648,6 +656,9 @@ def drop_shared(blocks):
             keep_p = []
             for it in L["places"]:
                 ks = [k for k in it["keys"] if k not in seen]
+                for k in it["keys"]:
+                    if k in seen and seen[k] not in L["shared_from"]:
+                        L["shared_from"].append(seen[k])
                 if not ks:
                     L["shared"] += it["n"]
                     continue
@@ -659,8 +670,19 @@ def drop_shared(blocks):
                 keep_p.append(it)
                 mine.update(ks)
             L["places"] = keep_p
-        seen |= mine
+        for k in mine:
+            seen[k] = P.get("route_id")
+        if lost:
+            _resay(P)
     return blocks
+
+
+def _resay(P):
+    """The block's sentences again over the limits it still prints; the not-checked and not-fetched sentences stay."""
+    keep_first = [x for x in P.get("sentences") or [] if x == NOT_CHECKED + "."]
+    keep_last = [x for x in P.get("sentences") or [] if x in (PLACES_NOT_FETCHED, NOT_ROUTED)]
+    items = [i for L in P.get("legs") or [] for i in L["limits"]]
+    P["sentences"] = keep_first + _sentences(items, {k: set(v) for k, v in (P.get("vehicle_values") or {}).items()}) + keep_last
 
 
 def all_words(P):
@@ -680,7 +702,11 @@ def more_words(n):
 
 
 def shared_words(n, first_route):
-    return f"{n} more shown under {first_route} above" if n else ""
+    """"3 more shown under R012 above"; printed under several routes: "3 more shown above"."""
+    if not n:
+        return ""
+    rs = [first_route] if isinstance(first_route, str) else [r for r in (first_route or []) if r]
+    return f"{n} more shown under {rs[0]} above" if len(rs) == 1 else f"{n} more shown above"
 
 
 def checked_words(P):
