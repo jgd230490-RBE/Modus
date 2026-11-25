@@ -333,6 +333,8 @@ ok("CSS: the site heading is a 1 px ink rule, the name Sora 600 15 px; the table
    /\.tbl tr\.la-site>td\{[^}]*border-top:1px solid var\(--ink\)/.test(html) && /\.la-sn\{[^}]*font:600 15px/.test(html)
    && /\.la-cards>tbody>tr\.la-site\{border:0 !important;border-top:1px solid var\(--ink\) !important;/.test(html));
 ok("CSS: a status chip in any tablet card keeps its shape (inline-flex), found by this task", html.includes(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}"));
+ok("CSS: the total row's second line wraps (its one long line held the Site column at 339 px; 280 px again, as before the sites)",
+   html.includes(".tbl tr.la-total td.la-stick .la-sub{white-space:normal;}"));
 
 console.log(`ui_fix_la_sites.js: ${pass} passed, ${fail.length} failed`);
 fail.forEach(f => console.log("  ✗ " + f));

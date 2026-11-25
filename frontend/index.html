@@ -1129,6 +1129,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .la-cell:hover{border-bottom-color:var(--muted);}
   .tbl tr.la-total td{font-weight:600;background:var(--surface-2);border-top:1px solid var(--grey);}
   .tbl.compact tr.la-total td,.tbl.compact td.num{height:auto;padding-top:4px;padding-bottom:4px;}
+  /* 25 Nov 2026 (task A): the total row's second line wraps, so the Site column keeps its 280 px and Mon to Fri and the Week
+     fit at 1150 px with the rail folded */
+  .tbl tr.la-total td.la-stick .la-sub{white-space:normal;}
   /* 13 Oct 2026 (W6, bundle F) — RowDetails: one primary value, at most two grey chips, one status (word + icon),
      a chevron that opens a details row (a <dl>, one fact a line). Below 768 px every .rd-table is cards in the same
      order: primary, chips, status, the figures, details. Tokens only, so every look follows. */
