@@ -468,6 +468,41 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ibtn:hover{color:var(--ink);}
   .ibtn[aria-expanded="true"]{color:var(--navy);}
   .ibtn:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  /* 23 Nov 2026 (claude/working-list, the mockup's card 1): the "Working" chip in the header and its list. The chip
+     shows only while the list is not empty. On the dark bar (Ink, Dark) it is the dark grade of each status colour;
+     on Light's white bar the light grade, through the status tokens. The list is a surface card in every look. */
+  .work{position:relative;display:inline-flex;margin-right:4px;}
+  .work-chip{position:relative;display:inline-flex;align-items:center;gap:7px;min-height:28px;border-radius:999px;padding:4px 11px 4px 9px;font:inherit;font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;cursor:pointer;border:1px solid #92400E;background:#3A2A12;color:#FCD34D;}
+  .work-chip::after{content:"";position:absolute;inset:-8px -2px;}
+  .work-chip i{flex:none;width:9px;height:9px;border-radius:50%;background:#FBBF24;}
+  .work-chip.wc-ok{border-color:#047857;background:#0F2A22;color:#6EE7B7;} .work-chip.wc-ok i{background:#34D399;}
+  .work-chip.wc-bad{border-color:#B91C1C;background:#3B1414;color:#FCA5A5;} .work-chip.wc-bad i{background:#F87171;}
+  html[data-theme="light"] .work-chip{border-color:var(--warn-text);background:var(--st-warn-bg);color:var(--warn-text);}
+  html[data-theme="light"] .work-chip i{background:var(--gold);}
+  html[data-theme="light"] .work-chip.wc-ok{border-color:var(--ok-text);background:var(--st-ok-bg);color:var(--ok-text);}
+  html[data-theme="light"] .work-chip.wc-ok i{background:var(--green);}
+  html[data-theme="light"] .work-chip.wc-bad{border-color:var(--bad-text);background:var(--st-bad-bg);color:var(--bad-text);}
+  html[data-theme="light"] .work-chip.wc-bad i{background:var(--red);}
+  .work-chip:focus-visible{outline:2px solid var(--hdr-fg);outline-offset:2px;}
+  .work-list{position:absolute;right:0;top:40px;z-index:60;width:372px;max-width:calc(100vw - 16px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);font-size:13px;line-height:1.4;text-align:left;}
+  .work-list .wl-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);}
+  .work-list h6{margin:0;font-size:13px;font-weight:600;color:var(--ink);}
+  .work-list ul{list-style:none;margin:0;padding:0;max-height:60vh;overflow:auto;}
+  .wl-row{display:flex;gap:9px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid var(--line);}
+  .wl-row:last-child{border-bottom:0;}
+  .wl-dot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--gold);}
+  .wl-done .wl-dot{background:var(--green);} .wl-stopped .wl-dot{background:var(--red);}
+  .wl-main{flex:1;min-width:0;}
+  .wl-line{display:block;width:100%;padding:0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;overflow-wrap:anywhere;}
+  button.wl-line{cursor:pointer;} button.wl-line:hover{text-decoration:underline;}
+  .wl-main small{display:block;color:var(--muted);font-size:12px;}
+  .wl-prog{height:5px;border-radius:3px;background:var(--grey);margin-top:5px;overflow:hidden;}
+  .wl-prog i{display:block;height:100%;background:var(--gold);}
+  .wl-row .btn-sec{flex:none;} .wl-row .row-x{flex:none;}
+  .wl-note{margin:0;padding:8px 12px;border-top:1px solid var(--line);color:var(--ink);}
+  @media (max-width:640px){ .work{margin-left:6px;} .work-list{position:fixed;left:8px;right:8px;top:60px;width:auto;max-width:none;} }
+  /* the one refusal, where a second job would be pressed (the mockup's card 3) */
+  .work-busy{margin:6px 0 2px;padding:0 10px;max-width:270px;white-space:normal;font-size:13px;font-weight:400;line-height:1.4;color:inherit;}
   .info-pop{position:fixed;z-index:80;max-width:340px;width:max-content;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.45;text-align:left;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;}
   .info-pop:focus{outline:none;}
   .info-pop h6{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--popover-fg);text-transform:none;letter-spacing:0;padding-right:22px;}
@@ -1642,6 +1677,81 @@ function errMsg(e){
 // "Not saved." + why
 function errSay(what, e){ return `${what} ${errMsg(e)}`; }
 
+// ---- The "Working" list (23 Nov 2026, claude/working-list; the mockup notes\working-list-mockup-1121, Option A) ---------
+// One long job at a time for the organisation, and one place that says what is running. The SERVER keeps the record and
+// makes every sentence (the row's line, the refusal); this page prints them. WORK is the one copy of the list on the
+// page: the header's chip asks for it (WorkChip), every page reads it through useWork(). A job this page sends in
+// batches (Route all, Busy-hour times, a zone's re-route, Route again) starts its row with workStart and ends it with
+// workEnd; while one is being sent, closing the tab asks first (workLeave, Q7) and a tab that does go says so (workGone).
+const WORK_BUSY = 423;             // the status the server refuses a second job with: its sentence is shown alone
+const WORK_CARRY = "wayscope-work-carry";
+const WORK_POLL_BUSY = 4000, WORK_POLL_IDLE = 30000;
+var WORK = { jobs: [], busy: {}, running: null, sig: "", subs: new Set(), sending: {}, carry: null, go: null, canGo: null, seq: 0 };
+function workApply(j){
+  if(!j || !Array.isArray(j.jobs)) return;
+  // an answer that says what the page already shows draws nothing again (the Routes page reads this list too)
+  const sig = JSON.stringify([j.jobs, j.busy || {}]);
+  if(sig === WORK.sig) return;
+  WORK.sig = sig;
+  WORK.jobs = j.jobs; WORK.busy = j.busy || {}; WORK.running = j.running || null;
+  WORK.subs.forEach(f => { try { f(); } catch(e){} });
+}
+// a batch's reply carries its row as it now reads: the list shows it at once, in step with the page's own line
+function workSeen(v){
+  if(!v || !v.id || !WORK.jobs.some(j => j.id === v.id)) return;
+  WORK.jobs = WORK.jobs.map(j => j.id === v.id ? { ...j, ...v, can_carry: j.can_carry, can_close: j.can_close } : j);
+  WORK.sig = "";
+  WORK.subs.forEach(f => { try { f(); } catch(e){} });
+}
+function workRead(){
+  const seq = ++WORK.seq;
+  return fetch(`${API}/working`).then(r => r.ok ? r.json() : null)
+    .then(j => { if(j && seq === WORK.seq) workApply(j); return j; }).catch(() => null);
+}
+function useWork(){
+  const [, bump] = useState(0);
+  useEffect(() => { const f = () => bump(n => n + 1); WORK.subs.add(f); return () => { WORK.subs.delete(f); }; }, []);
+  return WORK;
+}
+// the server's sentence, alone, when it refused because another long job is running; "" for any other failure
+function workBusy(e){ return (e && e.status === WORK_BUSY) ? errMsg(e) : ""; }
+function workSending(){ return Object.keys(WORK.sending).length > 0; }
+// start the row of a job this page is about to send (rejects with the refusal while another job runs)
+async function workStart(kind, body){
+  const job = await postJSON("/working/start", { kind, ...(body || {}) });
+  WORK.sending[job.id] = job;
+  workRead();
+  return job;
+}
+// the job ended ("done") or stopped part-way ("stopped"); never throws
+function workEnd(job, state){
+  if(!job) return Promise.resolve();
+  delete WORK.sending[job.id];
+  return postJSON(`/working/${encodeURIComponent(job.id)}/end`, { state: state || "done" }).catch(() => {}).then(() => workRead());
+}
+// Q7: the browser's own "Leave site?" question, only while this page is sending a job
+function workLeave(ev){
+  if(!workSending()) return;
+  ev.preventDefault(); ev.returnValue = "";
+  return "";
+}
+// the tab is going: the rows it was sending read "stopped" at once, not after the wait for a missing batch
+function workGone(){
+  Object.keys(WORK.sending).forEach(id => {
+    if(id === "import") return;
+    try {
+      fetch(`${API}/working/${encodeURIComponent(id)}/end`, { method: "POST", keepalive: true,
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state: "stopped" }) });
+    } catch(e){}
+  });
+}
+try { window.addEventListener("beforeunload", workLeave); window.addEventListener("pagehide", workGone); } catch(e){}
+// "14:21": a job's time on the reader's own clock
+function workClock(iso){
+  const d = iso ? new Date(iso) : null;
+  return (!d || isNaN(d)) ? "" : d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 // ---- Appearance (5 Oct 2026) ----------------------------------------------------
 // Three looks — "ink" (the 29 Sep rebrand, default), "light" (white header bar), "dark"
 // (dark surfaces, orange controls) — set as html[data-theme] and read as CSS tokens (see
@@ -1702,6 +1812,8 @@ const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 // `text` over 40 words, or a banned word anywhere in here. `value` (a prop, not an entry) carries
 // the exact, unrounded figure the old hover tooltip showed, so moving a figure here loses nothing.
 const INFO = {
+  // 23 Nov 2026 (claude/working-list): the "i" in the Working list's head (John's yes to the mockup's words, 24 of them)
+  "work.list": { title: "Working", text: "Long jobs run one at a time. You can leave the page: the job carries on and this list says when it is done.", guide: "ug-working-list" },
   // 11 Nov 2026 (card 3, John: yes): the "i" beside "Plan changed since Issue N" (its value: the first two changes)
   "clp.changed": { title: "Since the last issue", text: "What changed in the plan since this CLP's last issue, as the approve card shows it." },
   "dash.material": { title: "Material in view", text: "The planned quantity of every plan line in view, in tonnes. Cubic metres and lorry loads become tonnes through each line's own conversion.", guide: "3-1-filters-and-the-six-cards", tech: "t1-volume" },
@@ -4942,7 +5054,7 @@ function CommunityPanel({ access }){
     setMsg("Starting…");
     fetch(`${API}/community/refresh`, { method: "POST" })
       .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, j })))
-      .then(({ ok, status, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(errSay("Not started.", errOf(status, j))); })
+      .then(({ ok, status, j }) => { if(ok){ setSt(j); workRead(); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(errSay("Not started.", errOf(status, j))); })
       .catch(e => setMsg(errSay("Not started.", e)));
   };
   const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
@@ -4994,7 +5106,7 @@ function CollisionPanel({ access }){
     setMsg("Starting…");
     fetch(`${API}/collisions/refresh`, { method: "POST" })
       .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, j })))
-      .then(({ ok, status, j }) => { if(ok){ setSt(j); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(errSay("Not started.", errOf(status, j))); })
+      .then(({ ok, status, j }) => { if(ok){ setSt(j); workRead(); setMsg(j.started ? "Fetching: this takes a few minutes." : (j.message || "")); } else setMsg(errSay("Not started.", errOf(status, j))); })
       .catch(e => setMsg(errSay("Not started.", e)));
   };
   const day = (s) => { if(!s) return "—"; const d = new Date(s.length > 10 ? s : s + "T12:00:00Z"); return isNaN(d) ? s : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
@@ -5115,6 +5227,106 @@ function RouteMapExportMenu({ months, ipts, picked }){
 }
 
 // ================================================================= Header
+// ================================================================= The "Working" chip and its list (23 Nov 2026)
+// In the header for every staff sign-in, on every page; NOTHING is drawn while the list is empty. The chip says the
+// most pressing state and how many lines are in it ("Working · 1" amber, "Stopped · 1" red, "Done · 1" green); a click
+// opens the list. A row: the job's line (a link to the page it runs on, where this sign-in has that page), a thin bar
+// where a total is known, when it started; who started it only as the row's title. A finished row has a named "×"; a
+// stopped one "Carry on" for someone who may start that job, never on a phone (nothing on a phone writes).
+// It asks the server every 4 s while a job runs and every 30 s otherwise, never from a hidden tab.
+function WorkChip(){
+  const w = useWork();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const box = useRef(null);
+  const escd = useRef(false);
+  useEffect(() => {
+    let t = null, gone = false;
+    const next = () => { if(!gone) t = setTimeout(tick, (WORK.running || workSending()) ? WORK_POLL_BUSY : WORK_POLL_IDLE); };
+    const tick = () => { if(gone) return; if(typeof document !== "undefined" && document.hidden) return next(); workRead().then(next); };
+    const seen = () => { if(typeof document !== "undefined" && !document.hidden) workRead(); };
+    tick();
+    document.addEventListener("visibilitychange", seen);
+    return () => { gone = true; clearTimeout(t); document.removeEventListener("visibilitychange", seen); workApply({ jobs: [], busy: {} }); };
+  }, []);
+  useEffect(() => {
+    if(!open) return;
+    const away = (e) => { if(box.current && box.current.contains(e.target)) return; if(e.target && e.target.closest && e.target.closest(".info-pop")) return; setOpen(false); };
+    // 24 Nov 2026: Escape with the list's own "i" box open closes that box only (its own handler); the next Escape
+    // closes the list, and the chip takes the focus back (the row or "i" that had it is gone with the list)
+    const key = (e) => { if(e.key !== "Escape") return; if(document.querySelector(".info-pop")) return; escd.current = true; setOpen(false); };
+    document.addEventListener("mousedown", away); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", key); };
+  }, [open]);
+  useEffect(() => {
+    if(open || !escd.current) return;
+    escd.current = false;
+    const b = box.current && box.current.querySelector("[data-work-chip]");
+    if(b){ try { b.focus(); } catch(e){} }
+  }, [open]);
+  const jobs = w.jobs || [];
+  useEffect(() => { if(!jobs.length && open) setOpen(false); }, [jobs.length]);
+  if(!jobs.length) return null;
+  const count = (st) => jobs.filter(j => j.state === st).length;
+  const run = count("running"), stop = count("stopped");
+  const tone = run ? "warn" : stop ? "bad" : "ok";
+  const word = run ? "Working" : stop ? "Stopped" : "Done";
+  const n = run || stop || count("done");
+  const phone = !!(window.matchMedia && window.matchMedia("(max-width: 767px)").matches);
+  const go = (j) => { if(WORK.go && WORK.go(j.page)) setOpen(false); };
+  const shut = (j) => { postJSON(`/working/${encodeURIComponent(j.id)}/close`, {}).then(workApply).catch(() => workRead()); };
+  // "Carry on": a job the server runs is started again from here; one the page sends goes to its own page, which runs it
+  const carry = async (j) => {
+    setNote("");
+    if(j.sent_by === "server"){
+      const path = j.kind === "community" ? "/community/refresh" : j.kind === "collisions" ? "/collisions/refresh" : "/forecast-weeks/restrictions/refresh";
+      try { const r = await postJSON(path, {}); if(r && r.started === false && r.message) setNote(r.message); }
+      catch(e){ setNote(workBusy(e) || errSay("Not started.", e)); }
+      workRead();
+      return;
+    }
+    WORK.carry = j;
+    if(!(WORK.go && WORK.go(j.page))){ WORK.carry = null; return; }
+    setOpen(false);
+    try { window.dispatchEvent(new Event(WORK_CARRY)); } catch(e){}
+  };
+  return (
+    <span className="work" ref={box}>
+      <button type="button" className={"work-chip wc-" + tone} data-work-chip={tone} aria-haspopup="dialog"
+              aria-expanded={open ? "true" : "false"} onClick={() => setOpen(o => !o)}>
+        <i aria-hidden="true"></i><span>{word} · {n}</span>
+      </button>
+      {open && (
+        <div id="work-list" className="work-list" role="dialog" aria-label="Working" data-work-list="1">
+          <div className="wl-head"><h6>Working</h6><InfoTip id="work.list" /></div>
+          <ul>
+            {jobs.map(j => {
+              const at = workClock(j.state === "running" ? j.started_at : (j.ended_at || j.started_at));
+              const sub = j.state === "running" ? `Started ${at}` : j.state === "done" ? `Done ${at}` : `${at}${j.kept ? " · " + j.kept : ""}`;
+              const pct = (j.state === "running" && j.total > 0) ? Math.max(0, Math.min(100, Math.round(100 * (j.done || 0) / j.total))) : null;
+              const linked = !!(WORK.canGo && WORK.canGo(j.page));
+              return (
+                <li key={j.id} className={"wl-row wl-" + j.state} data-work-row={j.state} title={j.by ? `Started by ${j.by}` : undefined}>
+                  <i className="wl-dot" aria-hidden="true"></i>
+                  <div className="wl-main">
+                    {linked ? <button type="button" className="wl-line" data-work-go={j.page} onClick={() => go(j)}>{j.line}</button>
+                            : <span className="wl-line">{j.line}</span>}
+                    {pct != null && <div className="wl-prog" role="progressbar" aria-label={j.line} aria-valuemin="0" aria-valuemax={j.total} aria-valuenow={j.done || 0}><i style={{ width: pct + "%" }}></i></div>}
+                    <small>{sub}</small>
+                  </div>
+                  {j.state === "stopped" && j.can_carry && !phone && <button type="button" className="btn-sec btn-sm" data-work-carry={j.id} onClick={() => carry(j)}>Carry on</button>}
+                  {j.can_close && <button type="button" className="row-x" aria-label={`Close: ${j.line}`} title="Close" data-work-close={j.id} onClick={() => shut(j)}></button>}
+                </li>
+              );
+            })}
+          </ul>
+          {note && <p className="wl-note" role="status" data-work-note="1">{note}</p>}
+        </div>
+      )}
+    </span>
+  );
+}
+
 function Header({ view, role, setView, signOut, vehLang, setVehLang }){
   return (
     <header className="brand-bar shrink-0">
@@ -5157,6 +5369,8 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
                   </button>
                 ))}
               </span>)}
+              {/* 23 Nov 2026: the "Working" chip, for staff; it draws nothing while no long job is in its list */}
+              {role.via !== "reviewer" && view === "portal" && <WorkChip />}
               {(role.via === "login" || role.via === "reviewer") ? <AccountMenu role={role} onSignOut={signOut} />
                 : <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>}
               {/* 11 Oct 2026: the Guide button moved to the right end of the demo bar (DemoBar). It was shown
@@ -8893,6 +9107,12 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const navFirst = visible.flatMap(g => g.items).find(navMatch);
   const allowed = new Set(visible.flatMap(g => g.items.map(i => i.id)));
   useEffect(() => { if(!allowed.has(page)) setPage("dashboard"); }, [canApprove, isAdmin]);
+  // 23 Nov 2026 (the "Working" list): a row goes to the page its job runs on, only where this sign-in has that page
+  useEffect(() => {
+    WORK.canGo = (p) => allowed.has(p);
+    WORK.go = (p) => { if(!allowed.has(p)) return false; setPage(p); return true; };
+    return () => { WORK.go = null; WORK.canGo = null; };
+  });
   // G3 (D51, HU14): a lead's demo login says which page it opened, so the leads list shows who looked at what. Staff
   // page opens are never sent (the server would ignore them anyway).
   useEffect(() => {
@@ -11068,15 +11288,18 @@ function OrgFile(){
       setFile({ name: f.name, pkg, counts: { locations: n("locations"), routes: n("routes"), lines: n("forecasts"), drawn: n("route_geometry") } });
     }).catch(() => setMsg({ ok: false, text: "Couldn't read that file." }));
   };
+  // 23 Nov 2026 (the "Working" list, Q8): the replace is a job in the list (the server keeps its row while the request
+  // runs); while the file is being sent, closing the tab asks first; a refusal because another job runs is shown alone
   const replace = () => {
     setBusy(true); setMsg(null);
+    WORK.sending.import = 1; workRead();
     postJSON("/admin/tenant/import?replace=1", file.pkg)
       .then(() => {
         setMsg({ ok: true, text: "Replaced." + (file.counts.routes && !file.counts.drawn ? " Draw the routes again on Routes." : "") });
         setFile(null); setTyped("");
       })
-      .catch(e => setMsg({ ok: false, text: errSay("Not replaced.", e) }))
-      .finally(() => setBusy(false));
+      .catch(e => setMsg({ ok: false, text: workBusy(e) || errSay("Not replaced.", e) }))
+      .finally(() => { delete WORK.sending.import; setBusy(false); workRead(); });
   };
   // the name as typed: case, the kind of dash and extra spaces do not matter (a long dash is hard to type)
   const normName = (t) => String(t || "").toLowerCase().replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim();
@@ -12705,12 +12928,14 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   // state while it runs. A route never checked is named, never shown clean.
   const [tt, setTt] = useState({ status: "unknown", refresh: null });
   const [ttPolling, setTtPolling] = useState(false);
+  const [ttBusy, setTtBusy] = useState("");     // 23 Nov 2026: the one refusal while another long job runs, beside the button
   const refreshTarkTee = async () => {
+    setTtBusy("");
     try {
       const r = await fetch(`${API}/forecast-weeks/restrictions/refresh`, { method: "POST" });
       if(!r.ok) throw await errFrom(r);
-      setTtPolling(true);
-    } catch(e){ setErr(errSay("Couldn't start the road-restriction check.", e)); }
+      setTtPolling(true); workRead();
+    } catch(e){ const b = workBusy(e); if(b) setTtBusy(b); else setErr(errSay("Couldn't start the road-restriction check.", e)); }
   };
   useEffect(() => {
     let live = true;
@@ -12730,7 +12955,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
         if(!live) return;
         setTt({ status: j.status, refresh: j.refresh });
         if(j.refresh && j.refresh.running){ setTimeout(tickPoll, 4000); }
-        else { setTtPolling(false); setTick(t => t + 1); }     // done — re-read the page, flags included
+        else { setTtPolling(false); setTick(t => t + 1); workRead(); }     // done — re-read the page, flags included
       })
       .catch(() => { if(live){ setTtPolling(false); } });
     tickPoll();
@@ -12941,7 +13166,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
           {lines.length > 0 && ttSrc.restrictions !== "skipped" && ttSrc.restrictions !== "off" && ttSrc.restrictions_provider && (
             <div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>
               <span>
-                {ttRunning ? `checking ${ttName.toLowerCase()} — this takes a minute; the page will refresh when it finishes…`
+                {ttRunning ? `${ttName.split(" (")[0]}: checking`
                  : ttSrc.restrictions === "ok" ? `${ttName}: checked ${(ttSrc.restrictions_checked_at || "").replace("T", " ").slice(0, 16)} UTC${ttSrc.restrictions_week ? ` · flags shown for the week ${ttSrc.restrictions_week[0]} → ${ttSrc.restrictions_week[1]}` : ""}`
                  : ttSrc.restrictions === "partial" ? `${ttName}: ${(ttSrc.restrictions_unchecked || []).join(", ")} not checked since the route was worked out — the rest as of ${(ttSrc.restrictions_checked_at || "").slice(0, 10)}`
                  : `${ttName}: NOT checked for these routes — that is not the same as "no restrictions".`}
@@ -12951,6 +13176,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                   {ttSrc.restrictions === "ok" ? "re-check" : "check now"}
                 </button>
               )}
+              {ttBusy && !ttRunning && <span role="status" data-work-busy="closures">{ttBusy}</span>}
               {ttSrc.restrictions_refresh && ttSrc.restrictions_refresh.status === "unavailable" && !ttRunning && (
                 <span style={{ color: "var(--red)" }}>· could not reach {ttShort}; showing the last check</span>
               )}
@@ -16055,7 +16281,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         if(onChanged) m += await onChanged(inv);
       }
       setMsg(m);
-    } catch(e){ setMsg(errSay("Not done.", e)); }
+    } catch(e){ setMsg(workBusy(e) || errSay("Not done.", e)); }
     setBusy(false);
   };
 
@@ -17294,6 +17520,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [promoting, setPromoting] = useState("");
   const [token, setToken] = useState("");
   const [bakeBusy, setBakeBusy] = useState("");   // route id currently being (re-)baked
+  const [bakeLine, setBakeLine] = useState("");   // 23 Nov 2026: its line in the "Working" list, shown on the row
   const [selected, setSelected] = useState(null);
   const selectedRef = useRef(null);   // 8 Nov 2026: read by applyEmphasis (the fade), which runs from map events too
 
@@ -17368,6 +17595,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [rMaterial, setRMaterial] = useState("");
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeMsg, setRouteMsg] = useState("");
+  const work = useWork();                         // 23 Nov 2026: the "Working" list (what is running, the refusal)
   // 29 Oct 2026 (task 0f-2, card 2): what a busy-hour times run costs, read for an admin only (the button is theirs)
   const [hourPlan, setHourPlan] = useState(null);
   useEffect(() => {
@@ -18101,10 +18329,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         ? `${rid}: ${said} Routing again puts the original order back.`
         : `${rid}: alternative ${alt_index} is now the main route for ${vehShort(profile)}. Routing again puts the original order back.`);
     } catch(e){
-      const w = errSay("Couldn't use this alternative.", e);
+      const w = workBusy(e) || errSay("Couldn't use this alternative.", e);   // 23 Nov 2026: another long job is running
       setRouteMsg(w);
       if(!said) setPromoted({ route: rid, text: w, best: null, failed: true });
     }
+    workRead();
     setPromoting("");
   };
 
@@ -18131,17 +18360,22 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // Bake one route for a set of vehicle profiles. Routes are baked individually now —
   // there is no global profile selection, so every caller states which vehicles it means.
   // Returns the profiles that failed.
-  const bakeOneRoute = async (routeId, profiles, viaHolding) => {
+  // 23 Nov 2026 (the "Working" list): `job` (Route again's row) rides on each request, and `say` gets the row's line
+  // after each lorry type; a new or edited route and a moved site pass neither and are not in the list
+  const bakeOneRoute = async (routeId, profiles, viaHolding, job, say) => {
     const failed = [];
     for(const prof of (profiles || [])){
       const q = new URLSearchParams({ route_id: routeId, profile: prof });
       if(viaHolding) q.set("via_holding", "true");               // 29 Oct 2026 (task 3c): through the holding area, one option
+      if(job) q.set("job", job.id);
       if(tokenRef.current) q.set("token", tokenRef.current);
       try {
         const r = await fetch(`${API}/admin/bake-route?${q.toString()}`, { method: "POST" });
         if(!r.ok){ failed.push(`${vehShort(prof)}: ${errMsg(await errFrom(r))}`); continue; }
         const j = await r.json();
         if(j.error) failed.push(`${vehShort(prof)}: ${j.error}`);
+        workSeen(j.working);
+        if(say && j.working && j.working.state === "running" && j.working.done < j.working.total) say(j.working.line);
       } catch(e){ failed.push(`${vehShort(prof)}: ${errMsg(e)}`); }
     }
     return failed;
@@ -18162,11 +18396,24 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
 
   // Routes-table action: re-bake this route for the vehicles it already has.
-  const rebakeRoute = async (routeId, profiles, viaHolding) => {
+  // 23 Nov 2026 (the "Working" list): a job in the list, one request a lorry type; its line ("R014: routing again, 1 of
+  // 4 lorry types") is the row's and the strip's while it runs. `carry` = the stopped row "Carry on" was pressed on.
+  const rebakeRoute = async (routeId, profiles, viaHolding, carry) => {
     const profs = (profiles && profiles.length) ? profiles : [showProfile];
-    setBakeBusy(routeId);
-    setRouteMsg(`Re-routing ${routeId} for ${profs.map(vehShort).join(", ")}${viaHolding ? " through the holding area" : ""}…`);
-    const failed = await bakeOneRoute(routeId, profs, viaHolding);
+    const say = (line) => { setRouteMsg(line); setBakeLine(line); };
+    setBakeBusy(routeId); setBakeLine("");
+    let job = null, failed = [];
+    try {
+      job = await workStart("route_again", { subject: routeId, profiles: profs, via_holding: !!viaHolding, carry: carry ? carry.id : null });
+      say(job.line);
+      failed = await bakeOneRoute(routeId, profs, viaHolding, job, say);
+    } catch(e){
+      workEnd(job, "stopped");
+      setRouteMsg(workBusy(e) || errSay("Not routed again.", e));
+      setBakeBusy("");
+      return;
+    }
+    workEnd(job, failed.length ? "stopped" : "done");
     await reloadNetwork();
     if(selected === routeId){
       try {
@@ -18842,73 +19089,94 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // the count of routing calls is on the button and in the question first, the batches looped as Route all's
   // 16 Nov 2026 (claude/busy-hours-redo-stale, John's yes to the mockup): only the routes routed again since the last run
   // (hourDue), no clear; when none are, the whole run again as before (clear first). hourDue / hourAll: the menu line too.
-  const hourBake = async () => {
+  // 23 Nov 2026 (the "Working" list): the run is a job in the list; its line ("Busy-hour times: 240 of 854 worked out")
+  // is the strip's while it runs. `carry` = the stopped row "Carry on" was pressed on: no question, never a clear.
+  const hourBake = async (carry) => {
+    const c = (carry && carry.kind === "hour_times") ? carry : null;
     const due = hourDue(hourPlan), all = hourPlan ? hourPlan.routes : 0;
     const calls = due ? due.here_calls : (hourPlan ? hourPlan.here_calls : 0);
-    if(!confirm(due
+    if(!c && !confirm(due
         ? `Work out the busy-hour times for ${due.routes} ${due.routes === 1 ? "route" : "routes"}${due.stale ? " routed again" : ""}?\n\n` +
           `${calls} routing calls.${due.routes < all ? " The other routes keep theirs." : ""} The plan's figures do not change.`
         : `Work out the busy-hour times again for all ${all} routes?\n\n${calls} routing calls. ` +
           `Every route's times are replaced. The plan's figures do not change.`)) return;
     setRouteBusy(true);
+    let job = null;
     try {
-      if(!due){
-        const res = await fetch(`${API}/admin/hour-times/clear`, { method: "POST" });
+      job = await workStart("hour_times", c ? { carry: c.id }
+        : { total: due ? due.leg_hours : (hourPlan ? hourPlan.legs * (hourPlan.hours || []).length : null) });
+      setRouteMsg(job.line);
+      if(!due && !c){
+        const res = await fetch(`${API}/admin/hour-times/clear?job=${encodeURIComponent(job.id)}`, { method: "POST" });
         if(!res.ok) throw await errFrom(res);
       }
       let last = Infinity;
       while(true){
-        const j = await postRouteBatch(new URLSearchParams({ limit: "30" }), setRouteMsg, "hour-times/bake");
+        const j = await postRouteBatch(new URLSearchParams({ limit: "30", job: job.id }), setRouteMsg, "hour-times/bake");
         const left = j.remaining ?? 0;
-        setRouteMsg(`Busy-hour times — ${left} left…`);
+        workSeen(j.working);
+        setRouteMsg((j.working && j.working.line) || job.line);
         if(left <= 0) break;
         if(left >= last) throw new Error(`${left} left and not falling`);
         last = left;
       }
+      workEnd(job, "done");
       const p = await fetch(`${API}/admin/hour-times/plan`).then(okJSON);
       setHourPlan(p);
-      setRouteMsg(due && due.routes < p.routes
+      setRouteMsg(!c && due && due.routes < p.routes
         ? `Busy-hour times worked out for ${due.routes} ${due.routes === 1 ? "route" : "routes"}; the other ${p.routes - due.routes} kept theirs.`
         : `Busy-hour times worked out for ${p.routes} routes.`);
     } catch(e){
-      setRouteMsg(`Busy-hour times stopped. ${errMsg(e)} Those already worked out are kept.`);
+      workEnd(job, "stopped");
+      setRouteMsg(workBusy(e) || `Busy-hour times stopped. ${errMsg(e)} Those already worked out are kept.`);
     }
     setRouteBusy(false);
   };
 
-  const bulkBake = async () => {
-    const profs = rVehicles.length ? rVehicles : [showProfile];
-    const legLabel = bakeLegs === "loaded" ? "laden leg only" : "both legs";
-    if(!confirm(
+  // 23 Nov 2026 (the "Working" list): the run is a job in the list; its line ("Route all: 62 of 188 legs") is the
+  // strip's while it runs. `carry` = the stopped row "Carry on" was pressed on: the same lorry types and legs, no
+  // question (the batches skip what is done).
+  const bulkBake = async (carry) => {
+    const c = (carry && carry.kind === "route_all") ? carry : null;
+    const profs = c ? ((c.args && c.args.profiles) || []) : (rVehicles.length ? rVehicles : [showProfile]);
+    const legsNow = c ? ((c.args && c.args.legs) === "loaded" ? "loaded" : "both") : bakeLegs;
+    const legLabel = legsNow === "loaded" ? "laden leg only" : "both legs";
+    if(!c && !confirm(
       `Route ${profs.length} vehicle profile(s) across the whole network, ${legLabel}?\n\n` +
       `${profs.map(vehShort).join(", ")}\n\n` +
       `This can take several minutes. Routes already worked out are routed again, ` +
       `and any alternative made main goes back.`)) return;
 
     setRouteBusy(true);
+    let job = null;
     try {
+      job = await workStart("route_all", { profiles: profs, legs: legsNow === "loaded" ? "loaded" : "", carry: c ? c.id : null });
+      setRouteMsg(job.line);
       for(const prof of profs){
         // the endpoint is the authority on 'remaining'; the loop stops if it ever fails to
         // fall (a bug, not a slow batch: every batch does at least one leg). 17 Oct 2026: was a
         // cap of 200 calls, which a short batch could reach on a big network.
         let last = Infinity;
         while(true){
-          const q = new URLSearchParams({ profile: prof, limit: "30" });
-          if(bakeLegs === "loaded") q.set("legs", "loaded");
+          const q = new URLSearchParams({ profile: prof, limit: "30", job: job.id });
+          if(legsNow === "loaded") q.set("legs", "loaded");
           if(tokenRef.current) q.set("token", tokenRef.current);
           const j = await postRouteBatch(q, setRouteMsg);
           const left = j.remaining ?? 0;
-          setRouteMsg(`Routing ${vehShort(prof)} — ${left} leg(s) remaining…`);
+          workSeen(j.working);                 // the list keeps step with the line here
+          setRouteMsg((j.working && j.working.line) || job.line);
           await reloadNetwork();
           if(left <= 0) break;
           if(left >= last) throw new Error(`${left} leg(s) left and not falling`);
           last = left;
         }
       }
+      workEnd(job, "done");
       await reloadNetwork();
       setRouteMsg(`Routing the whole network finished for ${profs.map(vehShort).join(", ")}. Check the Vehicles column for anything still amber or red.`);
     } catch(e){
-      setRouteMsg(`Routing the whole network stopped. ${errMsg(e)} Routes already worked out are kept, so you can run it again.`);
+      workEnd(job, "stopped");
+      setRouteMsg(workBusy(e) || `Routing the whole network stopped. ${errMsg(e)} Routes already worked out are kept, so you can run it again.`);
     }
     setRouteBusy(false);
   };
@@ -18925,7 +19193,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setSelected(null);
       await reloadNetwork();
       setRouteMsg(`Cleared ${j.cleared ?? 0} route(s). Locations kept.`);
-    } catch(e){ setRouteMsg(errSay("Not cleared.", e)); }
+    } catch(e){ setRouteMsg(workBusy(e) || errSay("Not cleared.", e)); }   // 24 Nov 2026: a long job is running
     setRouteBusy(false);
   };
 
@@ -19054,25 +19322,34 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // geometry are exactly the ones that were cleared, so it re-routes those and nothing
   // else. Doing it server-side inside the write request would block one HTTP call on
   // dozens of HERE round trips and time out on Render.
-  const rebakeAfterZone = async (inval) => {
+  // 23 Nov 2026 (the "Working" list): the re-route is a job in the list; its line ("Zone re-route: 12 of 40 legs") is
+  // the Zones line while it runs. `carry` = the stopped row "Carry on" was pressed on (its lorry types, no `inval`).
+  const rebakeAfterZone = async (inval, carry) => {
+    const c = (carry && carry.kind === "zone_reroute") ? carry : null;
     const legs = (inval && inval.legs) || [];
-    if(!legs.length) return "";
-    const profs = Array.from(new Set(legs.map(l => l.vehicle_profile)));
-    let done = 0;
-    for(const prof of profs){
-      let last = Infinity;             // 17 Oct 2026: as Route all, stop only if 'remaining' stops falling
-      while(true){
-        const q = new URLSearchParams({ profile: prof, limit: "30" });
-        if(tokenRef.current) q.set("token", tokenRef.current);
-        const j = await postRouteBatch(q, setZoneMsg);
-        done += j.baked || 0;
-        const left = j.remaining ?? 0;
-        setZoneMsg(`Re-routing ${vehShort(prof)} — ${left} leg(s) left…`);
-        if(left <= 0) break;
-        if(left >= last) throw new Error(`${left} leg(s) left and not falling`);
-        last = left;
+    if(!legs.length && !c) return "";
+    const profs = c ? ((c.args && c.args.profiles) || []) : Array.from(new Set(legs.map(l => l.vehicle_profile)));
+    let done = 0, job = null;
+    try {
+      job = await workStart("zone_reroute", c ? { profiles: profs, carry: c.id } : { profiles: profs, total: legs.length });
+      setZoneMsg(job.line);
+      for(const prof of profs){
+        let last = Infinity;             // 17 Oct 2026: as Route all, stop only if 'remaining' stops falling
+        while(true){
+          const q = new URLSearchParams({ profile: prof, limit: "30", job: job.id });
+          if(tokenRef.current) q.set("token", tokenRef.current);
+          const j = await postRouteBatch(q, setZoneMsg);
+          done += j.baked || 0;
+          const left = j.remaining ?? 0;
+          workSeen(j.working);
+          setZoneMsg((j.working && j.working.line) || job.line);
+          if(left <= 0) break;
+          if(left >= last) throw new Error(`${left} leg(s) left and not falling`);
+          last = left;
+        }
       }
-    }
+    } catch(e){ workEnd(job, "stopped"); throw e; }
+    workEnd(job, "done");
     await reloadNetwork();
     // Phase 4: the zone list carries the haul-road link counts and the derived lengths,
     // so a re-bake driven by an attach has to refresh it too or the "used by" column
@@ -19168,7 +19445,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       }
       setZoneMsg(msg);
       setZoneForm(null); setDrawPts([]); setZoneDraw(false);
-    } catch(e){ setZoneMsg(errSay("Not saved.", e)); }
+    } catch(e){ setZoneMsg(workBusy(e) || errSay("Not saved.", e)); }   // 23 Nov 2026: another long job is running
     setZoneBusy(false);
   };
 
@@ -19201,9 +19478,34 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       setZoneMsg(msg);
       if(zoneSel === z.id) setZoneSel(null);
       if(zoneForm && zoneForm.id === z.id) cancelZone();
-    } catch(e){ setZoneMsg(errSay("Not deleted.", e)); }
+    } catch(e){ setZoneMsg(workBusy(e) || errSay("Not deleted.", e)); }
     setZoneBusy(false);
   };
+
+  // 23 Nov 2026 (the "Working" list): "Carry on" on a stopped row. The header's list sends the row here (this page is
+  // where the job runs); the same action runs again with what the row kept, and its batches skip what is done.
+  const carryRef = useRef(null);
+  carryRef.current = async (c) => {
+    if(!c || !canEdit) return;
+    if(c.kind === "route_all") return bulkBake(c);
+    if(c.kind === "hour_times") return hourBake(c);
+    if(c.kind === "route_again"){
+      const all = (c.args && c.args.profiles) || [];
+      return rebakeRoute(c.subject, all.slice(Math.min(c.done || 0, all.length)), !!(c.args && c.args.via_holding), c);
+    }
+    if(c.kind === "zone_reroute"){
+      setZoneBusy(true);
+      try { setZoneMsg((await rebakeAfterZone(null, c)).trim()); }
+      catch(e){ setZoneMsg(workBusy(e) || errSay("Zone re-route stopped.", e)); }
+      setZoneBusy(false);
+    }
+  };
+  useEffect(() => {
+    const run = () => { const c = WORK.carry; if(!c) return; WORK.carry = null; carryRef.current(c); };
+    run();
+    window.addEventListener(WORK_CARRY, run);
+    return () => window.removeEventListener(WORK_CARRY, run);
+  }, []);
 
   // push saved zones to the map
   useEffect(() => {
@@ -20514,22 +20816,24 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               <option value="both">Both legs</option>
               <option value="loaded">Laden leg only</option>
             </select></label>
-            <button type="button" onClick={bulkBake} disabled={routeBusy || !(status && status.length)} data-route-all="1"
+            <button type="button" onClick={bulkBake} disabled={routeBusy || !!work.busy.route_all || !(status && status.length)} data-route-all="1"
               title={rVehicles.length
                 ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
                 : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}>
               {`Route all · ${(rVehicles.length || 1)} vehicle(s)`}
             </button>
             {hourPlan && hourPlan.legs > 0 && (
-              <button type="button" onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}>
+              <button type="button" onClick={hourBake} disabled={routeBusy || !!work.busy.hour_times} data-hour-bake style={{ whiteSpace: "nowrap" }}>
                 {hourDue(hourPlan) ? `Busy-hour times · ${hourDue(hourPlan).here_calls} calls`
                                    : `Busy-hour times again · ${hourPlan.here_calls} calls`}
               </button>
             )}
-            <button type="button" onClick={clearRoutes} disabled={routeBusy || !(status && status.length)} data-clear-routes="1"
+            <button type="button" onClick={clearRoutes} disabled={routeBusy || !!work.running || !(status && status.length)} data-clear-routes="1"
               style={{ color: "var(--red)" }}>
               Clear all routes
             </button>
+            {/* 23 Nov 2026 (the "Working" list, card 3): while a long job runs, the one sentence, from the server */}
+            {work.running && <p className="work-busy" role="status" data-work-busy="routes">{work.running === "route_all" ? work.busy.hour_times : work.busy.route_all}</p>}
             </RoutingMenu>}
           </span>
         </div>
@@ -20656,7 +20960,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 tc-late" style={{ whiteSpace: "nowrap" }} data-label="Vehicles"><VehCount profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap rd-actions tc-late">
                       {canEdit && <>
-                      {bakeBusy === r.id && <span className="text-xs text-slate-500 mr-1" data-route-busy={r.id}>Routing…</span>}
+                      {bakeBusy === r.id && <span className="text-xs text-slate-500 mr-1" data-route-busy={r.id} style={{ display: "inline-block", maxWidth: 190, whiteSpace: "normal", verticalAlign: "middle" }}>{bakeLine}</span>}
                       {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯". REVERSED 11 Nov 2026 (CLOCS card
                           B-F6, John's yes): Route is no longer the row's visible button; it is in the "⋯" and asks first (one
                           click routed the route again at once, replacing its lines and spending routing calls) */}

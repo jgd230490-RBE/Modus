@@ -643,7 +643,11 @@ ok("5c: the strip takes in each abnormal load's own drawn line (phase 3: a fetch
 db.execute("DELETE FROM abnormal_loads WHERE tenant_id = ? AND id IN (?, ?)", (db.current_tenant(), "AL900", "AL901"))
 community._write_meta("running", {}, started_at=community._now())
 r = community.start_refresh(by="x", sync=True, fetchers=FX_FETCH, strip=strip, today=TODAY)
-ok("5: start_refresh refuses while a refresh is running", r["started"] is False and "already running" in r["message"])
+# REVERSED 23 Nov 2026 (claude/working-list, John's yes to the mockup's card 3): the refusal is the "Working" list's one
+# sentence, the same kind included; "a refresh is already running" is gone
+ok("5: start_refresh refuses while a refresh is running", r["started"] is False and "already running" not in r["message"]
+   and r["message"] == "The community places fetch is running. The community places fetch can start when it finishes.",
+   str(r.get("message")))
 community._write_meta("running", {}, started_at="2026-10-14T00:00:00Z")
 ok("5: a 'running' row older than 30 minutes reads as failed (a restart killed it)", community.status()["state"] == "failed")
 r = community.start_refresh(by="x", sync=True, fetchers=FX_FETCH, strip=strip, today=TODAY)

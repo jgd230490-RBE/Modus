@@ -439,7 +439,11 @@ ok("4: sites only (no road route yet): fetched round the sites, and the page say
 cl.refresh(fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
 cl._write_meta("running", cl._detail(cl._meta_row()), started_at=cl._now())
 _again = cl.start_refresh(by="x", fetchers={"download": stub_download(only_2025)})
-ok("4: start_refresh refuses a second run while one is running", _again["started"] is False and "already running" in _again["message"])
+# REVERSED 23 Nov 2026 (claude/working-list, John's yes to the mockup's card 3): the refusal is the "Working" list's one
+# sentence, the same kind included; "a fetch is already running" is gone
+import working as _working  # noqa: E402
+ok("4: start_refresh refuses a second run while one is running", _again["started"] is False
+   and "already running" not in _again["message"] and _again["message"] == _working.sentence("collisions", "collisions"), str(_again.get("message")))
 cl._write_meta("done", cl._detail(cl._meta_row()))
 _sync = cl.start_refresh(by="y", sync=True, fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
 ok("4: ...and starts one otherwise (sync here)", _sync["started"] is True and cl.status()["state"] == "done")
@@ -1427,9 +1431,13 @@ _cm_det = community._detail(community._meta_row()) if community._meta_row() else
 _cl_state = cl.status()["state"]
 community._write_meta("running", {}, started_at=community._now())
 _r13 = cl.start_refresh(by="x", sync=True, fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
+# REVERSED 23 Nov 2026 (claude/working-list, John's yes to the mockup's card 3, which bends PR #180): fetch_guard's two
+# sentences ("The community considerations are being fetched. Fetch the collision history when that has finished.") are
+# the "Working" list's one pattern now, made in working.sentence
 ok("13: the collision fetch refuses while the community fetch runs, in words a person can act on, and marks nothing",
-   _r13["started"] is False and _r13["message"] == fetch_guard.BUSY_WORDS["community"]
-   and "Fetch the collision history when that has finished." in _r13["message"] and cl.status()["state"] == _cl_state,
+   _r13["started"] is False and not hasattr(fetch_guard, "BUSY_WORDS")
+   and _r13["message"] == "The community places fetch is running. The collision history fetch can start when it finishes."
+   and "Fetch the collision history when that has finished." not in _r13["message"] and cl.status()["state"] == _cl_state,
    str(_r13.get("message")))
 community._write_meta("running", {}, started_at="2026-10-14T00:00:00Z")
 _r13b = cl.start_refresh(by="x", sync=True, fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
@@ -1438,17 +1446,21 @@ ok("13: ...a community run older than its stale limit (a dead thread after a res
 community._write_meta("done", _cm_det)
 cl._write_meta("running", cl._detail(cl._meta_row()), started_at=cl._now())
 _r13c = community.start_refresh(by="x", sync=True)
-ok("13: the community fetch refuses while the collision fetch runs, and marks nothing",
-   _r13c["started"] is False and _r13c["message"] == fetch_guard.BUSY_WORDS["collisions"]
+ok("13: the community fetch refuses while the collision fetch runs, and marks nothing",     # REVERSED 23 Nov 2026, as above
+   _r13c["started"] is False
+   and _r13c["message"] == "The collision history fetch is running. The community places fetch can start when it finishes."
    and community.status()["state"] != "running", str(_r13c.get("message")))
 cl._write_meta("done", cl._detail(cl._meta_row()))
 ok("13: the words name no supplier or back end", not re.search(r"Geofabrik|GIAS|NaPTAN|DfT|STATS19|server|thread|memory|API",
-                                                              " ".join(fetch_guard.BUSY_WORDS.values())))
+                                                              " ".join([_r13["message"], _r13c["message"]])))
 _src_cm, _src_cl = read("backend/community.py"), read("backend/collisions.py")
 ok("13: both starters check and mark their run under the ONE shared lock (two presses at once cannot both start)",
    "with fetch_guard.LOCK, _LOCK:" in _src_cm.split("def start_refresh(")[1][:900]
    and "with fetch_guard.LOCK, _LOCK:" in _src_cl.split("def start_refresh(")[1][:900]
-   and 'fetch_guard.other_running("community")' in _src_cm and 'fetch_guard.other_running("collisions")' in _src_cl)
+   # NARROWED 23 Nov 2026 (claude/working-list): the check under the lock is working.refusal (any long job running, the
+   # other fetch included), no longer fetch_guard.other_running
+   and 'fetch_guard.other_running(' not in _src_cm + _src_cl
+   and 'working.refusal("community")' in _src_cm and 'working.refusal("collisions")' in _src_cl)
 ok("13: the technical guide says so (T9, before T10); the user guide carries no back-end word for it",
    'id="t9-one-fetch"' in read("frontend/help/technical/index.html")
    and read("frontend/help/technical/index.html").index('id="t9-one-fetch"') < read("frontend/help/technical/index.html").index('id="t10-public-map"')
