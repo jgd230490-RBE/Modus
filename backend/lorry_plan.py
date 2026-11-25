@@ -1025,13 +1025,31 @@ def supplier_orders_unit(u):
     return {"m3": "m³", "t": "t", "vehicles": "loads"}.get(u or "", u or "")
 
 
-def build_xlsx(data, view, day):
-    """The day's lorries as one sheet: one row a trip (lorry, order, time, route, from, to, load, minutes)."""
+def _pick(blocks, yard=None, vehicle=None, lorry=None):
+    """25 Nov 2026 (card 4): the day's blocks narrowed to one load point, one lorry type and one lorry (driver_pages's
+    filter, for the XLSX); a filter that leaves nothing is refused in words."""
+    if yard in (None, "") and vehicle in (None, "") and lorry in (None, ""):
+        return blocks
+    out = []
+    for b in blocks:
+        if (yard not in (None, "") and str(b.get("yard_id")) != str(yard)) or (vehicle not in (None, "") and b.get("vehicle") != vehicle):
+            continue
+        ls = [r for r in b["lorries"] if lorry in (None, "") or str(r["n"]) == str(lorry)]
+        if ls:
+            out.append(dict(b, lorries=ls))
+    if not out:
+        raise PlanError("No such lorry on that day.")
+    return out
+
+
+def build_xlsx(data, view, day, yard=None, vehicle=None, lorry=None):
+    """The day's lorries as one sheet: one row a trip (lorry, order, time, route, from, to, load, minutes). 25 Nov 2026:
+    `yard`, `vehicle` and `lorry` narrow it as the Driver sheet's download does."""
     from export import openpyxl, Font, PatternFill, Alignment, get_column_letter, NAVY, MISSING
     if openpyxl is None:
         raise RuntimeError("openpyxl is not installed: " + MISSING.get("xlsx", ""))
     import export
-    blocks = day_view(data, view, day)
+    blocks = _pick(day_view(data, view, day), yard, vehicle, lorry)
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Lorry plan"
@@ -1069,5 +1087,11 @@ def build_xlsx(data, view, day):
     return out.getvalue()
 
 
-def file_stem(data, view, day):
-    return f"lorry-plan-{day}-{view}"
+def file_stem(data, view, day, yard=None, lorry=None):
+    """25 Nov 2026: a narrowed download names its load point and lorry."""
+    out = f"lorry-plan-{day}-{view}"
+    if yard not in (None, ""):
+        out += f"-{slug(yard)}"
+    if lorry not in (None, ""):
+        out += f"-lorry-{lorry}"
+    return out
