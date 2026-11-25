@@ -279,8 +279,9 @@ const grow = (el) => act(() => { ROS.filter(r => r.els.includes(el)).forEach(r =
     ok("⭐ DOM: the Best option card is the first thing in the panel's body, with its answer",
        TRY(() => { const first = q('[data-ro="card"]').firstElementChild; return first.classList.contains("bo-card") && first.getAttribute("data-best-option") === "Suggested"
                      && /Alt 1.?Suggested/.test(first.textContent.replace(/\s+/g, " ")); }));
-    ok("⭐ DOM: a Suggested card shows 'Make Alt 1 primary' at once (the route was picked by opening it; an admin login)",
-       TRY(() => q("button[data-bo-promote]").textContent === "Make Alt 1 primary"));
+    // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Use Alt 1 as the main route" (it read "Make Alt 1 primary")
+    ok("⭐ DOM: a Suggested card shows 'Use Alt 1 as the main route' at once (the route was picked by opening it; an admin login)",
+       TRY(() => q("button[data-bo-promote]").textContent === "Use Alt 1 as the main route"));
     ok("⭐ DOM: the settings in order: Vehicles, Near the route, Gates, Temporary haul roads",
        TRY(() => { const t = q('[data-ro="settings"]'); const at = (s) => t.textContent.indexOf(s);
                    return !!t.querySelector('[data-route-vehicles="R001"]') && !!t.querySelector('[data-route-near="R001"]') && !!t.querySelector("[data-route-gates]")
