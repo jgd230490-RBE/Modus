@@ -1107,14 +1107,18 @@ def page_first(doc, pages):
 #  The summary (16 Nov 2026, step 1c; notes\route-best-summary-mockup-1116,  #
 #  John: "Yes, as recommended")                                                #
 # --------------------------------------------------------------------------- #
-SUM_BLUE = "#2563EB"          # the suggested option, in every panel but collisions (S4)
-SUM_GREY = "#94A3B8"          # every other bar, and every collision bar
+SUM_BLUE = "#2563EB"          # the suggested option's column head (S4)
+SUM_GREY = "#94A3B8"          # the route in use's bars and every collision bar (the rule's "grey")
+SUM_INK = "#64748B"           # an option's bar (the rule's "ink"): the file's own grey ink, export.GREY
+SUM_PICK = "#F5F8FE"          # the suggested option's column, a light tint under its cells
+SUM_OK = "#047857"            # a difference on the better side: a dot and its words
+SUM_WARN = "#B45309"          # on the worse side: a diamond and its words
 SUM_LINE = "#E2E8F0"
 SUM_SOFT = "#F8FAFC"
 SUM_TITLE = "Route analysis · Summary"
 SUM_DECIDES = "The planner decides; nothing here changes the plan."
-SUM_NOT_COUNTED = "Not counted yet: not fetched along every option."
-SUM_SHOWN = "Cycle routes and community places are shown, not counted (*): not fetched along every option yet."
+#: 25 Nov 2026: the "(*)" went with the starred figures of "The figures" table (the rows say "Not counted yet")
+SUM_SHOWN = "Cycle routes and community places are shown, not counted: not fetched along every option yet."
 #: 24 Nov 2026 (the Routes page rethink, Q7; John: "Yes, as recommended"): step 3 in the card 4 / 5 words ("A trade-off"
 #: is "Planner to decide"; nothing says ahead, behind or trade); step 2 names the measures (the "People" heading went)
 SUM_STEPS = [("1 · Rule out", "An option that adds a lorry limit below this lorry, or crosses a road closed on the day."),
@@ -1157,196 +1161,307 @@ def _sum_pick(B):
     return next((c["label"] for c in B["cols"] if c.get("chosen")), None)
 
 
-def _sum_bars(doc, x, y, w, B, key, sub=None, pct_key=None, less=False, grey_all=False, fmt=_n, row=8.4):
-    """One group of bars, every bar from zero, on the group's own scale; the suggested option blue unless grey_all
-    (collisions); a ruled-out option hatched. Returns the y below it."""
-    c = doc.c
-    vals = [(c_["counts"].get(key) if sub is None else (c_["counts"].get(key) or {}).get(sub)) for c_ in B["cols"]]
-    mx = max([v for v in vals if v is not None] or [0]) or 1
-    pk = _sum_pick(B)
-    lab_w, pct_w = 30, (44 if pct_key else 0)
-    track = w - lab_w - pct_w - 2
-    for col, v in zip(B["cols"], vals):
-        out = bool(col["ruled_out"])
-        mine = (not grey_all) and pk == col["label"]
-        c.setFillColorRGB(*(_rgb("#94A3B8") if out else NAVY_RGB if mine else GREY))
-        c.setFont(doc.B if mine else doc.R, 6.2)
-        c.drawString(x, y - 6.2, _fit(_pdf_safe(col["label"]), doc.R, 6.2, lab_w - 2))
-        tx = x + lab_w
-        c.setStrokeColorRGB(*_rgb(SUM_GREY)); c.setLineWidth(0.4); c.line(tx, y - 7.6, tx, y - 0.6)
-        bw = 0 if v is None else max(0.0, float(v) / mx * track * 0.78)
-        if bw > 0:
-            if out:
-                c.setFillColorRGB(1, 1, 1); c.setStrokeColorRGB(*_rgb("#CBD5E1")); c.setLineWidth(0.4)
-                c.rect(tx, y - 6.8, bw, 5.4, stroke=1, fill=1)
-                c.setStrokeColorRGB(*_rgb("#E2E8F0"))
-                s = 0
-                while s < bw:
-                    c.line(tx + s, y - 6.8, tx + min(s + 3, bw), y - 1.4)
-                    s += 2.6
-            else:
-                c.setFillColorRGB(*_rgb(SUM_BLUE if mine else SUM_GREY)); c.rect(tx, y - 6.8, bw, 5.4, stroke=0, fill=1)
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.R, 6.2)
-        c.drawString(tx + bw + 2.5, y - 6.2, fmt(v))
-        if pct_key and not col["in_use"]:
-            pw = _pct_words(col["pct"].get(pct_key), less)
-            if pw:
-                c.setFillColorRGB(*GREY); c.setFont(doc.R, 5.9); c.drawRightString(x + w, y - 6.2, pw)
-        y -= row
-    return y
+# --------------------------------------------------------------------------- #
+#  The schedule (25 Nov 2026, the Routes page rethink, Q11 Direction 1; John:  #
+#  "Yes, as recommended"): the six panels and "The figures" are ONE table, a   #
+#  row a measure, a column for the route in use and for each option, every    #
+#  figure with its bar from zero on the row's own scale. The rows, their marks #
+#  and their words are the rule's (route_best.option_rows, an option's         #
+#  "rows"): the page prints them and works nothing out. Two rows are the       #
+#  page's own, figures only and never marked: the other places shown near and  #
+#  the length, which the old table carried and the rule does not compare.      #
+# --------------------------------------------------------------------------- #
+SUM_SCHED = "The options, measure by measure"
+SUM_SCALE = "Every bar starts at zero; each row has its own scale."
+SUM_HEAD = "A round trip"
+SUM_DIFF = "Against the route in use"
+SUM_HOW = "How the answer was reached"
+SUM_SHOWN_ROW = "other places near (shown)"
+SUM_KM_ROW = "Length, km a round trip"
+SUM_OUT = "ruled out"
+SUM_NO_BUSY = "No busy-hour times are worked out for this route."
+SUM_STEP, SUM_PAD = 7.8, 4.4      # a schedule row: a line of 7.8 pt, 4.4 pt of air
+#: the order of the rows (the rule's keys; "shown" and "km" are the page's own)
+SUM_ORDER = ("collisions", "goods", "left_turns", "cycle_meets", "cycle_beside_km", "places", "shown", "round_trip",
+             "trips", "busy_08:00", "busy_17:00", "busy", "carbon", "km", "limits")
+#: a key's figure in an option's counts (a ruled-out option has no rows: its figures are read from its counts, so the
+#: column keeps them as the old page did; pinned equal to the rule's own figures for every option it writes rows for)
+SUM_COUNT_OF = {"collisions": ("collisions", 0), "goods": ("goods", 0), "left_turns": ("left_turns", 0),
+                "cycle_meets": ("cycle_meets", 0), "cycle_beside_km": ("cycle_beside_km", 2), "places": ("places", 0),
+                "round_trip": ("cycle_min", 1), "trips": ("trips", 0), "busy_08:00": ("busy_min", 1),
+                "busy_17:00": ("busy_min", 1), "carbon": ("co2_kg", 1), "km": ("km", 1), "shown": ("shown", 0)}
+#: the rule's labels, for a page where it wrote no rows (every option ruled out, or none stored); pinned equal to
+#: route_best.option_rows' own labels
+SUM_LABELS = {"left_turns": "Left-hand turns", "cycle_meets": "Cycle routes met",
+              "cycle_beside_km": "km beside a cycle route",
+              "places": "Community: schools, hospitals, health centres", "round_trip": "Round trip, min",
+              "trips": "Trips a lorry fits a day", "busy_08:00": "Setting off at 08:00",
+              "busy_17:00": "Setting off at 17:00", "carbon": "Carbon, kg CO₂e a trip"}
 
 
-def _sum_none(doc, x, y, w, words):
-    """A part not counted: said in a dashed box, never drawn as a bar."""
-    c = doc.c
-    lines = _wrap(_pdf_safe(words), doc.R, 6.2, w - 10)
-    h = 8 + len(lines) * 8
-    c.setFillColorRGB(*_rgb(SUM_SOFT)); c.setStrokeColorRGB(*_rgb("#CBD5E1")); c.setLineWidth(0.5); c.setDash(2, 1.6)
-    c.roundRect(x, y - h - 3, w, h, 2.5, stroke=1, fill=1); c.setDash()
-    yy = y - 3 - 4
-    for ln in lines:
-        c.setFillColorRGB(*GREY); c.setFont(doc.R, 6.2); c.drawString(x + 5, yy - 6.2, ln)
-        yy -= 8
-    return y - h - 6
+def _sum_safe(t):
+    """Words for the schedule: the rule's "Config → Map and bulletin" keeps its arrow where the file's font has one
+    (Inter; Helvetica, the fallback, has none and reads "to", as _pdf_safe gives)."""
+    import brand_pdf
+    t = str(t if t is not None else "")
+    return _pdf_safe(t) if brand_pdf.fonts().get("fallback") else t
 
 
-def _sum_panels(B):
-    """The six panels: (title, unit, [(kind, args)], foot) — kind "bars", "sub" (a small heading) or "none"."""
-    cur = B["history"] == "current"
-    P = []
-    if cur:
-        goods = "; ".join(f"{c['label']} {_n(c['counts'].get('goods'))}" for c in B["cols"])
-        P.append(("Collisions on the road", f"recorded, {B['period']}", [("bars", dict(key="collisions", grey_all=True))],
-                  f"{SUM_HGV}: {goods}"))
-    else:
-        P.append(("Collisions on the road", "recorded", [("none", "Not compared: the collision history is out of date for "
-                  "this route." if B["history"] == "out_of_date" else "Not compared: the collision history has not been "
-                  "fetched.")], ""))
-    if B["counted"]:
-        items = [("sub", "Left-hand turns"), ("bars", dict(key="left_turns", pct_key="left_turns"))]
+def _sum_count(col, key):
+    """A column's figure for a row key, from its counts (None where it has none)."""
+    if key not in SUM_COUNT_OF:
+        return None
+    k, _d = SUM_COUNT_OF[key]
+    v = (col.get("counts") or {}).get(k)
+    if key.startswith("busy_"):
+        return (v or {}).get(key[5:]) if isinstance(v, dict) else None
+    if key == "shown":
+        return sum(v.values()) if isinstance(v, dict) else None
+    return v
+
+
+def _sum_text(v, key):
+    return "" if v is None else _n(v, SUM_COUNT_OF.get(key, (None, 1))[1])
+
+
+def schedule(B):
+    """The schedule as data: {"cols", "rows", "diff_col"}. A column: {label, in_use, chosen, out (ruled out)}. A row:
+    {key, label, sub, span (words across every figure cell, or None), cells: one a column {text, v, bar ("grey",
+    "ink", "hatch" or None), mark, words, none}}. `diff_col`: the difference has its own last column (exactly one
+    option, not ruled out, as card 5 draws it); otherwise it sits under each option's figure."""
+    import route_best
+    cols = [dict(label=c["label"], in_use=bool(c["in_use"]), chosen=bool(c.get("chosen")),
+                 out=bool(c.get("ruled_out")), src=c) for c in B["cols"]]
+    opts = [c for c in cols if not c["in_use"]]
+    live = [c for c in opts if not c["out"]]
+    hist = B.get("history") == "current"
+    by = {id(c): {r["key"]: r for r in (c["src"].get("rows") or [])} for c in live}
+    keys = {k for c in live for k in by[id(c)]}
+    hours = {k for k in keys if k.startswith("busy_")}
+    if hours:
+        keys.discard("busy")       # an option with no hour held says so in its own cells of the hour rows
+    has_rows = bool(keys)
+    if not has_rows:
+        # the rule writes no rows (every option ruled out, or none stored): the route in use's figures, and a ruled-out
+        # option's, under the rule's own labels; collisions as counts or the rule's own words why not
+        keys = {"left_turns", "places", "round_trip", "trips", "carbon"}
+        keys |= {"collisions", "goods"} if hist else {"collisions"}
         if B.get("cycle_held"):
-            items += [("sub", "Cycle routes met"), ("bars", dict(key="cycle_meets", pct_key="cycle_meets")),
-                      ("sub", "km beside a cycle route"),
-                      ("bars", dict(key="cycle_beside_km", pct_key="cycle_beside_km", less=True,
-                                    fmt=lambda v: _n(v, 2)))]
-        P.append(("Left-hand turns and cycle routes", "a round trip", items, ""))
-        shown = [c["counts"].get("shown") for c in B["cols"]]
-        foot = ("Other places near, shown: " + "; ".join(f"{c['label']} {sum((s or {}).values())}"
-                                                          for c, s in zip(B["cols"], shown))) if all(
-            isinstance(s, dict) for s in shown) else ""
-        P.append(("Schools, hospitals, health centres", "within 250 m, a round trip",
-                  [("bars", dict(key="places", pct_key="places"))], foot))
-    else:
-        P.append(("Left-hand turns and cycle routes", "a round trip", [("none", SUM_NOT_COUNTED)], ""))
-        P.append(("Schools, hospitals, health centres", "within 250 m", [("none", SUM_NOT_COUNTED)], ""))
-    hw = lambda head: next((f"{c['label']}: {c['head_words'].get(head)}" for c in B["cols"]
-                            if (c.get("chosen") or c.get("traded")) and c["head_words"].get(head)
-                            and c["head_words"].get(head) != "not counted"), "")
-    trips = "Trips a lorry fits a day: " + "; ".join(f"{c['label']} {_n(c['counts'].get('trips'))}" for c in B["cols"])
-    P.append(("Time", "minutes, one round trip with loading", [("bars", dict(key="cycle_min"))],
-              trips + ("\n" + hw("time") if hw("time") else "")))
-    use_busy = any((c["counts"].get("busy_min") or {}).get(h) is not None for c in B["cols"] if c["in_use"]
-                   for h in RA.BUSY_HOURS)
-    if B.get("busy_held"):
-        items = []
-        for h in RA.BUSY_HOURS:
-            items += [("sub", f"Setting off at {h}"), ("bars", dict(key="busy_min", sub=h))]
-        P.append(("Busy hours", "minutes, one round trip", items, hw("busy")))
-    else:
-        P.append(("Busy hours", "minutes, one round trip", [("none", "Not compared: busy-hour times are held for the "
-                  "route in use only." if use_busy else "No busy-hour times are worked out for this route.")], ""))
-    P.append(("Carbon", "kg CO₂e, one round trip", [("bars", dict(key="co2_kg"))], hw("carbon")))
-    return P
-
-
-def _sum_draw_panel(doc, x, y, w, h, panel, B, row):
-    c = doc.c
-    t, u, items, foot = panel
-    c.setStrokeColorRGB(*_rgb(SUM_LINE)); c.setLineWidth(0.6); c.roundRect(x, y - h, w, h, 3, stroke=1, fill=0)
-    ix, iw = x + 5, w - 10
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 7); c.drawString(ix, y - 9.5, _pdf_safe(_fit(t, doc.B, 7, iw)))
-    c.setFillColorRGB(*GREY); c.setFont(doc.R, 5.9); c.drawString(ix, y - 16.5, _pdf_safe(_fit(u, doc.R, 5.9, iw)))
-    yy = y - 20
-    for kind, a in items:
-        if kind == "sub":
-            c.setFillColorRGB(*GREY); c.setFont(doc.R, 5.8); c.drawString(ix, yy - 6.4, _pdf_safe(a)); yy -= 8.4
-        elif kind == "none":
-            yy = _sum_none(doc, ix, yy, iw, a)
-        else:
-            yy = _sum_bars(doc, ix, yy, iw, B, row=row, **a)
-    for part in (foot or "").split("\n"):
-        if part:
-            yy = doc.para(part, ix, yy - 1, iw, 5.9, GREY)
-    return yy
-
-
-def _sum_table(doc, x, y, w, B):
-    """The figures: the route in use and each option, a row a measure; percentages beside cycle routes, left turns and
-    places only; collisions as counts (S4: no tint and no word on them)."""
-    c = doc.c
-    cols = B["cols"]
-    pk = _sum_pick(B)
-    star = "" if B["counted"] else "*"
-    lab_w = min(150, w * 0.42)
-    cw = (w - lab_w) / max(1, len(cols))
-    fs = 6.6 if len(cols) <= 4 else 5.8
-    # header
-    hh = 20 if any(col["ruled_out"] for col in cols) else 13
-    c.setFillColorRGB(*BAND); c.rect(x, y - hh, w, hh, stroke=0, fill=1)
-    for j, col in enumerate(cols):
-        cx = x + lab_w + cw * (j + 1) - 3
-        if pk == col["label"]:
-            c.setFillColorRGB(*_rgb("#DBEAFE")); c.rect(x + lab_w + cw * j, y - hh, cw, hh, stroke=0, fill=1)
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, fs); c.drawRightString(cx, y - 9, _pdf_safe(col["label"]))
-        if col["ruled_out"]:
-            c.setFillColorRGB(*GREY); c.setFont(doc.R, 5.6); c.drawRightString(cx, y - 17, "ruled out")
-    y -= hh + 1
+            keys |= {"cycle_meets", "cycle_beside_km"}
+        hours = {f"busy_{h}" for h in RA.BUSY_HOURS if any(_sum_count(c["src"], f"busy_{h}") is not None for c in cols)}
+        keys |= hours or {"busy"}
+    if all(isinstance((c["src"].get("counts") or {}).get("shown"), dict) for c in cols):
+        keys.add("shown")
+    keys.add("km")
     rows = []
-    if B["history"] == "current":
-        rows.append((f"Collisions on the road, {B['period']}", lambda k: _n(k["counts"].get("collisions")), None))
-        rows.append(("   " + SUM_HGV[0].lower() + SUM_HGV[1:], lambda k: _n(k["counts"].get("goods")), None))
-    else:
-        rows.append(("Collisions on the road", lambda k: "not compared", None))
+    for key in (k for k in SUM_ORDER if k in keys):
+        first = next((by[id(c)][key] for c in live if key in by[id(c)] and by[id(c)][key].get("none") is None), None)
+        anyrow = first or next((by[id(c)][key] for c in live if key in by[id(c)]), None)
+        if anyrow:
+            label, sub = anyrow["label"], bool(anyrow.get("sub"))
+        elif key == "collisions":
+            label, sub = (f"{route_best.ROW_COLLISIONS}, {B['period']}" if B.get("period") else route_best.ROW_COLLISIONS), False
+        elif key == "goods":
+            label, sub = route_best.HGV_WORDS, True
+        elif key == "shown":
+            label, sub = SUM_SHOWN_ROW, True
+        elif key == "km":
+            label, sub = SUM_KM_ROW, False
+        elif key == "busy":
+            label, sub = "Busy hours", False
+        else:
+            label, sub = SUM_LABELS.get(key, key), False
+        cells = []
+        for c in cols:
+            cell = {"text": "", "v": None, "bar": None, "mark": None, "words": "", "none": None}
+            if c["in_use"]:
+                if first is not None:
+                    cell.update(text=first["in_use_text"], v=first["in_use"], bar="grey")
+                elif key in ("shown", "km") or (not has_rows and key in SUM_COUNT_OF
+                                                and (hist or key not in ("collisions", "goods"))):
+                    v = _sum_count(c["src"], key)
+                    cell.update(text=_sum_text(v, key), v=v, bar="grey" if v is not None else None)
+            elif c["out"] or not by[id(c)]:
+                # a ruled-out option (hatched), or one left in with no rows: its figures from its counts, never marked
+                if key in SUM_COUNT_OF and (hist or key not in ("collisions", "goods")):
+                    v = _sum_count(c["src"], key)
+                    kind = "hatch" if c["out"] else "grey" if key in ("collisions", "goods") else "ink"
+                    cell.update(text=_sum_text(v, key), v=v, bar=kind if v is not None else None)
+            else:
+                r = by[id(c)].get(key)
+                if r is None and key.startswith("busy_"):
+                    r = by[id(c)].get("busy")
+                if r is None and key in ("shown", "km"):
+                    v = _sum_count(c["src"], key)
+                    cell.update(text=_sum_text(v, key), v=v, bar="ink" if v is not None else None)
+                elif r is not None and r.get("none") is not None:
+                    cell["none"] = r["none"]
+                elif r is not None and r.get("key") == key:
+                    cell.update(text=r["option_text"], v=r["option"], bar=r.get("bars"), mark=r["mark"],
+                                words=r.get("words") or "")
+            cells.append(cell)
+        # a measure no column has a figure for: said once across the figure cells where every option says the same
+        span = None
+        if not has_rows and key == "busy":
+            span = SUM_NO_BUSY
+        elif not has_rows and key == "collisions" and not hist:
+            span = (route_best.ROW_STALE if B.get("history") == "out_of_date" else route_best.NO_HISTORY_WORDS)
+        else:
+            nones = {cells[j]["none"] for j, c in enumerate(cols) if not c["in_use"]}
+            if (len(nones) == 1 and None not in nones and not any(c["out"] for c in opts)
+                    and all(cl["v"] is None for cl in cells)):
+                span = nones.pop()
+        rows.append({"key": key, "label": label, "sub": sub, "span": span, "cells": cells})
+    return {"cols": [{k: c[k] for k in ("label", "in_use", "chosen", "out")} for c in cols], "rows": rows,
+            "diff_col": len(opts) == 1 and len(live) == 1}
 
-    def withpct(key, d=1, less=False):
-        def f(k):
-            v = k["counts"].get(key)
-            return (_n(v, d) + star) if v is not None else "–"
-        return f, (lambda k: _pct_words(k["pct"].get(key), less) if not k["in_use"] else "")
-    for lab, key, d, less in (("Left-hand turns, a round trip", "left_turns", 1, False),
-                              ("Cycle routes met", "cycle_meets", 1, False),
-                              ("km beside a cycle route", "cycle_beside_km", 2, True),
-                              ("Schools, hospitals, health centres, 250 m", "places", 1, False)):
-        if key in ("cycle_meets", "cycle_beside_km") and not B.get("cycle_held"):
-            continue
-        f, p = withpct(key, d, less)
-        rows.append((lab, f, p))
-    if all(isinstance(k["counts"].get("shown"), dict) for k in cols):
-        rows.append(("   other places near (shown)", lambda k: _n(sum(k["counts"]["shown"].values())) + star, None))
-    rows += [("Round trip with loading, min", lambda k: _n(k["counts"].get("cycle_min")), None),
-             ("Trips a lorry fits a day", lambda k: _n(k["counts"].get("trips")), None)]
-    for h in RA.BUSY_HOURS:
-        if any((k["counts"].get("busy_min") or {}).get(h) is not None for k in cols):
-            rows.append((f"Setting off at {h}, min", lambda k, h=h: _n((k["counts"].get("busy_min") or {}).get(h)), None))
-    rows += [("Carbon, kg CO₂e a round trip", lambda k: _n(k["counts"].get("co2_kg")), None),
-             ("Length, km a round trip", lambda k: _n(k["counts"].get("km")), None)]
-    for lab, f, p in rows:
-        rh = 15.5 if p and any(p(k) for k in cols) else 10.5
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.R, fs)
-        c.drawString(x + 2, y - 7.4, _pdf_safe(_fit(lab, doc.R, fs, lab_w - 4)))
-        for j, k in enumerate(cols):
-            cx = x + lab_w + cw * (j + 1) - 3
-            c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B if pk == k["label"] else doc.R, fs)
-            c.drawRightString(cx, y - 7.4, _pdf_safe(f(k)))
-            if p:
-                pw = p(k)
-                if pw:
-                    c.setFillColorRGB(*GREY); c.setFont(doc.R, 5.6); c.drawRightString(cx, y - 13.6, pw)
+
+def _sum_wrap(t, font, size, width):
+    from reportlab.lib.utils import simpleSplit
+    return simpleSplit(_sum_safe(t), font, size, width)
+
+
+def _sum_shape(c, x, y, mark):
+    """The status shape before a difference's words: a dot for the mark "ok", a diamond for "warn"."""
+    if mark == "ok":
+        c.setFillColorRGB(*_rgb(SUM_OK)); c.circle(x + 2.4, y + 2.2, 2.2, stroke=0, fill=1)
+    elif mark == "warn":
+        c.setFillColorRGB(*_rgb(SUM_WARN))
+        p = c.beginPath()
+        if p is None:              # the measuring pass draws nothing (_NoCanvas)
+            return
+        p.moveTo(x + 2.4, y + 4.8); p.lineTo(x + 4.8, y + 2.2); p.lineTo(x + 2.4, y - 0.4)
+        p.lineTo(x, y + 2.2); p.close(); c.drawPath(p, stroke=0, fill=1)
+
+
+def _sum_words(doc, x, y, mark, words, size=6.4):
+    """A difference: the shape and the rule's words (green for "ok", amber for "warn"), plain words otherwise."""
+    c = doc.c
+    if not words:
+        return
+    if mark in ("ok", "warn"):
+        _sum_shape(c, x, y, mark)
+        c.setFillColorRGB(*_rgb(SUM_OK if mark == "ok" else SUM_WARN)); c.setFont(doc.R, size)
+        c.drawString(x + 7.5, y, _pdf_safe(words))
+    else:
+        c.setFillColorRGB(*(NAVY_RGB if mark == "plain" else GREY)); c.setFont(doc.R, size)
+        c.drawString(x, y, _pdf_safe(words))
+
+
+def _sum_bar(c, x, y, w, kind):
+    if w <= 0:
+        return
+    if kind == "hatch":
+        c.setFillColorRGB(1, 1, 1); c.setStrokeColorRGB(*_rgb("#CBD5E1")); c.setLineWidth(0.4)
+        c.rect(x, y, w, 5, stroke=1, fill=1)
+        c.setStrokeColorRGB(*_rgb("#CBD5E1"))
+        s = 0
+        while s < w:
+            c.line(x + s, y, x + min(s + 3, w), y + 5)
+            s += 2.6
+    else:
+        c.setFillColorRGB(*_rgb(SUM_INK if kind == "ink" else SUM_GREY))
+        c.roundRect(x, y, w, 5, 1.2, stroke=0, fill=1)
+
+
+def _sum_schedule(doc, x, y, w, B):
+    """Draws the schedule; returns the y below it."""
+    c = doc.c
+    S = schedule(B)
+    cols, rows = S["cols"], S["rows"]
+    nc = len(cols)
+    lab_w = 168
+    diff_w = 112 if S["diff_col"] else 0
+    cw = (w - lab_w - diff_w) / max(1, nc)
+    num_w = 30
+    bar_max = min(170.0, cw - num_w - 10)
+    fs = 7.0 if nc <= 4 else 6.4
+    pk = _sum_pick(B)
+    out_any = any(col["out"] for col in cols)
+    hh = 21 if out_any else 13
+    # the head: the band, the suggested option's column headed in blue (as before)
+    c.setFillColorRGB(*BAND); c.rect(x, y - hh, w, hh, stroke=0, fill=1)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, fs); c.drawString(x + 2, y - 9, SUM_HEAD)
+    for j, col in enumerate(cols):
+        cx = x + lab_w + cw * j
+        if col["chosen"]:
+            c.setFillColorRGB(*_rgb("#DBEAFE")); c.rect(cx, y - hh, cw, hh, stroke=0, fill=1)
+        c.setFillColorRGB(*(_rgb(SUM_BLUE) if col["chosen"] else NAVY_RGB)); c.setFont(doc.B, fs)
+        c.drawString(cx + 4, y - 9, _pdf_safe(_fit(col["label"], doc.B, fs, cw - 6)))
+        if col["out"]:
+            c.setFillColorRGB(*GREY); c.setFont(doc.R, 6); c.drawString(cx + 4, y - 17.5, SUM_OUT)
+    if diff_w:
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, fs); c.drawString(x + w - diff_w + 4, y - 9, SUM_DIFF)
+    y -= hh
+    under = not S["diff_col"]
+    for r in rows:
+        # the row's height: a line, a second for words under a figure, more for words that wrap in a cell
+        n_lines = 1
+        if under and any(cl["words"] for cl in r["cells"]):
+            n_lines = 2
+        if r["span"] is None:
+            for cl in r["cells"]:
+                if cl["none"]:
+                    n_lines = max(n_lines, len(_sum_wrap(cl["none"], doc.R, 6.2, cw - 8)))
+        rh = SUM_PAD + n_lines * SUM_STEP
+        if r["span"] is not None:
+            rh = SUM_PAD + len(_sum_wrap(r["span"], doc.R, 6.4, w - lab_w - 8)) * SUM_STEP
+        # the label
+        c.setFillColorRGB(*(GREY if r["sub"] else NAVY_RGB)); c.setFont(doc.R, fs)
+        lx = x + (12 if r["sub"] else 2)
+        c.drawString(lx, y - 8.6, _pdf_safe(_fit(r["label"], doc.R, fs, lab_w - (lx - x) - 4)))
+        if pk and r["span"] is None:
+            j = next(j for j, col in enumerate(cols) if col["chosen"])
+            c.setFillColorRGB(*_rgb(SUM_PICK)); c.rect(x + lab_w + cw * j, y - rh, cw, rh, stroke=0, fill=1)
+        if r["span"] is not None:
+            yy = y
+            for ln in _sum_wrap(r["span"], doc.R, 6.4, w - lab_w - 8):
+                c.setFillColorRGB(*GREY); c.setFont(doc.R, 6.4); c.drawString(x + lab_w + 4, yy - 8.6, ln); yy -= SUM_STEP
+        else:
+            vals = [cl["v"] for cl in r["cells"] if cl["v"] is not None and cl["bar"]]
+            mx = max([float(v) for v in vals] or [0]) or 1.0
+            for j, (col, cl) in enumerate(zip(cols, r["cells"])):
+                cx = x + lab_w + cw * j
+                if cl["none"]:
+                    yy = y
+                    for ln in _sum_wrap(cl["none"], doc.R, 6.2, cw - 8):
+                        c.setFillColorRGB(*GREY); c.setFont(doc.R, 6.2); c.drawString(cx + 4, yy - 8.6, ln); yy -= SUM_STEP
+                    continue
+                if cl["v"] is None:
+                    c.setFillColorRGB(*GREY); c.setFont(doc.R, fs)
+                    c.drawRightString(cx + num_w, y - 8.6, _pdf_safe(cl["text"] or "–"))
+                    continue
+                c.setFillColorRGB(*(GREY if col["out"] else NAVY_RGB))
+                c.setFont(doc.B if col["chosen"] else doc.R, fs)
+                c.drawRightString(cx + num_w, y - 8.6, _pdf_safe(cl["text"]))
+                bw = max(0.0, float(cl["v"]) / mx * bar_max)
+                if bw > 0:
+                    _sum_bar(c, cx + num_w + 4, y - 9.2, max(bw, 1.0), cl["bar"])
+                if under and cl["words"]:
+                    _sum_words(doc, cx + num_w + 4, y - 8.6 - SUM_STEP, cl["mark"], cl["words"], 6.2)
+            if S["diff_col"]:
+                cl = next(cl for col, cl in zip(cols, r["cells"]) if not col["in_use"])
+                if not cl["none"]:
+                    _sum_words(doc, x + w - diff_w + 4, y - 8.6, cl["mark"], cl["words"])
         c.setStrokeColorRGB(*_rgb(SUM_LINE)); c.setLineWidth(0.4); c.line(x, y - rh + 0.5, x + w, y - rh + 0.5)
+        if r["span"] is None:      # the columns' thin rules, so a figure reads with its column (none across a span)
+            for j in range(1, nc + (1 if diff_w else 0)):
+                c.line(x + lab_w + cw * j, y, x + lab_w + cw * j, y - rh + 0.5)
         y -= rh
-    if not B["counted"]:
-        y = doc.para("* shown, not counted toward the answer.", x, y - 2, w, 5.9, GREY)
     return y
+
+
+def _sum_how_line():
+    """"How the answer was reached" as one line in SUM_STEPS' own words: "1 Rule out an option … → 2 Compare each … →
+    3 Clearly better …" (card 5)."""
+    parts = []
+    for ttl, t in SUM_STEPS:
+        n, name = ttl.split(" · ")
+        if name == "Answer":
+            parts.append(f"{n} {t}")
+        else:
+            parts.append(f"{n} {name} {t[0].lower()}{t[1:]}".rstrip("."))
+    return " → ".join(parts)
 
 
 #: 17 Nov 2026 (the live check, finding 1; John: "Yes, as recommended"): no reason may push the page's content off the
@@ -1472,57 +1587,23 @@ def _sum_lower_h(doc, B):
 
 
 def _sum_lower(doc, y, B):
-    """The summary page from "At a glance" down; returns the lowest y drawn."""
+    """The summary page from the schedule down; returns the lowest y drawn."""
     c, m = doc.c, doc.m
-    # two columns: the panels (left), the figures (right)
-    lw = doc.cw * 0.56
-    rx, rw = m + lw + 16, doc.cw - lw - 16
     y -= 4
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9); c.drawString(m, y - 9, "At a glance")
-    key = "Every bar starts at zero; each panel has its own scale."
-    c.setFillColorRGB(*GREY); c.setFont(doc.R, 6.2); c.drawString(m + 58, y - 9, key)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9); c.drawString(m, y - 9, SUM_SCHED)
+    kx = m + _w(SUM_SCHED, doc.B, 9) + 10
+    c.setFillColorRGB(*GREY); c.setFont(doc.R, 6.2); c.drawString(kx, y - 9, SUM_SCALE)
     if _sum_pick(B):
-        kx = m + 58 + _w(key, doc.R, 6.2) + 10
-        c.setFillColorRGB(*_rgb(SUM_BLUE)); c.rect(kx, y - 9, 10, 5.4, stroke=0, fill=1)
+        kx += _w(SUM_SCALE, doc.R, 6.2) + 10
+        c.setFillColorRGB(*_rgb("#DBEAFE")); c.rect(kx, y - 10, 10, 6.4, stroke=0, fill=1)
         c.setFillColorRGB(*GREY); c.drawString(kx + 13, y - 9, "The suggested option")
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9); c.drawString(rx, y - 9, "The figures")
-    ty = _sum_table(doc, rx, y - 14, rw, B)
-    y -= 14
-    panels = _sum_panels(B)
-    ncol = len(B["cols"])
-    row = 8.4 if ncol <= 4 else 7.0
-    pw, gap = (lw - 2 * 6) / 3, 6
-    for r0 in (0, 3):
-        trio = panels[r0:r0 + 3]
-        hs = []
-        for p in trio:
-            t, u, items, foot_ = p
-            h = 22 + sum(8.4 if k == "sub" else ncol * row if k == "bars" else
-                         (8 + len(_wrap(_pdf_safe(a), doc.R, 6.2, pw - 20)) * 8 + 6) for k, a in items)
-            for part in (foot_ or "").split("\n"):
-                if part:
-                    h += len(_wrap(_pdf_safe(part), doc.R, 5.9, pw - 10)) * 8.1 + 1
-            hs.append(h + 4)
-        ph = max(hs)
-        for j, p in enumerate(trio):
-            _sum_draw_panel(doc, m + j * (pw + gap), y, pw, ph, p, B, row)
-        y -= ph + gap
-    y = min(y, ty) - 4
-    # how the answer was reached, and how to read the page
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9); c.drawString(m, y - 9, "How the answer was reached"); y -= 13
-    sw = (doc.cw - 2 * 14) / 3
-    lines = [_wrap(_pdf_safe(t), doc.R, 6.4, sw - 12) for _, t in SUM_STEPS]
-    sh = 15 + max(len(l) for l in lines) * 8
-    for j, ((ttl, _t), ls) in enumerate(zip(SUM_STEPS, lines)):
-        sx = m + j * (sw + 14)
-        c.setStrokeColorRGB(*_rgb(SUM_LINE)); c.setLineWidth(0.6); c.roundRect(sx, y - sh, sw, sh, 3, stroke=1, fill=0)
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 6.8); c.drawString(sx + 6, y - 9, ttl)
-        yy = y - 11
-        for ln in ls:
-            c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.R, 6.4); c.drawString(sx + 6, yy - 6.6, ln); yy -= 8
-        if j < 2:
-            c.setFillColorRGB(*GREY); c.setFont(doc.R, 9); c.drawCentredString(sx + sw + 7, y - sh / 2 - 3, "→")
-    y -= sh + 6
+    y = _sum_schedule(doc, m, y - 14, doc.cw, B) - 6
+    # how the answer was reached: one line in the steps' own words (card 5)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9); c.drawString(m, y - 9, SUM_HOW); y -= 12
+    from reportlab.lib.utils import simpleSplit
+    for ln in simpleSplit(_sum_safe(_sum_how_line()), doc.R, 6.6, doc.cw):
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.R, 6.6); c.drawString(m, y - 6.6, ln); y -= 8.8
+    y -= 5
     c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9); c.drawString(m, y - 9, "How to read this page"); y -= 13
     half = doc.cw / 2
     for j in range(0, len(SUM_READ), 2):
@@ -1541,7 +1622,15 @@ SUMMARY_SHEET_HEAD = ["Route", "Option", "Answer", "Why", "Ruled out by", "Colli
                       "Cycle routes met, %", "km beside a cycle route", "km beside, %",
                       "Schools, hospitals, health centres (250 m)", "Those places, %", "Other places near (shown)",
                       "Round trip with loading, min", "Trips a day", "Setting off 08:00, min", "Setting off 17:00, min",
-                      "kg CO2e a round trip", "km a round trip", "Cycle and places counted"]
+                      "kg CO2e a round trip", "km a round trip", "Cycle and places counted", SUM_DIFF]
+
+
+def diff_words(col):
+    """An option's differences in the rule's own words, measure by measure ("Left-hand turns: 13 more; …"), for the
+    Summary sheet's last column (25 Nov 2026, Q11): from its schedule rows, so the sheet and the page say the same;
+    empty for the route in use and a ruled-out option (which has no rows)."""
+    return "; ".join(f"{r['label']}: {r['words']}" for r in (col.get("rows") or []) if r.get("words")
+                     and r.get("none") is None)
 
 
 def summary_rows(R):
@@ -1565,7 +1654,7 @@ def summary_rows(R):
                     c.get("left_turns"), p.get("left_turns"), c.get("cycle_meets"), p.get("cycle_meets"),
                     c.get("cycle_beside_km"), p.get("cycle_beside_km"), c.get("places"), p.get("places"),
                     sum(shown.values()) if isinstance(shown, dict) else None, c.get("cycle_min"), c.get("trips"),
-                    bm.get("08:00"), bm.get("17:00"), c.get("co2_kg"), c.get("km"), cnt])
+                    bm.get("08:00"), bm.get("17:00"), c.get("co2_kg"), c.get("km"), cnt, diff_words(k) or None])
     return out
 
 
@@ -1734,7 +1823,8 @@ def build_xlsx(D):
     for j, t in enumerate(SUMMARY_SHEET_HEAD, 1):
         cell = ws.cell(row=4, column=j, value=t)
         cell.font, cell.fill = head, fill
-        ws.column_dimensions[get_column_letter(j)].width = {1: 10, 2: 22, 3: 22, 4: 60, 5: 40}.get(j, 14)
+        ws.column_dimensions[get_column_letter(j)].width = {1: 10, 2: 22, 3: 22, 4: 60, 5: 40,
+                                                                  len(SUMMARY_SHEET_HEAD): 70}.get(j, 14)
     for i, r in enumerate((r for R in D["routes"] for r in summary_rows(R)), 5):
         for j, v in enumerate(r, 1):
             ws.cell(row=i, column=j, value=v)
