@@ -507,6 +507,22 @@ ok("6f. bulletin: a figure kept to one decimal splits in tenths that add up (5.3
    _BDt._tl_split(5.3, 5, 2.66, 2.64) == "(2.7 in, 2.6 out)", _BDt._tl_split(5.3, 5, 2.66, 2.64))
 ok("6g. bulletin: a busiest-day figure (not in + out) keeps each half rounded on its own",
    _BDt._tl_split(40.0, 50, 17.6, 14.6) == "(18 in, 15 out)", _BDt._tl_split(40.0, 50, 17.6, 14.6))
+# 24 Nov 2026 (public map lines rethink, card 7; seen on live: the B6047 limit's own card "159 … 81 in, 77 out", 158):
+# the public map's limit card reads the bulletin's own split, so the card and the bulletin's row are one sum
+ok("⭐ 6h. card 7: tl_split_parts is the bulletin's split as numbers; 81.3 in + 77.3 out = 158.6 reads 159 = 82 + 77",
+   _BDt.tl_split_parts(158.6, 150, 81.3, 77.3) == (82, 77) and _BDt.tl_split_parts(32.2, 150, 17.6, 14.6) == (18, 14)
+   and _BDt.tl_split_parts(5.3, 5, 2.66, 2.64) == (0.27e1, 0.26e1) and _BDt.tl_split_parts(40.0, 50, 17.6, 14.6) == (18, 15),
+   str(_BDt.tl_split_parts(158.6, 150, 81.3, 77.3)))
+ok("⭐ 6h. the public read gives a movements limit's month in_shown / out_shown from that split; the map's card prints them",
+   'v["in_shown"], v["out_shown"] = bulletin_doc.tl_split_parts(' in M
+   and "${tlimIO(r, 'in')} in, ${tlimIO(r, 'out')} out" in read("map/index.html"))
+# (the public read itself needs FastAPI, which this venv stubs: the same call on the staff summary's month, as main does it)
+_m6h = sp["limits"][0]["months"][str(NOV27)]
+_io6h = _BDt.tl_split_parts(_m6h["value"], sp["limits"][0]["limit"]["value"], _m6h["in_per_day"], _m6h["out_per_day"])
+ok("⭐ 6h. Main Street in Nov 2027: 21.5 (16.5 in, 5 out) against 21 reads 22 = 17 in + 5 out (rounded apart: 17 + 5 too, but by the rule)",
+   _io6h == (17, 5) and sum(_io6h) == int(_BDt._tl_value(_m6h["value"], 21)), str(_io6h))
+ok("🔴 6h. the limit card no longer rounds in and out apart ('${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out' gone)",
+   "${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out" not in read("map/index.html"))
 _bad = []
 for _i in range(0, 400):
     for _o in (0.0, 0.25, 0.5, 0.49, 3.75, 14.6, 61.95):

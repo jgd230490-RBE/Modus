@@ -3064,7 +3064,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   const end = code.indexOf("\n    }\n", code.indexOf("map.on('mouseleave', 'area-fill'", start)) + 7;
   const blk = start >= 0 && end > start ? code.slice(start, end) : "";
   ok("§2.2b: the council block is in the page (AREAS, the ramp, the layers, the card)", blk.length > 2000
-     && /function areaFillExpr\(mode\)/.test(blk) && /function areaCardHTML\(a, payload, when\)/.test(blk)
+     && /function areaFillExpr\(mode\)/.test(blk) && /function councilCardHTML\(a, payload, when\)/.test(blk)   // NARROWED 24 Nov 2026: renamed (areaCardHTML was declared twice)
      && /function ensureAreaLayers\(\)/.test(blk) && /function setupAreaCard\(\)/.test(blk));
   // its OWN group and boxes, outside "Disruption zones", off by default
   const gStart = html.indexOf('<div class="control-group" id="council-group" hidden>');
@@ -3196,7 +3196,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("🔴 §2.2b: ...and never a hard-coded dataset's lines (another tenant's boundaries must not be credited to ONS)",
      !/Office for National Statistics|Crown copyright/.test(code.replace(/function osCredit\(year\) \{[^\n]*\}/, "")));   // NARROWED 28 Oct 2026 (8b): OS's own credit for OS's own map, osCredit(), is the one place the words appear
   // the card, as the page builds it
-  const card = new Function((blk.match(/function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaCardHTML;")();
+  // 24 Nov 2026 (John's "Yes, both", the A2 addition to card 7): the council card shares its in / out by the page's
+  // wholeWords (section_select.share_whole's rule), which lives beside the road-load block
+  const WHOLE_SRC = (html.match(/function wholeShare\(cells, total\) \{[\s\S]*?\n    \}\n    function wholeWords\(cells, total\) \{[\s\S]*?\n    \}/) || [""])[0];
+  const card = new Function(WHOLE_SRC + "\n" + (blk.match(/function councilCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return councilCardHTML;")();   // NARROWED 24 Nov 2026: renamed
   const A = { area_id: "E07000131", name: "Harborough", tier: "district", tier_words: "local authority district",
               source: "ONS Local Authority Districts (May 2026) Boundaries UK BSC", highway_authority: "Leicestershire County Council",
               movements_per_day: 12.34, routes: ["R001", "R002"], return_only_routes: ["R009"], co2_t: 30.5, co2_t_per_day: 1.39,
@@ -3206,10 +3209,39 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("⭐ §2.2b: the per-council card: the name, the tier and the highway authority, movements with the rule, CO2e of the month's total",
      ch.includes("Harborough") && ch.includes("Local authority district") && ch.includes("highway authority: Leicestershire County Council")
      // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default)
-     && ch.includes("Lorry movements a day") && ch.includes("<b>12.3</b>") && ch.includes("2 of the 18 routes with approved volume in Oct 2026 enter it laden")
+     // REVERSED 24 Nov 2026 (John's "Yes, both", card 7's rule on the council card): whole movements, 12.34 reads 12 (it read 12.3)
+     && ch.includes("Lorry movements a day") && ch.includes("<b>12</b>") && !ch.includes("<b>12.3</b>") && ch.includes("2 of the 18 routes with approved volume in Oct 2026 enter it laden")
      && ch.includes("1 more run back through it empty") && ch.includes("A lorry coming and going is 2 movements, as councils count them.")
      && !ch.includes("two-way")
      && ch.includes("30.5 t of 482 t") && ch.includes("split by the km inside") && ch.includes("Lorry-km in Oct 2026"), ch);
+  {
+    // 24 Nov 2026 (John's "Yes, both"): the council card's in and out are whole numbers that add up to its figure
+    const W = new Function(WHOLE_SRC + "\nreturn { wholeShare, wholeWords };")();
+    const io2 = card(Object.assign({}, A, { movements_per_day: 158.62, in_per_day: 81.4, out_per_day: 77.22 }), P, "Apr 2027");
+    ok("⭐ card 7 (A2 addition): the council card reads whole movements and its in / out add up to them: 158.62 = 81.4 + 77.22 reads '159', '82 in, 77 out' (it read 158.6, 81.4 in, 77.2 out)",
+       io2.includes("<b>159</b>") && io2.includes("82 in, 77 out · ") && !/\d\.\d in,/.test(io2), io2.slice(0, 400));
+    const io3 = card(Object.assign({}, A, { movements_per_day: 1.4, in_per_day: 1.1, out_per_day: 0.3 }), P, "Apr 2027");
+    ok("card 7 (A2 addition): ...a leg above nothing that reads 0 says 'under 1' (1.4 = 1.1 + 0.3: '1', '1 in, under 1 out')",
+       io3.includes("<b>1</b>") && io3.includes("1 in, under 1 out · "), io3.slice(0, 400));
+    const io4 = card(Object.assign({}, A, { movements_per_day: 0.6, in_per_day: 0.3, out_per_day: 0.3 }), P, "Apr 2027");
+    ok("card 7 (A2 addition): ...a figure under one reads 'under 1', its legs 'under 1' each, never '1 in' under it",
+       io4.includes("<b>under 1</b>") && io4.includes("under 1 in, under 1 out · "), io4.slice(0, 400));
+    ok("⭐ card 7 (A2 addition): the page's wholeShare is section_select.share_whole: 59.56 + 59.56 reads 60 + 59; 1.8 + 0 + 0.3 + 0.3 reads 2, 0, 0, 0; adds up over 300 random rows",
+       !!WHOLE_SRC && JSON.stringify(W.wholeShare([59.56, 59.56], 119.12)) === "[60,59]"
+       && JSON.stringify(W.wholeShare([1.8, 0, 0.3, 0.3], 2.4)) === "[2,0,0,0]"
+       && JSON.stringify(W.wholeShare([0.6, 0.6, 0.6], 1.8)) === "[1,1,0]"
+       && JSON.stringify(W.wholeWords([0.3, 0.3], 0.6)) === '["under 1","under 1"]'
+       && (() => { let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+                   for (let k = 0; k < 300; k++) { const c = Array.from({ length: 1 + Math.floor(rnd() * 8) }, () => Math.round(rnd() * 400) / 10);
+                     const tot = c.reduce((a, b) => a + b, 0), t = W.wholeShare(c, tot);
+                     if (t.reduce((a, b) => a + b, 0) !== Math.floor(tot + 0.5) || t.some((v, i) => Math.abs(v - c[i]) >= 1)) return false; }
+                   return true; })(), JSON.stringify(W.wholeShare([59.56, 59.56], 119.12)));
+  }
+  ok("⭐🔴 24 Nov 2026 (found by card 7's build): a click on a council opens the council's own card; no function name is declared twice in the map page (a second global areaCardHTML() from 2.1-4 won, and a council click opened 'Selected area · Loading…')",
+     (() => { const names = (html.match(/^ *function [A-Za-z0-9_$]+\(/gm) || []).map(x => x.trim());
+              const seen = {}, twice = names.filter(n => (seen[n] = (seen[n] || 0) + 1) === 2); return twice.length === 0; })()
+     && (html.match(/setHTML\(councilCardHTML\(a, AREAS\.data, when\)\)/g) || []).length === 2
+     && !/setHTML\(areaCardHTML\(/.test(html), "");
   ok("§2.2b: ...the planning-estimate stamp from the server, and every name escaped",
      ch.includes(P.carbon.stamp) && ch.includes("&lt;b>x&lt;/b>") && !ch.includes("<b>x</b>"));
   ok("§2.2b: ...a carbon the server could not give reads 'no figure', never 0 t",
@@ -3267,7 +3299,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("⭐ §2.2b: the county answers a click with its own card — a fill with no paint under it, on while its box is",
      /const AREA_COUNTY_LAYERS = \['area-county-outline', 'area-county-fill', 'area-county-label'\];/.test(blk)
      && /id: 'area-county-fill', type: 'fill', source: 'areas-source',\s*filter: \['==', \['get', 'tier'\], 'county'\],\s*layout: \{ visibility: cVis \}, paint: \{ 'fill-color': AREA_INK, 'fill-opacity': 0 \} \}, before\);/.test(blk)
-     && /map\.on\('click', 'area-county-fill', \(e\) => \{[\s\S]*?setHTML\(areaCardHTML\(a, AREAS\.data, when\)\)/.test(blk));
+     && /map\.on\('click', 'area-county-fill', \(e\) => \{[\s\S]*?setHTML\(councilCardHTML\(a, AREAS\.data, when\)\)/.test(blk));   // NARROWED 24 Nov 2026: renamed
   ok("🔴 §2.2b: ...but never over a district: a district (or a route, site or zone) under the click answers instead",
      /f\.layer\.id === 'area-fill' \|\| \(!String\(f\.layer\.id\)\.startsWith\('area-'\)[\s\S]*?if \(above\.length\) return;/.test(
        blk.slice(blk.indexOf("map.on('click', 'area-county-fill'"))));
@@ -3728,6 +3760,22 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
          && pop.includes("South Team") && !/IPT\s*\d/i.test(pop) && pop.includes("46 lorry movements a day · 2 routes") && !pop.includes("0 in, 0 out")
          && pop.indexOf("R2") < pop.indexOf("R1"), pop.slice(0, 300));
       ok("C1: ...and names the routes on the section that the filters leave out", B.roadLoadPopupHTML(RUNS[10].runs[0], 10, { R1: true }).includes("outside the filters: R2"));
+      // 24 Nov 2026 (John's "Yes, both", the A2 addition to card 7): the shared road section card's in / out add up to its
+      // figure (they were rounded apart: 40.4 + 40.4 + ... could read 41 = 20 in, 20 out)
+      const ioRun = { id: "S9", routes: ["R1", "R2"], movements_per_day: 40.8, in_per_day: 20.4, out_per_day: 20.4, co2_t: 1, length_km: 2,
+                      geometry: [[0, 0], [0, 1]], route_shares: [{ route_id: "R1", teams: [], movements_per_day: 39.0, in_per_day: 19.5, out_per_day: 19.5, co2_t: 1 },
+                                                              { route_id: "R2", teams: [], movements_per_day: 1.8, in_per_day: 0.9, out_per_day: 0.9, co2_t: null }] };
+      const fio = B.roadLoadFeatures({ runs: [ioRun] }, null)[0];
+      ok("⭐ card 7 (A2 addition): the shared road section's in / out add up to its figure: 40.8 = 20.4 + 20.4 reads '41', '21 in, 20 out' (rounded apart it read 20 in, 20 out)",
+         !!fio && fio.properties.rl_mv_text === "41" && fio.properties.rl_in_text === "21" && fio.properties.rl_out_text === "20",
+         JSON.stringify(fio && fio.properties));
+      const pio = B.roadLoadPopupHTML(ioRun, 10, null);
+      ok("card 7 (A2 addition): ...and each route's row too: 39 = 19.5 + 19.5 reads '20 in, 19 out'; 1.8 = 0.9 + 0.9 reads '1 in, 1 out' under '2'",
+         /PV\(\) === 2/.test(B.roadLoadPopupHTML.toString()) && (pio.includes("20 in, 19 out") || !pio.includes(" in, ")) && !pio.includes("20 in, 20 out"), pio.slice(0, 600));
+      ok("🔴 card 7 (A2 addition): no in / out on either card is rounded apart any more (rlN(rin), rlN(Number(sh.in_per_day)) and fmt(a.in_per_day, 1) are gone)",
+         !/rlN\(rin\)|rlN\(rout\)|rlN\(Number\(sh\.in_per_day\)\)|fmt\(a\.in_per_day, 1\)|fmt\(a\.movements_per_day, 1\)/.test(html)
+         && /wholeWords\(\[rin, rout\], mv\)/.test(html) && /wholeWords\(\[sh\.in_per_day, sh\.out_per_day\], mv\)/.test(html)
+         && /wholeWords\(\[a\.in_per_day, a\.out_per_day\], amv\)/.test(html));
       // the month
       TL.on = true; TL.matrix = null;
       ok("C1: the bar open before its matrix is read is NO month (not the default January)", B.mapModeMonth() === null);
@@ -4606,13 +4654,13 @@ function qrRead(mod) {
   {
     // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): areaJoin takes a third argument, `loading`
     const fj = /function areaJoin\(shapes, figs(, loading)?\) \{[\s\S]*?\n    \}/.exec(ab), ft = /function areaFigureText\(a, mode, when\) \{[\s\S]*?\n    \}/.exec(ab);
-    const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);
+    const ff = /function areaFeatures\(payload, mode, off, when\) \{[\s\S]*?\n    \}/.exec(ab), fcard = /function councilCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/.exec(ab);   // NARROWED 24 Nov 2026: renamed
     let J = null, T = null, F = null, C = null;
     try {
       J = new Function(fj[0] + "\nreturn areaJoin;")();
       T = new Function(ft[0] + "\nreturn areaFigureText;")();
       F = new Function("areaFigureText", ff[0] + "\nreturn areaFeatures;")(T);
-      C = new Function("AREAS", fcard[0] + "\nreturn areaCardHTML;")({ mode: 'movements' });
+      C = new Function("AREAS", (html.match(/function wholeShare\(cells, total\) \{[\s\S]*?\n    \}\n    function wholeWords\(cells, total\) \{[\s\S]*?\n    \}/) || [""])[0] + "\n" + fcard[0] + "\nreturn councilCardHTML;")({ mode: 'movements' });   // 24 Nov 2026: + the page's wholeWords
     } catch (e) {}
     const shapes = { areas: [{ area_id: "A", name: "Alpha", tier: "district", geometry: { type: "Polygon", coordinates: [] }, label_point: [0, 0] },
                              { area_id: "B", name: "Beta", tier: "district", geometry: { type: "Polygon", coordinates: [] } }], attribution: ["L1"] };
@@ -7879,20 +7927,22 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   } catch (e) { err = String(e && e.stack || e); }
   ok("⭐ 2.1-4 (sandbox): the block runs against a fake map, adding nothing to it", !!F && F.SECSEL_MAP === false, err);
   if (F) {
-    const res = { kind: 'road', month: 23, a_day: 21.5, in: 16.5, out: 5,
-                  routes: [{ route_id: 'R1', in: 11.5, out: 0, a_day: 11.5 }, { route_id: 'R2', in: 5, out: 5, a_day: 10 }] };
+    // REVERSED 24 Nov 2026 (card 7, John's Q11 = (a)): the server answers WHOLE numbers that add up (was tenths: 11.5 / 16.5 / 21.5)
+    const res = { kind: 'road', month: 23, a_day: 22, in: 17, out: 5,
+                  routes: [{ route_id: 'R1', in: 12, out: 0, a_day: 12 }, { route_id: 'R2', in: 5, out: 5, a_day: 10 }] };
     const rp = { R1: { origin: 'Quarry A', dest: 'Site B', ipt: 'IPT1' }, R2: { origin: 'Plant C', dest: 'Site B', ipt: 'IPT1' } };
     const v = F.secselView(res, { R1: true }, rp);
     ok("2.1-4 (sandbox): the route filters split the rows — R2 outside them is named apart and left out of the total",
-       v.n === 1 && v.left.join() === 'R2' && v.aday === 11.5 && v.inn === 11.5 && v.out === 0 && v.rows[0].from === 'Quarry A' && v.rows[0].team === 'North Team');
+       v.n === 1 && v.left.join() === 'R2' && v.aday === 12 && v.inn === 12 && v.out === 0 && v.rows[0].from === 'Quarry A' && v.rows[0].team === 'North Team');
     const h = F.secselCardHTML(res, { passing: null, rp, clicked: 'R1', limits: [{ state: 'over', text: 'Traffic limit · 212 / 200 a day' }] });
     ok("⭐ 2.1-4 Q2 / Q3 (sandbox): 'This road · Nov 2027', the day's figure, routes, in / out, In / Out / A day columns, a total row",
        h.includes('>This road · Nov 2027</h4>') && h.includes('<b>22 lorry movements a day</b> · 2 routes')
        // REVERSED 10 Nov 2026 (road card polish, Q1 = A): the in / out line and the table read ONE decimal (was '17 in, 5 out', '12 · 0 · 12')
-       && h.includes('16.5 in, 5.0 out') && !h.includes('17 in, 5 out')
+       // REVERSED AGAIN 24 Nov 2026 (card 7, John's Q11 = (a)): every figure whole, adding up ('17 in, 5 out', '12 · 0 · 12', '17 · 5 · 22')
+       && h.includes('17 in, 5 out') && !h.includes('16.5 in, 5.0 out')
        && h.includes('<th class="num">In</th><th class="num">Out</th><th class="num">A day</th>') && h.includes('class="secsel-total"')
-       && h.includes('<td class="num">11.5</td><td class="num">0</td><td class="num">11.5</td>') && !h.includes('<td class="num">12</td>')
-       && h.includes('<td class="num">16.5</td><td class="num">5.0</td><td class="num">21.5</td></tr>'), h);
+       && h.includes('<td class="num">12</td><td class="num">0</td><td class="num">12</td>') && !h.includes('<td class="num">11.5</td>')
+       && h.includes('<td class="num">17</td><td class="num">5</td><td class="num">22</td></tr>'), h);
     // NARROWED 11 Nov 2026 (card A-X1): the team is on the route's name (a tip and the screen reader's words), not a line in the row
     ok("2.1-4 (sandbox): the clicked route's row is tinted and has its card button; Copy; the limit line; teams on the card",
        // NARROWED 11 Nov 2026 (merge of A-X1 with R1, PR #270): the route number is R1's button, its name unchanged; the team is
@@ -7911,12 +7961,12 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
          && h2.includes('<tr class="secsel-clicked"><td class="secsel-rid"><button type="button" class="secsel-rid-btn" data-rid="R2"'));
       ok("⭐ R1 (sandbox): the ONE card button follows the picked row: picking R2 gives 'R2’s card' and not 'R1’s card'; nothing picked gives no card button",
          h2.includes('R2’s card</button>') && !h2.includes('R1’s card</button>') && !F.secselCardHTML(res, { passing: null, rp }).includes('’s card</button>'));
-      const ar = F.secselCardHTML({ kind: 'area', month: 23, a_day: 21.5, in: 16.5, out: 5, routes: res.routes }, { passing: null, rp, clicked: 'R1' });
+      const ar = F.secselCardHTML({ kind: 'area', month: 23, a_day: 22, in: 17, out: 5, routes: res.routes }, { passing: null, rp, clicked: 'R1' });
       ok("⭐ R1 / frame 8 (sandbox): the AREA card's rows are buttons too (data-kind area), the picked row is tinted, and the picked route gets a 'R1’s card' button that opens its panel (Copy table and Draw again stay)",
          (ar.match(/<button type="button" class="secsel-rid-btn"/g) || []).length === 2 && ar.includes('data-rid="R1" aria-label="Show R1 on the map" aria-pressed="true" data-kind="area"')
          && ar.includes('<tr class="secsel-clicked">') && ar.includes('R1’s card</button>') && ar.includes('data-kind="area" onclick="secselRouteCard(this.dataset.rid, this.dataset.kind)"')
          && ar.includes('>Copy table</button>') && ar.includes('>Draw again</button>')
-         && !F.secselCardHTML({ kind: 'area', month: 23, a_day: 21.5, in: 16.5, out: 5, routes: res.routes }, { passing: null, rp }).includes('’s card</button>'));
+         && !F.secselCardHTML({ kind: 'area', month: 23, a_day: 22, in: 17, out: 5, routes: res.routes }, { passing: null, rp }).includes('’s card</button>'));
     }
     ok("🔴 2.1-4 (sandbox): no 'Shared road section', no 'two-way' on the card", !/Shared road section|two-way/i.test(h));
     const one = F.secselCardHTML({ kind: 'road', month: 23, a_day: 4, routes: [{ route_id: 'R3', in: 2, out: 2, a_day: 4 }] }, { rp });
@@ -7944,7 +7994,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
     ok("⭐ 2.1-4 Q8 (sandbox): Copy — the title with '(demo)', the count, a tab table with a total, the date and the link; no team names",
        lines[0] === 'Wolds Link (demo) · selected area · Nov 2027' && lines[1] === 'Approved plan, lorry movements a day (a visit = 2 movements, in and out).'
        && lines[2] === 'Route\tFrom\tTo\tIn\tOut\tA day' // REVERSED 10 Nov 2026 (road card polish, Q1 = A): Copy carries the table's one-decimal figures (was 12 / 0 / 12 and 17 / 5 / 22)
-       && lines[3] === 'R1\tQuarry A\tSite B\t11.5\t0\t11.5' && lines[4] === 'R2\tPlant C\tSite B\t5.0\t5.0\t10.0' && lines[5] === 'Total\t\t\t16.5\t5.0\t21.5'
+       // REVERSED AGAIN 24 Nov 2026 (card 7): Copy carries the table's whole numbers
+       && lines[3] === 'R1\tQuarry A\tSite B\t12\t0\t12' && lines[4] === 'R2\tPlant C\tSite B\t5\t5\t10' && lines[5] === 'Total\t\t\t17\t5\t22'
        && lines[6] === 'From the Wayscope public map, 10 Nov 2026. https://x/map/?month=2027-11&area=1,2,3,4'
        && !/North Team|IPT1/.test(cp.tsv + cp.html) && cp.html.includes('<table') && cp.html.includes('<a href="https://x/map/?month=2027-11&amp;area=1,2,3,4">'), cp.tsv);
     ok("2.1-4 (sandbox): the reads' addresses", F.roadAtUrl({ lng: -0.95, lat: 52.5 }, 23, 30) === '/api/public/road-at?lon=-0.95000&lat=52.50000&r=30&month=23'
@@ -7961,33 +8012,53 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   if (F) {
     const rp = { R050: { origin: 'Viaduct', dest: 'Landfill' }, R033: { origin: 'Plant', dest: 'Compound' }, R048: { origin: 'Terminal', dest: 'Viaduct' },
                  R040: { origin: 'Terminal', dest: 'Melton' }, R045: { origin: 'Quarry', dest: 'Compound' } };
-    // the server's answer in tenths that add up (test_section_select.py proves the server's side)
-    const live = { kind: 'area', month: 15, in: 62.4, out: 61.9, a_day: 124.3, idle: ['R045', 'R047'],
-                   routes: [{ route_id: 'R050', in: 59.6, out: 59.6, a_day: 119.2 }, { route_id: 'R033', in: 1.5, out: 1.5, a_day: 3.0 },
-                            { route_id: 'R048', in: 0.8, out: 0.8, a_day: 1.6 }, { route_id: 'R040', in: 0.5, out: 0, a_day: 0.5 },
+    // REVERSED 24 Nov 2026 (public map lines rethink, card 7, John's Q11 = (a), "Yes, as recommended"; was 10 Nov's Q1 = A, tenths):
+    // the server's answer in WHOLE numbers that add up (section_select.share_whole; test_section_select.py proves the server's side)
+    const live = { kind: 'area', month: 15, in: 63, out: 61, a_day: 124, idle: ['R045', 'R047'],
+                   routes: [{ route_id: 'R050', in: 60, out: 59, a_day: 119 }, { route_id: 'R033', in: 2, out: 1, a_day: 3 },
+                            { route_id: 'R048', in: 1, out: 1, a_day: 2 }, { route_id: 'R040', in: 0, out: 0, a_day: 0, small: ['in', 'a_day'] },
                             { route_id: 'R006', in: 0, out: 0, a_day: 0, small: ['in', 'out', 'a_day'] }] };
     const v = F.secselView(live, null, rp);
-    ok("⭐ POLISH Q1 (sandbox; live 10 Nov read '60 · 60 · 119', '1 · 1 · 3', 'under 1 · under 1 · 2', 86 + 85 against 172): every row's In + Out is its A day and the rows add to the Total, in exact tenths",
-       v.rows.every(r => Math.round(r.inn * 10) + Math.round(r.out * 10) === Math.round(r.aday * 10))
-       && v.inn === 62.4 && v.out === 61.9 && v.aday === 124.3 && Math.round(v.inn * 10) + Math.round(v.out * 10) === Math.round(v.aday * 10), JSON.stringify(v));
+    ok("⭐ CARD 7 (sandbox; live 10 Nov read '60 · 60 · 119', 86 + 85 against 172): every row's In + Out is its A day and the rows add to the Total, in whole numbers",
+       v.rows.every(r => r.inn + r.out === r.aday && Number.isInteger(r.aday))
+       && v.inn === 63 && v.out === 61 && v.aday === 124 && v.inn + v.out === v.aday, JSON.stringify(v));
     const h = F.secselCardHTML(live, { rp });
-    ok("⭐ POLISH Q1 (sandbox): the table and the in / out line read one decimal; the headline stays a whole number",
-       h.includes('<b>124 lorry movements a day</b>') && h.includes('62.4 in, 61.9 out')
-       && h.includes('<td class="num">59.6</td><td class="num">59.6</td><td class="num">119.2</td>')
-       && h.includes('<td class="num">1.5</td><td class="num">1.5</td><td class="num">3.0</td>')
-       && h.includes('<td class="num">0.8</td><td class="num">0.8</td><td class="num">1.6</td>')
-       && h.includes('<td class="num">0.5</td><td class="num">0</td><td class="num">0.5</td>')
-       && h.includes('<td class="num">62.4</td><td class="num">61.9</td><td class="num">124.3</td></tr>'), h);
-    ok("🔴 POLISH Q1 (sandbox): no 'under 1' in the table; a route that runs under a tenth reads 'under 0.1', never a bare 0",
-       !/<td class="num">under 1<\/td>/.test(h) && h.includes('<td class="num">under 0.1</td><td class="num">under 0.1</td><td class="num">under 0.1</td>'));
+    ok("⭐ CARD 7 (sandbox): the headline, the in / out line, the table and the Total read whole numbers (was one decimal: '62.4 in, 61.9 out', '59.6 · 59.6 · 119.2')",
+       h.includes('<b>124 lorry movements a day</b>') && h.includes('63 in, 61 out')
+       && h.includes('<td class="num">60</td><td class="num">59</td><td class="num">119</td>')
+       && h.includes('<td class="num">2</td><td class="num">1</td><td class="num">3</td>')
+       && h.includes('<td class="num">1</td><td class="num">1</td><td class="num">2</td>')
+       && h.includes('<td class="num">under 1</td><td class="num">0</td><td class="num">under 1</td>')
+       && h.includes('<td class="num">63</td><td class="num">61</td><td class="num">124</td></tr>') && !/\d\.\d<\/td>/.test(h), h);
+    ok("🔴 CARD 7 (sandbox): no 'under 0.1' and no decimal left on the card; a route that runs under one a day reads 'under 1', never a bare 0",
+       !h.includes('under 0.1') && h.includes('<td class="num">under 1</td><td class="num">under 1</td><td class="num">under 1</td>')
+       && !/\bsec1\b/.test(code) && !code.includes("'under 0.1' : sec"));
     ok("POLISH Q1 (sandbox): the hover tip stays whole — '124 movements a day · 5 routes'", F.secselTipText(live, null) === '124 movements a day · 5 routes');
-    ok("POLISH Q1 (sandbox): thousands keep their comma beside the decimal", F.secselCardHTML({ kind: 'road', month: 15, a_day: 2469, in: 1234.5, out: 1234.5,
-         routes: [{ route_id: 'R050', in: 1234.5, out: 1234.5, a_day: 2469 }] }, { rp }).includes('<td class="num">1,234.5</td><td class="num">1,234.5</td><td class="num">2,469.0</td>'));
+    ok("CARD 7 (sandbox): thousands keep their comma (was beside the decimal)", F.secselCardHTML({ kind: 'road', month: 15, a_day: 2469, in: 1235, out: 1234,
+         routes: [{ route_id: 'R050', in: 1235, out: 1234, a_day: 2469 }] }, { rp }).includes('<td class="num">1,235</td><td class="num">1,234</td><td class="num">2,469</td>'));
+    // card 7's own example (Apr 2027, a road three routes use): '2 · 0 · 2', two rows '0 · under 1 · under 1', the Total's Out 'under 1'
+    const c7 = { kind: 'road', month: 17, in: 2, out: 0, a_day: 2, idle: ['R001', 'R002', 'R003'],
+                 routes: [{ route_id: 'R034', in: 2, out: 0, a_day: 2 }, { route_id: 'R012', in: 0, out: 0, a_day: 0, small: ['out', 'a_day'] },
+                          { route_id: 'R040', in: 0, out: 0, a_day: 0, small: ['out', 'a_day'] }] };
+    const h7 = F.secselCardHTML(c7, { rp });
+    ok("⭐ CARD 7 (sandbox): the mockup's card — '2 lorry movements a day · 3 of 6 routes', '2 in, under 1 out', Total '2 · under 1 · 2'",
+       h7.includes('<b>2 lorry movements a day</b> · 3 of 6 routes</div>') && h7.includes('<div class="secsel-sub">2 in, under 1 out</div>')
+       && h7.includes('<td class="num">2</td><td class="num">0</td><td class="num">2</td>')
+       && h7.includes('<td class="num">0</td><td class="num">under 1</td><td class="num">under 1</td>')
+       && h7.includes('<tr class="secsel-total"><td colspan="2">Total</td><td class="num">2</td><td class="num">under 1</td><td class="num">2</td></tr>'), h7);
+    const cp7 = F.secselCopyParts(c7, null, rp, 'https://x/map/', '24 Nov 2026').tsv.split('\n');
+    ok("CARD 7 (sandbox): Copy gives the same — 'R040 · 0 · under 1 · under 1', Total '2 · under 1 · 2'",
+       cp7.includes('R040\tTerminal\tMelton\t0\tunder 1\tunder 1') && cp7.includes('Total\t\t\t2\tunder 1\t2'), cp7.join(' | '));
+    // seen on live 24 Nov 2026: the tip read "under 1 movements a day · 1 route"; the count's words follow the count
+    ok("⭐ CARD 7 (sandbox): the hover tip is singular for 'under 1' and '1' — 'under 1 movement a day · 1 route', '1 movement a day · 1 route'",
+       F.secselTipText({ kind: 'road', month: 17, a_day: 0, routes: [{ route_id: 'R012', in: 0, out: 0, a_day: 0, small: ['out', 'a_day'] }] }, null) === 'under 1 movement a day · 1 route'
+       && F.secselTipText({ kind: 'road', month: 17, a_day: 1, routes: [{ route_id: 'R012', in: 1, out: 0, a_day: 1 }] }, null) === '1 movement a day · 1 route'
+       && F.secselTipText({ kind: 'road', month: 17, a_day: 2, routes: [{ route_id: 'R012', in: 1, out: 1, a_day: 2 }] }, null) === '2 movements a day · 1 route');
     ok("⭐ POLISH Q3 (sandbox): '5 of 7 routes' when some routes on the ground carry nothing that month; plain 'n routes' when all do",
        h.includes('</b> · 5 of 7 routes</div>') && v.here === 7 && F.secselCardHTML(Object.assign({}, live, { idle: [] }), { rp }).includes('</b> · 5 routes</div>'));
     ok("POLISH Q3 (sandbox): the route filters count the idle routes too — R045 outside them leaves '1 of 2 routes'",
        F.secselCardHTML(live, { rp, passing: { R050: true, R047: true } }).includes('</b> · 1 of 2 routes</div>'));
-    const road = { kind: 'road', month: 23, in: 4.1, out: 4.1, a_day: 8.2, idle: ['R001', 'R045'], routes: [{ route_id: 'R004', in: 4.1, out: 4.1, a_day: 8.2 }] };
+    const road = { kind: 'road', month: 23, in: 4, out: 4, a_day: 8, idle: ['R001', 'R045'], routes: [{ route_id: 'R004', in: 4, out: 4, a_day: 8 }] };
     const hc = F.secselCardHTML(road, { rp, clicked: 'R045' });
     // REVERSED 11 Nov 2026 (card A-X1, John's yes): the line says it is the clicked one, and its card button goes (it was kept)
     ok("⭐ POLISH Q2 (sandbox; live 10 Nov: a table with R004 only and a button 'R045’s card'): the clicked route with no loads is said in one line; no button for it",
@@ -7998,7 +8069,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        !lost.includes('Pick a month</button>') && lost.includes('R045’s card</button>')
        && F.secselCardHTML({ kind: 'road', month: null, a_day: null, routes: [{ route_id: 'R050' }] }, { rp }).includes('Pick a month</button>'), lost);
     const cp = F.secselCopyParts(live, null, rp, 'https://x/map/', '10 Nov 2026').tsv.split('\n');
-    ok("POLISH Q1 (sandbox): Copy carries the same figures as the table", cp[3] === 'R050\tViaduct\tLandfill\t59.6\t59.6\t119.2' && cp[8] === 'Total\t\t\t62.4\t61.9\t124.3', cp.join(' | '));
+    // REVERSED 24 Nov 2026 (card 7): whole numbers (was '59.6 · 59.6 · 119.2' and '62.4 · 61.9 · 124.3')
+    ok("POLISH Q1 (sandbox): Copy carries the same figures as the table", cp[3] === 'R050\tViaduct\tLandfill\t60\t59\t119' && cp[8] === 'Total\t\t\t63\t61\t124', cp.join(' | '));
     ok("POLISH Q4 (sandbox): the cover test — a box under the card, beside it, and touching its edge",
        F.secselCovers([760, 260, 960, 600], [620, 98, 1000, 620]) === true && F.secselCovers([330, 260, 530, 600], [620, 98, 1000, 620]) === false
        && F.secselCovers([400, 260, 620, 600], [620, 98, 1000, 620]) === false);

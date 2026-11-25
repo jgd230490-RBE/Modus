@@ -26,8 +26,10 @@ function run(opts) {
   class Popup { constructor(o) { popups.push({ opts: o }); } setLngLat() { return this; } setHTML(h) { popups[popups.length - 1].html = h; return this; } addTo() { return this; } }
   const L = { id: "Z041", name: "B6047 Melton Road", limit: { value: 150, basis: "daily" }, months: { "25": { state: "over", value: 162, routes: [] } } };
   const g = { markerHitAt: opts.noFn ? undefined : (pt => { g.seen = pt; return !!opts.marker; }), roadCardHitAt: () => false, seen: null };
-  const f = new Function("markerHitAt", "roadCardHitAt", "TLIM", "routePropsById", "escHtml", "tlimUnit", "tlimN", "tlimV", "monthLabel", "TLIM_COL", "mapboxgl", "map",
-    src + "\nreturn trafficLimitPopup;")(g.markerHitAt, g.roadCardHitAt, { data: { limits: [L] }, month: 25 }, () => ({}), x => String(x), () => "movements", x => String(x), x => String(x), () => "Jan 2028", { over: "#b91c1c", none: "#64748b" }, { Popup }, {});
+  const f = new Function("markerHitAt", "roadCardHitAt", "TLIM", "routePropsById", "escHtml", "tlimUnit", "tlimN", "tlimV", "monthLabel", "TLIM_COL", "mapboxgl", "map", "tlimIO",
+    src + "\nreturn trafficLimitPopup;")(g.markerHitAt, g.roadCardHitAt, { data: { limits: [L] }, month: 25 }, () => ({}), x => String(x), () => "movements", x => String(x), x => String(x), () => "Jan 2028", { over: "#b91c1c", none: "#64748b" }, { Popup }, {},
+    // 24 Nov 2026 (card 7): the popup reads its in / out through the page's tlimIO (in_shown / out_shown, else tlimN)
+    (r, k) => String(r[k + "_shown"] != null ? r[k + "_shown"] : r[k + "_per_day"]));
   const point = { x: 804, y: 424 };
   f({ features: [{ properties: { id: "Z041" } }], point, lngLat: { lng: 0, lat: 0 } });
   return { popups, seen: g.seen, point };
