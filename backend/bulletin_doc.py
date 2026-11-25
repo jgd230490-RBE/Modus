@@ -820,17 +820,15 @@ def _tl_value(v, limit):
     return _whole(v)
 
 
-def _tl_split(v, limit, inn, out):
+def tl_split_parts(v, limit, inn, out):
     """
-    12 Nov 2026 (found on live after batch 6: "32 (18 in, 15 out)"). The "(x in, y out)" after a limit's figure, in the
-    figure's own precision, ADDING UP to the figure as printed: the printed whole (or tenth, when `_tl_value` keeps one
-    decimal) is shared between in and out by the larger remainder (17.6 in + 14.6 out = 32.2 reads "32 (17 in, 15 out)"
-    or "(18 in, 14 out)", never 18 + 15). Only when in + out IS the figure (an average limit); a busiest-day figure is
-    not their sum, so each is rounded on its own as before.
+    The numbers behind `_tl_split` (24 Nov 2026: the public map's traffic-limit card reads them too, so the card and the
+    bulletin share ONE split; seen on live: "159 … 81 in, 77 out", which adds to 158). -> (in, out) as whole numbers or
+    tenths, exactly as printed: they add up to `_tl_value(v, limit)` when in + out IS the figure.
     """
     v, inn, out = float(v or 0), float(inn or 0), float(out or 0)
     if abs((inn + out) - v) > 0.05:
-        return f"({_whole(inn)} in, {_whole(out)} out)"
+        return int(inn + 0.5), int(out + 0.5)
     shown = _tl_value(v, limit)
     tenth = "." in shown
     k = 10 if tenth else 1
@@ -853,8 +851,20 @@ def _tl_split(v, limit, inn, out):
         else:
             break
         left += 1
-    if tenth:
-        return f"({fa / 10:,.1f} in, {fb / 10:,.1f} out)"
+    return (fa / 10, fb / 10) if tenth else (fa, fb)
+
+
+def _tl_split(v, limit, inn, out):
+    """
+    12 Nov 2026 (found on live after batch 6: "32 (18 in, 15 out)"). The "(x in, y out)" after a limit's figure, in the
+    figure's own precision, ADDING UP to the figure as printed: the printed whole (or tenth, when `_tl_value` keeps one
+    decimal) is shared between in and out by the larger remainder (17.6 in + 14.6 out = 32.2 reads "32 (17 in, 15 out)"
+    or "(18 in, 14 out)", never 18 + 15). Only when in + out IS the figure (an average limit); a busiest-day figure is
+    not their sum, so each is rounded on its own as before. The numbers: `tl_split_parts`.
+    """
+    fa, fb = tl_split_parts(v, limit, inn, out)
+    if isinstance(fa, float):
+        return f"({fa:,.1f} in, {fb:,.1f} out)"
     return f"({fa:,} in, {fb:,} out)"
 
 
