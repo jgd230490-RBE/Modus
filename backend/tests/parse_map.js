@@ -412,7 +412,7 @@ ok("the card label says which question it is answering", code.includes("'Routes 
 
 ok("the ant-march animation runs only while the timeline is playing",
   code.includes("if(!TL.playing)"));
-ok("and the lanes stand still when it stops (NARROWED 28 Oct 2026 (task 0a): DASH_SOLID went with the rail's march)", /if\(!TL\.playing\)\{ _flowRAF=null; setFlowPulse\(null\); return; \}/.test(code) && !code.includes("DASH_SOLID"));
+ok("and the arrowheads stand still when it stops (NARROWED 28 Oct 2026 (task 0a): DASH_SOLID went with the rail's march; NARROWED 24 Nov 2026 (card 3): dots, not lanes; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))", /if\(!TL\.playing\)\{ _flowRAF=null; _flowLast=null; setFlowMarks\(_flowClock\); return; \}/.test(code) && !code.includes("DASH_SOLID"));
 ok("stopping playback cancels the rAF loop rather than letting it spin for ever",
   code.includes("cancelAnimationFrame(_flowRAF)"));
 ok("starting playback starts it", code.includes("startFlowAnimation();"));
@@ -1288,7 +1288,7 @@ ok("⭐ every lazy layer adder re-raises the marks afterwards",
 // putting the flow back under the labels (placeFlowLayer)
 ok("⭐ ...including the three forecast layers, which are the ones that actually covered them",
   /'text-halo-width':2\}\}\);\s*\n\s*raiseMarks\(\);/.test(code)
-  && /function ensureFlowLayer\(\)\{[\s\S]{0,2600}drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);\s*\}/.test(code));   // NARROWED 28 Oct 2026 (8d, GL JS v3): the dots layer is added in the same function
+  && /function ensureFlowLayer\(\)\{[\s\S]{0,2600}drawFlow\(\);\s*raiseMarks\(\);\s*\}/.test(code));   // NARROWED 28 Oct 2026 (8d, GL JS v3): the dots layer is added in the same function; NARROWED 24 Nov 2026 (card 3): no lane to place
 ok("⭐ ...and applyFilters, which runs after every user action",
   /markRouteEnds\(\);\s*\n\s*raiseMarks\(\);/.test(code));
 
@@ -1479,13 +1479,13 @@ ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the
 // A third condition, and the brief's own test — "animation only when the playhead month
 // has a Railhead movement".
 ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): applyRailFlow is gone", !/applyRailFlow/.test(code));
-ok("...pause / scrub / close stops the loop and drops the light (NARROWED 28 Oct 2026 (task 0a))",
-  /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*setFlowPulse\(null\);/.test(code));
+ok("...pause / scrub / close stops the loop and leaves the arrowheads standing where they are (NARROWED 28 Oct 2026 (task 0a); NARROWED 24 Nov 2026 (card 3); NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+  /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*_flowLast=null; setFlowMarks\(_flowClock\);/.test(code));
 // NARROWED 16 Oct 2026 (D115): ONE count, FLOW_CYCLE long (a whole number of the rail's seven steps and of every
 // band's steps); the hauls read it as their march step, the rail modulo its seven
 // NARROWED 23 Oct 2026: the hauls' light is a phase from the frame clock; the rail alone steps on _dashIx, in the same loop
-ok("⭐ the count steps on _dashIx while the hauls' light runs on the frames, one loop (NARROWED 28 Oct 2026 (task 0a): no rail reads it now)",
-  /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);[\s\S]{0,300}_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;/.test(code)
+ok("⭐ the count steps on _dashIx while the hauls' arrowheads drift on the frames, one loop (NARROWED 28 Oct 2026 (task 0a): no rail reads it now; NARROWED 24 Nov 2026 (card 3); NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting): the drift's own clock)",
+  /_flowT=ts; setFlowMarks\(_flowClock\); \}[\s\S]{0,300}_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;/.test(code)
   && /const FLOW_CYCLE = 7 \* 60;/.test(code) && !/DASH_SEQ/.test(code));
 // the pinned trio is the CHECKBOX toggle. The flow layer must not join it, or the
 // checkbox alone would switch it to 'visible' and it would march on a paused map.
@@ -2176,8 +2176,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /function reducedMotion\(\)\{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\); \} catch\(e\)\{ return false; \}/.test(code));
   // NARROWED 16 Oct 2026 (D115): the hauls' dashes STAND STILL under reduced motion (setFlowDash(null): round caps, the
   // bands' spacing) rather than going solid — still no march; the rail's overlay stays DASH_SOLID
-ok("reduced motion: no motion while playing when it matches — the hauls' lanes stand still (NARROWED 28 Oct 2026 (task 0a): no rail step)",
-     /function startFlowAnimation\(\)\{\s*if\(reducedMotion\(\)\)\{ setFlowPulse\(null\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
+ok("reduced motion: no motion while playing when it matches — the arrowheads stand still (NARROWED 28 Oct 2026 (task 0a): no rail step; NARROWED 24 Nov 2026 (card 3); NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+     /function startFlowAnimation\(\)\{\s*if\(reducedMotion\(\)\)\{ setFlowMarks\(_flowClock\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
   ok("reduced motion: Show on map jumps instead of flying when it matches",
      /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
      && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
@@ -2602,7 +2602,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      /id:'forecast-cap-badge',type:'symbol',source:'routes-source'/.test(code)
      && code.includes("['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]]")
      && code.includes("return ['all', ['==', ['get', 'type'], 'Inbound Highway'], ['in', ['get', 'route_id'], ['literal', ids]]];")
-     && (code.match(/'forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
+     && (code.match(/'forecast-casing','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2 && !/'forecast-flow',/.test(code)   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 24 Nov 2026 (card 3): the lane layer is gone
      && code.includes("setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));"));
 
   // 6. review §3 row 3 — the overlay honours the filters; per-route roll-up; WS names; the stockpile sentence
@@ -2615,7 +2615,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // features carry no type / route_id, so drawFlow() applies the same leg toggles and routePassesFilters instead
      // NARROWED 29 Oct 2026 (the diversion edge): + 'diversion-edge', so the amber edge follows the same filter
      && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','diversion-edge'];")
-     && code.includes("if (map.getLayer('forecast-flow')) drawFlow();")
+     && code.includes("if (map.getLayer('forecast-flow-light')) drawFlow();")   // NARROWED 24 Nov 2026 (card 3): the lanes are summed for the dots
      && /function flowLegFigures\(\)\{[\s\S]{0,500}const legOn = \{ 'Inbound Highway': !inCb \|\| inCb\.checked, 'Outbound Highway': !outCb \|\| outCb\.checked \};[\s\S]{0,200}const passing = modeRoutesPassing\(\);[\s\S]{0,200}\(p\.is_forecast && legOn\[p\.type\] && passing\[p\.route_id\]\)/.test(code)
      && !/filter:\['==','is_forecast',true\]/.test(code));
   ok("row 3: applyFilters() re-applies it, and so do both overlay adders",
@@ -3413,13 +3413,14 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 0);
   ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
      // NARROWED 16 Oct 2026 (D115): the flow is put back over the sections between the two
-     /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*if \(typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);\s*raiseMarks\(\);/.test(blkCode)
+     // NARROWED 24 Nov 2026 (card 3): no flow to place between them now
+     /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*raiseMarks\(\);/.test(blkCode)
      // NARROWED 12 Oct 2026 (night): the carbon label layer's definition is longer (point placement), so a wider window
      && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,700}raiseMarks\(\);/.test(blkCode)
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
   // NARROWED 29 Oct 2026 (the diversion edge): both lists also remove 'diversion-edge', after the labels
   ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels',(?:'forecast-labels',)?'diversion-edge','forecast-layer','forecast-casing','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
   ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
      (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
               const sl = a > 0 && b > a ? code.slice(a, b) : "";
@@ -3436,7 +3437,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // 12 Oct 2026 (night, the user: By council "would be good to see by itself")
   ok("⭐ council view: while a By council box is ticked the routes are thin pale grey with no casing, flow dashes or cap badges, and the route labels hide",
      blkCode.includes("const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;")
-     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
+     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow-light', 'forecast-cap-badge'];")   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 24 Nov 2026 (card 3): the lane layer is gone
      && blkCode.includes("COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });")
      && blkCode.includes("function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }"));
   ok("⭐ council view: ticking a council box turns the heat map Off; picking Volume or Carbon unticks the council boxes (one picture at a time); both write the link",
@@ -3881,19 +3882,19 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         el("toggle-carbon").checked = true; B.refreshMapModes(); await flush();
         {
           // 12 Oct 2026 (night): the council view, then back
-          fmap.addLayer({ id: "forecast-flow", paint: {}, layout: {} });
+          fmap.addLayer({ id: "forecast-flow-light", paint: {}, layout: {} });   // NARROWED 24 Nov 2026 (card 3): the dots, the lanes' layer is gone
           globalThis.areaTierOn = t => t === "district";
           B.refreshMapModes(); await flush();
           const fq = fmap.layers["forecast-layer"].paint;
           ok("⭐ council view (sandbox): with Local authority districts ticked the routes are #A8A29E at 2 px, the casing and flow hidden, the labels hidden",
              fq["line-color"] === "#A8A29E" && fq["line-width"] === 2 && fmap.layers["forecast-casing"].layout.visibility === "none"
-             && fmap.layers["forecast-flow"].layout.visibility === "none" && fmap.layers["forecast-labels"].layout.visibility === "none", JSON.stringify(fq));
+             && fmap.layers["forecast-flow-light"].layout.visibility === "none" && fmap.layers["forecast-labels"].layout.visibility === "none", JSON.stringify(fq));
           // REVERSED 12 Oct 2026 (night): no network fade in the mode block; the boxes are unticked (pinned above)
           ok("council view (sandbox): the mode block leaves the network's paint alone (no inbound-lines layer touched)", !fmap.layers["inbound-lines"]);
           delete globalThis.areaTierOn;
           B.refreshMapModes(); await flush();
           ok("council view (sandbox): unticked, the casing and flow are back and the routes take the mode's paint again",
-             fmap.layers["forecast-casing"].layout.visibility === "visible" && fmap.layers["forecast-flow"].layout.visibility === "visible"
+             fmap.layers["forecast-casing"].layout.visibility === "visible" && fmap.layers["forecast-flow-light"].layout.visibility === "visible"
              && fmap.layers["forecast-layer"].paint["line-color"] !== "#A8A29E");
         }
         // a failed carbon read
@@ -4452,7 +4453,7 @@ function qrRead(mod) {
      (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
      && !/promoteId/.test(code));
   ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels',(?:'forecast-labels',)?'diversion-edge','forecast-layer','forecast-casing','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge
      && !/'area-fill','forecast/.test(code));
   // the deep link carries Road load and Carbon
   ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
@@ -5864,61 +5865,60 @@ function qrRead(mod) {
      fA > 0 && fB > fA && rlEnd > 0 && fA > rlEnd);
   const fblk = fA > 0 && fB > fA ? src.slice(fA, fB) : "";
   const fcode = fblk.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
-  const addFlow = (fcode.match(/map\.addLayer\(\{ id: 'forecast-flow'[\s\S]*?\}\s*\}\);/) || [""])[0];
+  const addLight = (fcode.match(/map\.addLayer\(\{ id: 'forecast-flow-light'[\s\S]*?\}\s*\}\);/) || [""])[0];
 
-  // ---- the layer: its own source, the lanes' offset, round caps ----
-  ok("⭐ D115: forecast-flow draws the LANES from its own source (flow-source), never routes-source, and carries no filter",
-     fcode.includes("const FLOW_SOURCE = 'flow-source';") && /id: 'forecast-flow', type: 'line', source: FLOW_SOURCE,/.test(addFlow)
-     && !/filter:/.test(addFlow) && !/id:\s?'forecast-flow',\s?type:\s?'line',\s?source:\s?'routes-source'/.test(code));
-  ok("⭐ D115: the lanes are offset LEFT of the direction of travel — one NEGATIVE constant (Mapbox: negative = left), on the flow only",
-     /const FLOW_OFFSET = -1\.75;/.test(fcode) && /'line-offset': FLOW_OFFSET/.test(addFlow)
-     && (code.match(/'line-offset': FLOW_OFFSET/g) || []).length === 1);
-  // REVERSED 23 Oct 2026 (the user): the lanes are SOLID, white, round-capped, the width by band, a light along them while playing
-  ok("⭐ D115 / 23 Oct: the lanes as added — round caps and joins, white, the width a step by band, the still opacity, no dash, and NO gradient (NARROWED 28 Oct 2026, 8d: the light is dots on their own source)",
-     /layout: \{ 'line-cap': 'round', 'line-join': 'round',/.test(addFlow) && fcode.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];")
-     && /'line-color': '#ffffff', 'line-width': flowWidthExpr\(\), 'line-opacity': FLOW_STILL_OPACITY,/.test(addFlow) && !/line-gradient/.test(fcode)
-     && !/line-dasharray/.test(addFlow) && /lineMetrics: true/.test(fcode));
-ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one); none left on the page (REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn))",
+  // ---- the layer: REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6, card 3): the white
+  // lanes are gone; the dots run on their own point source. Each pin below replaces the lane pin that stood here.
+  ok("🔴 REVERSED 24 Nov 2026 (card 3): no lane layer — no forecast-flow line layer, no lanes' source, nothing drawn from routes-source for the flow (was: forecast-flow draws the LANES from flow-source)",
+     !/id: 'forecast-flow',/.test(code) && !/'forecast-flow'/.test(code) && !fcode.includes("const FLOW_SOURCE") && !code.includes("'flow-source'")
+     && !/id:\s?'forecast-flow',\s?type:\s?'line',\s?source:\s?'routes-source'/.test(code));
+  ok("🔴 REVERSED 24 Nov 2026 (card 3): no line-offset for the flow (FLOW_OFFSET gone); the arrowheads sit FLOW_MARK_SIDE px left of their travel (was: one NEGATIVE line-offset; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+     !/const FLOW_OFFSET\b/.test(code) && (code.match(/'line-offset': FLOW_OFFSET/g) || []).length === 0
+     && /const FLOW_MARK_SIDE = 2\.7;/.test(fcode) && /const dx = cx - ax, dy = cy - ay, nx = dy \/ len, ny = -dx \/ len;/.test(fcode));
+  ok("⭐ REVERSED 24 Nov 2026 (card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)): the arrowheads as added — one symbol layer on their own source, one picture turned to each mark's travel on the map, never in the way of a name, no filter, NO gradient anywhere (was: the lanes as added)",
+     /id: 'forecast-flow-light', type: 'symbol', source: FLOW_LIGHT_SOURCE,/.test(addLight) && !/filter:/.test(addLight)
+     && /'icon-image': FLOW_MARK_IMG, 'icon-rotate': \['get', 'rot'\],/.test(addLight)
+     && /'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',\s*'icon-allow-overlap': true, 'icon-ignore-placement': true/.test(addLight)
+     && fcode.includes("const FLOW_MARK_LEN = 5.2;") && fcode.includes("const FLOW_MARK_W = 5.2;") && fcode.includes("const FLOW_MARK_RING = '#00215B';") && fcode.includes("const FLOW_MARK_RING_W = 0.8;")
+     && !/line-gradient/.test(fcode) && !/lineMetrics: true/.test(fcode));
+ok("🔴 D115 / 23 Oct: no butt cap anywhere on the page; the frame's dots go through setFlowDots (REVERSED 28 Oct 2026 (task 0a); NARROWED 24 Nov 2026: setFlowPulse is gone with the lanes)",
      !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 0
-     && !/const cap = ix == null/.test(fcode) && /function setFlowPulse\(t\)\{/.test(fcode));
+     && !/const cap = ix == null/.test(fcode) && /function setFlowMarks\(ts\)\{/.test(fcode) && !/setFlowPulse|setFlowDots/.test(code));   // NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)
   // NARROWED 24 Nov 2026 (John, Q4 = Direction 2): one width with the heat map Off (5 / 7.6 px); Volume, Carbon and the
-  // shared sections by band (3 to 10 px). On the first band (3 px) the lanes no longer fit, so with a heat map on they
-  // are not drawn there (flowWidthExpr(true): width 0 on the first band) until the dots replace them
-  ok("⭐ D115: the blue under the lanes is the road, NOT offset; Off one width (5 / 7.6 px), a heat map's lines by band, and no lane on a 3 px line (NARROWED 24 Nov 2026)",
+  // shared sections by band (3 to 10 px). NARROWED again 24 Nov 2026 (card 3): no lane width to set on them any more
+  ok("⭐ D115: the blue under the dots is the road, NOT offset; Off one width (5 / 7.6 px), a heat map's lines by band, and no lane width (flowWidthExpr gone) (NARROWED 24 Nov 2026, card 3)",
      code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
      && !code.includes("CARBON_LINE_WIDTH") && !code.includes("ROAD_LOAD_LINE_WIDTH")
-     && code.includes("map.setPaintProperty('forecast-flow', 'line-width', flowWidthExpr(heat && !focus));")
-     && /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], hideFirst \? 0 : FLOW_WIDTHS\[0\]\];/.test(code)
+     && !code.includes("flowWidthExpr") && !/hideFirst/.test(code)
      && !/id:'forecast-(layer|casing)'[^\n]*line-offset/.test(code));
-  ok("D115: two lanes fit inside the blue with a gap between them (|offset| - width/2 > 0, |offset| + width/2 <= half the line)",
-     1.75 - 2.5 / 2 > 0 && 1.75 + 2.5 / 2 <= 6 / 2);
-  ok("⭐ D115: the flow sits over the blue (or the Volume sections) and UNDER the labels: placed after each adder and after the sections come and go",
-     /function placeFlowLayer\(\)\{[\s\S]{0,400}const anchor = \['road-load-line', 'forecast-layer'\]\.find/.test(fcode)
-     && /drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);/.test(fcode)
-     && /if \(had && typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);/.test(code));
+  ok("REVERSED 24 Nov 2026 (card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)): the two directions' rows of arrowheads do not touch (2 x FLOW_MARK_SIDE > an arrowhead's width) (was: two lanes fit inside the blue)",
+     2 * 2.7 > 5.2);
+  ok("🔴 REVERSED 24 Nov 2026 (card 3): nothing places the flow any more — placeFlowLayer is gone, the dots layer is added last and the marks raised over it (was: the flow over the blue, under the labels)",
+     !/placeFlowLayer/.test(code) && /drawFlow\(\);\s*raiseMarks\(\);\s*\}/.test(fcode)
+     && !/if \(had && typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);/.test(code));
 ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both legs) is gone; DASH_SEQ went with the rail (REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn))",
      !/'line-dasharray':\[0,4,3\]\}\}\)/.test(code) && !/DASH_SEQ/.test(code) && !/setFlowDash\(/.test(code));
   // ---- the bands ----
-  ok("⭐ D115: the bands are FIXED — the Volume heat map's own stops (FLOW_STOPS = ROUTE_VOLUME_STOPS), never cut from the month's figures",
-     fcode.includes("const FLOW_STOPS = ROUTE_VOLUME_STOPS;") && !/Math\.max\([^)]*fl_mv/.test(fcode) && !/\.sort\(\(a, b\) => b/.test(fcode));   // NARROWED 23 Oct 2026: flowPulse takes a max over the gradient's stops, never over a figure
-  // REVERSED 23 Oct 2026: the band expression's outputs are NUMBERS (the lane widths), which need no ['literal', …]
-  ok("⭐ D115 / 23 Oct: the width step's outputs are the five lane widths, plain numbers at the five stops",
-     // NARROWED 24 Nov 2026: the first band's width is 0 while a heat map is on (hideFirst), its own width otherwise
-     /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], hideFirst \? 0 : FLOW_WIDTHS\[0\]\];/.test(fcode)
-     && /e\.push\(s, FLOW_WIDTHS\[i \+ 1\]\);/.test(fcode));
-  // REVERSED 23 Oct 2026: no march step; the light's phase runs from the frame clock at one speed on every lane
-  ok("⭐ D115 / 23 Oct: ONE speed for every lane (FLOW_PULSE_SPEED), FLOW_PULSES points a lane, no FLOW_STEP",
-     !/const FLOW_STEP\b/.test(fcode) && /const FLOW_PULSE_SPEED = 0\.22;/.test(fcode) && /const FLOW_PULSES = 3;/.test(fcode)
-     && /const FLOW_PULSE_LEN = 0\.07;/.test(fcode));
+  // REVERSED 24 Nov 2026, 22:46 UTC (Q14, card 3b): the marks say the way, never the amount, so the flow has no bands
+  ok("⭐ D115 (REVERSED 24 Nov 2026, Q14): no bands in the flow — FLOW_STOPS is gone, nothing is cut from the month's figures (was: the Volume heat map's own fixed stops)",
+     !/FLOW_STOPS/.test(code) && !/Math\.max\([^)]*fl_mv/.test(fcode) && !/\.sort\(\(a, b\) => b/.test(fcode));   // NARROWED 23 Oct 2026: flowPulse takes a max over the gradient's stops, never over a figure
+  // REVERSED 24 Nov 2026 (card 3): no width step; the band picks the dots' GAP
+  ok("⭐ REVERSED 24 Nov 2026 (card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)): ONE gap for every road, 90 px on screen, no band (was: the five lane widths; then one gap a band)",
+     fcode.includes("const FLOW_MARK_GAP = 90;") && !/const FLOW_WIDTHS\b/.test(code) && !/FLOW_DOT_GAPS|function flowBand/.test(code)
+     && /const gp = FLOW_MARK_GAP, gap = gp \/ W,/.test(fcode));
+  // REVERSED 23 Oct 2026: no march step; NARROWED 24 Nov 2026 (card 3): one speed ON SCREEN, px a second, every band
+  ok("⭐ D115 / 23 Oct: ONE speed for every lane, no FLOW_STEP (NARROWED 24 Nov 2026, card 3: FLOW_DOT_SPEED px a second on screen; the three lights a lane are gone)",
+     !/const FLOW_STEP\b/.test(fcode) && /const FLOW_MARK_SPEED = 13;/.test(fcode) && !/FLOW_PULSE_SPEED|FLOW_PULSES|FLOW_PULSE_LEN|FLOW_STILL_OPACITY/.test(code)
+     && /run = FLOW_MARK_SPEED \* ts \/ 1000;/.test(fcode));   // NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)
   ok("⭐ D115: both feeds stamp the unrounded daily rate (f_day) beside the label's rounded f_avg, through the ONE divisor helper",
      /f\.properties\.f_day=perWorkingDayExact\(vol\);/.test(code)
      && /f\.properties\.f_day = \(m\.per_day != null\) \? m\.per_day : perWorkingDayExact\(m\.avg\);/.test(code)
      && /function perWorkingDay\(monthTotal\)\{\s*return Math\.round\(perWorkingDayExact\(monthTotal\)\);/.test(code)
      && (code.match(/monthTotal \/ wd/g) || []).length === 1 && /Number\(p\.f_day != null \? p\.f_day : p\.f_avg\)/.test(fcode));
-  ok("D115 / 23 Oct: the rail still ticks on the old clock (65 ms) and the stop drops the hauls to standing lanes, not a light",
+  ok("D115 / 23 Oct: the rail still ticks on the old clock (65 ms) and the stop leaves the arrowheads standing (NARROWED 24 Nov 2026, card 3: no standing lanes; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
      fcode.includes("const FLOW_TICK_MS = 65;") && /if\(map\.getLayer && \(ts-_dashT>FLOW_TICK_MS\)\)\{/.test(code)
-     && /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*setFlowPulse\(null\);/.test(code)
-     && /if\(!TL\.playing\)\{ _flowRAF=null; setFlowPulse\(null\);/.test(code));
+     && /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*_flowLast=null; setFlowMarks\(_flowClock\);/.test(code)
+     && /if\(!TL\.playing\)\{ _flowRAF=null; _flowLast=null; setFlowMarks\(_flowClock\);/.test(code));
   // ---- the legend's markup ----
   ok("D115: a flow legend under the heat map, hidden in the markup (shown while the lanes are on the map)",
      html.includes('<div class="mode-legend" id="flow-legend" hidden></div>')
@@ -5930,24 +5930,28 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     const strings = (fcode.match(/'[^'\n]*'/g) || []).join(" ");
     ok("D115: nothing a person reads in the flow block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
        !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(strings) && !/\bAI\b/.test(strings));
-    ok("D115: no lorry or time on the public map's flow (D36): the block draws the lanes and the light's dots only — one circle layer, no symbol, no clock (NARROWED 28 Oct 2026, 8d)",
-       (fcode.match(/type: 'circle'/g) || []).length === 1 && /id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE/.test(fcode)
-       && !/type: 'symbol'/.test(fcode) && !/Date\(|toLocaleTimeString|getHours/.test(fcode));
+    ok("D115: no lorry or time on the public map's flow (D36): the block draws the arrowheads only — one symbol layer of one picture, no circle, no line, no clock (NARROWED 28 Oct 2026, 8d; NARROWED 24 Nov 2026: no lanes; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       (fcode.match(/type: 'symbol'/g) || []).length === 1 && /id: 'forecast-flow-light', type: 'symbol', source: FLOW_LIGHT_SOURCE/.test(fcode)
+       && !/type: 'circle'/.test(fcode) && !/type: 'line'/.test(fcode) && !/Date\(|toLocaleTimeString|getHours/.test(fcode)
+       && (fcode.match(/map\.addImage\(/g) || []).length === 1);
   }
 
   {
     const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
-    ok("D115: the in-app guide (§8.3) describes the lanes, the fixed bands, the shared-road total and the dashes standing still when paused",
-       guide.includes("each direction has its own lane, on the left as driven") && guide.includes("<strong>A wider lane means more movements a day</strong> each way, on five fixed bands (under 10, 10 to 25, 25 to 50, 50 to 100, 100 and over)")   /* NARROWED 28 Oct 2026 (task 0a): the lanes are widths now, as drawn since 23 Oct */
-       && guide.includes("Where routes share a road, its lane shows their total") && guide.includes("paused, or with reduced motion set on your device, the lanes stand still")
-       && !guide.includes("white dashes run along the blue routes from origin to destination"));
+    ok("D115: the in-app guide (§8.3) describes the arrowheads: the way lorries go, each on its own side, not vehicles, standing still when paused (NARROWED 24 Nov 2026, card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       guide.includes("each direction on its own side, on the left as driven") && guide.includes("<strong>They show the way, not how many</strong>")
+       && guide.includes("they drift the way the lorries go") && guide.includes("paused, or with reduced motion set on your device, they stand still")
+       && !guide.includes("white dashes run along the blue routes from origin to destination") && !guide.includes("A wider lane means more movements a day")
+       && !guide.includes("The closer the dots"));
   }
 
   // ---- the block, run against a fake map and DOM ----
   const mk = () => {
     const layers = {}, sources = {}, order = [], log = [];
-    return { layers, sources, order, log,
+    return { layers, sources, order, log, zoom: 8, view: [-1, 51, 4, 53],
       getLayer: id => layers[id], getSource: id => sources[id],
+      getZoom() { return this.zoom; },
+      getBounds() { const v = this.view; return { getWest: () => v[0], getSouth: () => v[1], getEast: () => v[2], getNorth: () => v[3] }; },
       addSource(id, spec) { sources[id] = { spec, _data: spec.data, setData(d) { this._data = d; log.push("setData:" + id); } }; },
       addLayer(spec) { layers[spec.id] = { spec, paint: Object.assign({}, spec.paint), layout: Object.assign({}, spec.layout) }; order.push(spec.id); log.push("add:" + spec.id); },
       removeLayer(id) { delete layers[id]; order.splice(order.indexOf(id), 1); },
@@ -5965,12 +5969,12 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   const monthLabel = i => names[(i - 1) % 12] + ' ' + (2026 + Math.floor((i - 1) / 12));
   const stepRanges = (s, unit) => ['under ' + s[0] + unit, s[0] + ' to ' + s[1] + unit, s[1] + ' to ' + s[2] + unit, s[2] + ' to ' + s[3] + unit, s[3] + unit + ' and over'];
   const rlEsc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const CONFIG = { FORECAST_UNIT: "vehicles", COLORS: { forecast: "#3B82F6", forecastCasing: "#1F2024" } };
+  const CONFIG = { FORECAST_UNIT: "vehicles", COLORS: { forecast: "#0B4EA2", forecastCasing: "#FFFFFF" } };
   const VS = [10, 25, 50, 100];
-  // a road A-B-C-D along y = 0. R1 laden A->D and back D->A empty on the same road; R2 laden from B (a vertex 4e-6
-  // degrees off, which the snap must join) through C, then away north; R3's EMPTY leg runs B->C the same way as the
+  // a road A-B-C-D along y = 52 (degrees). R1 laden A->D and back D->A empty on the same road; R2 laden from B (a vertex
+  // 4e-6 degrees off, which the snap must join) through C, then away north; R3's EMPTY leg runs B->C the same way as the
   // laden lorries, then away south; R4 is not on the forecast this month.
-  const leg = (rid, type, coords, f_avg, on) => ({ type: "Feature", geometry: { type: "LineString", coordinates: coords },
+  const leg = (rid, type, coords, f_avg, on) => ({ type: "Feature", geometry: { type: "LineString", coordinates: coords.map(c => [c[0], c[1] + 52]) },
                                                    properties: { route_id: rid, type, is_forecast: on !== false, f_avg } });
   const a1_data = { features: [
     leg("R1", "Inbound Highway", [[0, 0], [1, 0], [2, 0], [3, 0]], 12),
@@ -5978,15 +5982,17 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     leg("R2", "Inbound Highway", [[1.000004, 0], [2, 0], [2, 1]], 20),
     leg("R3", "Outbound Highway", [[1, 0], [2, 0], [2, -1]], 7),
     leg("R4", "Inbound Highway", [[0, 0], [1, 0]], 30, false),
-    { type: "Feature", geometry: { type: "Point", coordinates: [0, 0] }, properties: { type: "Node" } } ] };
+    { type: "Feature", geometry: { type: "Point", coordinates: [0, 52] }, properties: { type: "Node" } } ] };
   let passing = { R1: true, R2: true, R3: true, R4: true };
-  let focus = false, month = 10;
+  let focus = false, month = 10, heat = null;
   let api = null, err = "";
   try {
     api = new Function("map", "document", "a1_data", "modeRoutesPassing", "councilFocus", "mapModeMonth", "forecastWindow", "rlEsc", "monthLabel",
       "stepRanges", "VOLUME_STOPS", "ROUTE_VOLUME_STOPS", "CONFIG", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "raiseMarks",
-      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowLightPoints, laneMetric, FLOW_LIGHT_SOURCE, setFlowPulse, renderFlowLegend, flowSample };")(
-      fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 6, 8.5, () => {});
+      "heatMode", "CARBON_RAMP", "LINE_BAND_WIDTHS", "LINE_BAND_PAD",
+      fblk + "\nreturn { FLOW, FLOW_MARK_GAP, FLOW_MARK_SPEED, FLOW_MARK_SIDE, FLOW_CYCLE, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, flowMarkPoints, laneMerc, mercX, mercY, mercLngLat, FLOW_LIGHT_SOURCE, setFlowMarks, renderFlowLegend, flowMarkSample };")(
+      fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 5, 7.6, () => {},
+      () => heat, ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B'], [3, 4.5, 6, 8, 10], 2.4);
   } catch (e) { err = e.message; }
   ok("⭐ D115 sandbox: the flow block runs against a fake map and DOM", !!api, err);
   if (api) {
@@ -5994,23 +6000,24 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     fmap.addSource("routes-source", { type: "geojson", data: a1_data });
     ["forecast-casing", "forecast-layer", "forecast-labels", "forecast-cap-badge"].forEach(id => fmap.addLayer({ id, paint: {}, layout: {} }));
     F.ensureFlowLayer();
-    const feats = () => fmap.sources["flow-source"]._data.features;
+    // NARROWED 24 Nov 2026 (card 3): the lanes are no longer sent to a source; flowFeatures() is what places the dots
+    const feats = () => F.flowFeatures();
     const near = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
-    // every directed segment of the drawn lanes, with the lane's figure
+    // every directed segment of the lanes, with the lane's figure
     const segs = () => { const out = {}; feats().forEach(f => { const c = f.geometry.coordinates; for (let i = 1; i < c.length; i++) {
-      const k = c[i - 1].map(v => Math.round(v)).join(",") + ">" + c[i].map(v => Math.round(v)).join(",");
+      const k = c[i - 1].map((v, j) => Math.round(v - (j ? 52 : 0))).join(",") + ">" + c[i].map((v, j) => Math.round(v - (j ? 52 : 0))).join(",");
       (out[k] = out[k] || []).push(f.properties.fl_mv); } }); return out; };
     let S = segs();
     ok("⭐ D115 sandbox: where three legs drive B->C the same way (R1 laden 12, R2 laden 20, R3 EMPTY 7) there is ONE lane, at their sum 39",
        JSON.stringify(S["1,0>2,0"]) === "[39]", JSON.stringify(S));
     ok("⭐ D115 sandbox: the other way, C->B, is its OWN lane (R1's empties alone, 12): two directions, two lanes, never one figure for both",
        JSON.stringify(S["2,0>1,0"]) === "[12]" && JSON.stringify(S["0,0>1,0"]) === "[12]" && JSON.stringify(S["1,0>0,0"]) === "[12]");
-    ok("⭐ D115 sandbox: no directed segment is drawn twice — no two lanes' dashes stacked in one direction anywhere",
+    ok("⭐ D115 sandbox: no directed segment is in two lanes — no two lanes' dots stacked in one direction anywhere",
        Object.values(S).every(v => v.length === 1), JSON.stringify(S));
     ok("D115 sandbox: each lane runs the way it is driven (R2 turns north at C, R3's empties south) with its own figure",
        JSON.stringify(S["2,0>2,1"]) === "[20]" && JSON.stringify(S["2,0>2,-1"]) === "[7]" && JSON.stringify(S["2,0>3,0"]) === "[12]" && JSON.stringify(S["3,0>2,0"]) === "[12]");
     ok("D115 sandbox: a vertex 4e-6 degrees off is the same vertex (the 1e-5 snap, road_sections' rule), so R2 joins the shared lane",
-       !feats().some(f => f.geometry.coordinates.some(c => near(c, [1.000004, 0]))));
+       !feats().some(f => f.geometry.coordinates.some(c => near(c, [1.000004, 52]))));
     ok("D115 sandbox: a route not on the forecast this month (R4) adds nothing; points and other types are not legs",
        F.FLOW.legs.length === 5 && JSON.stringify(S["0,0>1,0"]) === "[12]");
     ok("D115 sandbox: each lane says how many legs it sums (fl_legs)", feats().find(f => f.properties.fl_mv === 39).properties.fl_legs === 3);
@@ -6022,97 +6029,92 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     ok("⭐ D115 sandbox: a sidebar filter that lets R2 out re-sums the shared lane over the routes let through (19)",
        JSON.stringify(S["1,0>2,0"]) === "[19]" && !S["2,0>2,1"], JSON.stringify(S));
     passing = { R1: true, R2: true, R3: true, R4: true };
-    const n0 = fmap.log.filter(x => x === "setData:flow-source").length;
-    F.drawFlow(); F.drawFlow();
-    ok("D115 sandbox: the lanes are re-sent only when a figure changed (one setData for the change, none for the repeat)",
-       fmap.log.filter(x => x === "setData:flow-source").length === n0 + 1);
+    F.drawFlow(); const lit0 = F.FLOW.lit; F.drawFlow();
+    // NARROWED 24 Nov 2026 (card 3): nothing is sent to a source on a figure change; the dots' lanes (FLOW.lit) are
+    // worked out again only when a figure changed
+    ok("D115 sandbox: the lanes the dots run along are worked out again only when a figure changed (the same list for the repeat) (NARROWED 24 Nov 2026)",
+       F.FLOW.lit === lit0 && lit0.length > 0 && !fmap.log.some(x => x === "setData:flow-source"));
     a1_data.features[2].properties.f_avg = 26; F.drawFlow();
     ok("D115 sandbox: the next month's figures (f_avg re-stamped on the same legs) re-sum the same lanes without rebuilding them",
-       JSON.stringify(segs()["1,0>2,0"]) === "[45]" && F.FLOW.lanes === F.flowLanes());
+       JSON.stringify(segs()["1,0>2,0"]) === "[45]" && F.FLOW.lanes === F.flowLanes() && F.FLOW.lit !== lit0);
     a1_data.features[2].properties.f_avg = 20; F.drawFlow();
     a1_data.features[0].properties.f_day = 11.6; a1_data.features[2].properties.f_day = 19.7; a1_data.features[3].properties.f_day = 6.9; F.drawFlow();
     ok("⭐ D115 sandbox: a lane sums the UNROUNDED rates (f_day) where the feed stamped them, so it is the Volume figure, not a sum of roundings",
        JSON.stringify(segs()["1,0>2,0"]) === "[38.2]", JSON.stringify(segs()["1,0>2,0"]));
     [0, 2, 3].forEach(i => { delete a1_data.features[i].properties.f_day; }); F.drawFlow();
     // the layer and its order
-    ok("⭐ D115 sandbox: the flow is added right over forecast-layer and under the labels and badges",
-       fmap.order.join(",") === "forecast-casing,forecast-layer,forecast-flow,forecast-labels,forecast-cap-badge,forecast-flow-light", fmap.order.join(","));   // NARROWED 28 Oct 2026 (8d): the dots on top, like the abnormal load's dot
-    fmap.addLayer({ id: "road-load-casing", paint: {}, layout: {} }); fmap.addLayer({ id: "road-load-line", paint: {}, layout: {} }); fmap.addLayer({ id: "road-load-labels", paint: {}, layout: {} });
-    F.placeFlowLayer();
-    ok("D115 sandbox: with the Volume heat map's shared sections on, the flow moves over them (and under their labels)",
-       fmap.order.indexOf("forecast-flow") === fmap.order.indexOf("road-load-line") + 1 && fmap.order.indexOf("forecast-flow") < fmap.order.indexOf("road-load-labels"), fmap.order.join(","));
-    ["road-load-labels", "road-load-line", "road-load-casing"].forEach(id => fmap.removeLayer(id)); F.placeFlowLayer();
-    ok("D115 sandbox: and back under the route labels when they go", fmap.order.indexOf("forecast-flow") === fmap.order.indexOf("forecast-layer") + 1);
-    const fl = fmap.layers["forecast-flow"];
-    // REVERSED 23 Oct 2026 (the user, the route line redesign): the lanes are solid; the volume is the lane's width and
-    // the march is a light running along the lane. Each pin below replaces the dash pin that stood here.
-    const outs = e => e.filter((x, i) => i >= 2 && i % 2 === 0);
-    ok("⭐ D115 sandbox / 23 Oct: the lane as added — offset left (negative), round caps, the width step, the still opacity, no dash, no gradient (NARROWED 28 Oct 2026, 8d)",
-       fl.paint["line-offset"] < 0 && fl.layout["line-cap"] === "round" && JSON.stringify(fl.paint["line-width"]) === JSON.stringify(F.flowWidthExpr())
-       && !("line-gradient" in fl.paint) && fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY
-       && !("line-dasharray" in fl.paint), JSON.stringify(fl.paint));
-    const wexp = F.flowWidthExpr();
-    ok("⭐ D115 sandbox / 23 Oct: the width is a step on fl_mv at the five bands' stops [10, 25, 50, 100], every output a number",
-       wexp[0] === "step" && JSON.stringify(wexp[1]) === JSON.stringify(["to-number", ["get", "fl_mv"], 0])
-       && JSON.stringify(wexp.filter((x, i) => i >= 3 && i % 2 === 1)) === "[10,25,50,100]"
-       && outs(wexp).length === 5 && outs(wexp).every(o => typeof o === "number"), JSON.stringify(wexp));
-    ok("⭐ D115 sandbox / 23 Oct: wider lane = more movements — the widths grow band by band, the thinnest at least 1.6 px",
-       F.FLOW_WIDTHS.every((w, i) => i === 0 || w > F.FLOW_WIDTHS[i - 1]) && F.FLOW_WIDTHS[0] >= 1.6);
-    const plain = F.flowLightPoints(null);
-    ok("🔴 D115 sandbox / 23 Oct: standing still there is no light — no dots, no dash, nothing to march (NARROWED 28 Oct 2026, 8d: dots, not a gradient)",
+    // REVERSED 24 Nov 2026 (card 3): no lane layer; the dots layer is added last, on top, as the 28 Oct light was
+    ok("⭐ D115 sandbox: the dots are added on top of the forecast layers, and no lane layer is added at all (REVERSED 24 Nov 2026, card 3)",
+       fmap.order.join(",") === "forecast-casing,forecast-layer,forecast-labels,forecast-cap-badge,forecast-flow-light" && !fmap.log.includes("add:forecast-flow"), fmap.order.join(","));
+    ok("D115 sandbox: the road-load sections do not move the dots (no placing step since 24 Nov 2026, card 3)",
+       !fmap.log.some(x => /^move:forecast-flow/.test(x)));
+    ok("D115 sandbox: and no lane layer comes back after a re-add (REVERSED 24 Nov 2026, card 3)", (F.ensureFlowLayer(), !fmap.layers["forecast-flow"]));
+    const fl = fmap.layers["forecast-flow-light"];
+    // REVERSED 23 Oct 2026 (the user, the route line redesign), REVERSED again 24 Nov 2026 (card 3): the dots replace
+    // the lanes. Each pin below replaces the lane pin that stood here.
+    // NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting): the arrowheads replace the dots
+    ok("⭐ D115 sandbox / 24 Nov: the arrowheads as added — one picture, turned by each mark's rot on the map, full opacity, no filter (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       fl.layout["icon-image"] === "flow-arrowhead" && JSON.stringify(fl.layout["icon-rotate"]) === '["get","rot"]' && fl.layout["icon-rotation-alignment"] === "map"
+       && fl.paint["icon-opacity"] === 1 && !fl.spec.filter, JSON.stringify(fl.layout));
+    ok("⭐ D115 sandbox / 24 Nov: ONE gap and ONE speed for every road (90 px, 13 px a second on screen): the marks say the way, not the amount (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       F.FLOW_MARK_GAP === 90 && F.FLOW_MARK_SPEED === 13 && F.FLOW_MARK_SIDE === 2.7);
+    const plain = F.flowMarkPoints(null);
+    ok("🔴 D115 sandbox / 23 Oct: with no drift time there are no marks (a council view asks for none) (NARROWED 24 Nov 2026, card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
        plain.type === "FeatureCollection" && plain.features.length === 0);
     let lightOk = true, lightWhy = "";
-    const litN = (F.FLOW.lit || []).length;
-    for (const t of [0, 0.1, 0.33, 0.5, 0.66, 0.9, 0.999]) {
-      const g = F.flowLightPoints(t), pts = g.features.map(f => f.geometry.coordinates);
+    for (const t of [0, 100, 1000, 3333, 60000, 1e7]) {
+      const g = F.flowMarkPoints(t), pts = g.features.map(f => f.geometry.coordinates);
       const fin = pts.every(c => Number.isFinite(c[0]) && Number.isFinite(c[1]));
-      if (!fin || g.features.length !== litN * F.FLOW_PULSES || litN === 0 || !g.features.every(f => f.geometry.type === "Point")) { lightOk = false; lightWhy = "t=" + t + " " + g.features.length + "/" + litN + " " + JSON.stringify(pts).slice(0, 120); break; }
+      if (!fin || !g.features.length || !g.features.every(f => f.geometry.type === "Point")) { lightOk = false; lightWhy = "t=" + t + " " + g.features.length + " " + JSON.stringify(pts).slice(0, 120); break; }
     }
-    ok("⭐ D115 sandbox / 23 Oct: the light at any phase — FLOW_PULSES dots on every lane with movements, each a point with finite coordinates (NARROWED 28 Oct 2026, 8d)",
+    ok("⭐ D115 sandbox / 24 Nov: the arrowheads at any drift time — points with finite coordinates on the lanes with movements (NARROWED 24 Nov 2026, card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
        lightOk, lightWhy);
     {
-      // a two-point lane: the dot at phase 0 is its start, at 0.5 its middle; a phase step moves the dot along it
-      const lane = F.laneMetric({ coords: [[0, 0], [1, 0]] });
-      const one = (t) => { const keep = F.FLOW.lit; F.FLOW.lit = [lane]; const g = F.flowLightPoints(t); F.FLOW.lit = keep; return g.features.map(f => f.geometry.coordinates[0]); };
-      const p0 = one(0), p5 = one(0.5);
-      ok("⭐ 8d (sandbox): the dots sit ON the lane — at phase 0 on its start, a third and two thirds along; at 0.5 in its middle; the x of a dot grows with the phase",
-         lane.len > 0 && p0.length === F.FLOW_PULSES && Math.abs(p0[0]) < 1e-9 && Math.abs(p0[1] - 1 / 3) < 1e-9 && Math.abs(p0[2] - 2 / 3) < 1e-9
-         && Math.abs(p5[0] - 0.5) < 1e-9 && Math.abs(p5[1] - (0.5 + 1 / 3) % 1) < 1e-9, JSON.stringify([p0, p5]));
+      // a one-degree lane due east at zoom 8 (W = 131,072 px a world): about 364 px on screen, one mark every 90 px
+      const keep = F.FLOW.lit;
+      F.FLOW.lit = [{ lane: { coords: [[0, 52], [1, 52]] } }];
+      const gf = F.flowMarkPoints(0).features, g = gf.map(f => f.geometry.coordinates);
+      F.FLOW.lit = keep;
+      const lanePx = 512 * Math.pow(2, 8) / 360;
+      ok("⭐ 24 Nov (sandbox): along a lane one arrowhead every gap — about its length ÷ 90 px on a 364 px lane, every one just NORTH of an east-bound lane (left of its travel) and pointing east (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+         Math.abs(g.length - lanePx / 90) <= 1 && g.every(c => c[1] > 52 && c[1] < 52.01) && g.every((c, i) => i === 0 || c[0] > g[i - 1][0])
+         && gf.every(f => f.properties.rot === 90), g.length + " " + JSON.stringify(g.slice(0, 2)));
     }
-    ok("⭐ D115 sandbox / 23 Oct: SAME SPEED — one phase from the frame clock moves the light on every lane at once, no per-band step",
-       /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);/.test(code) && F.FLOW_PULSE_SPEED > 0 && F.FLOW_PULSE_SPEED < 1);
+    ok("⭐ D115 sandbox / 23 Oct: SAME SPEED — one frame clock moves the dots on every lane at once, no per-band step (NARROWED 24 Nov 2026: px a second on screen)",
+       /_flowT=ts; setFlowMarks\(_flowClock\);/.test(code) && F.FLOW_MARK_SPEED > 0);   // NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)
     ok("D115 sandbox / 23 Oct: the rail's cycle is still a whole number of its seven steps",
        F.FLOW_CYCLE > 0 && F.FLOW_CYCLE % 7 === 0, String(F.FLOW_CYCLE));
-    ok("D115 sandbox / 23 Oct: on screen the lanes are 1.6, 2.1, 2.6, 3.2 and 3.8 px wide, fewest movements first",
-       JSON.stringify(F.FLOW_WIDTHS) === "[1.6,2.1,2.6,3.2,3.8]");
-    F.setFlowPulse(0.3);
+    F.drawFlow();
     const dots = () => (fmap.sources[F.FLOW_LIGHT_SOURCE] && fmap.sources[F.FLOW_LIGHT_SOURCE]._data || { features: [] }).features.length;
-    ok("⭐ D115 sandbox / 23 Oct: playing, full opacity goes on the lane and the dots go on their source; the caps stay round (NARROWED 28 Oct 2026, 8d)", fl.layout["line-cap"] === "round"
-       && fl.paint["line-opacity"] === 1 && !("line-gradient" in fl.paint) && dots() === (F.FLOW.lit || []).length * F.FLOW_PULSES && dots() > 0, String(dots()));
-    F.setFlowPulse(null);
-    ok("⭐ D115 sandbox / 23 Oct: standing still again (pause, stop, reduced motion): the still opacity and no dots",
-       fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY && dots() === 0);
+    ok("⭐ D115 sandbox / 24 Nov: standing still (no Play), the arrowheads are on their source as soon as the lanes are drawn (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting): they show whenever a month is on screen)",
+       dots() > 0 && dots() === F.FLOW.marksShown && !fmap.layers["forecast-flow"], String(dots()));
+    F.setFlowMarks(1000);
+    ok("⭐ D115 sandbox / 24 Nov: drifting, they are set again at the drift time (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       dots() > 0 && dots() === F.FLOW.marksShown);
+    F.setFlowMarks(null);
+    ok("⭐ D115 sandbox / 24 Nov: asked for none (null), there are none", dots() === 0 && F.FLOW.marksShown === 0);
     // the legend
     const lg = el("flow-legend");
-    ok("⭐ D115 sandbox / 23 Oct: the legend says 'Wider lane = more movements a day', each way, the month, and the five band figures",
-       lg.hidden === false && lg.innerHTML.includes("<b style=\"margin:0\">Movements a day, each way</b>") && lg.innerHTML.includes("In Oct 2026") && lg.innerHTML.includes('aria-controls="info-flow"')   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): the title says it, the paragraph behind an i */
-       && ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].every(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
-    ok("D115 sandbox / 23 Oct: ...that each direction is its own lane on the left, the lane shows a shared road's total, the light moves while Play runs, the bands are fixed",
-       lg.innerHTML.includes("Each direction has its own lane, on the left.") && !lg.innerHTML.includes("while the timeline plays")
-       && lg.innerHTML.includes("Where routes share a road, the lane shows their total") && lg.innerHTML.includes("While Play runs, a light moves along each lane the way its lorries go")
-       && !lg.innerHTML.includes("a spacing means the same number in every month"));
-    ok("D115 sandbox / 23 Oct: each band's sample is drawn as the map draws it (a solid white lane of the band's width on the 6 px blue, no dash)",
-       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-width="1.6"') && lg.innerHTML.includes('stroke-width="3.8"')
-       && lg.innerHTML.includes('stroke-opacity="0.9"') && lg.innerHTML.includes('stroke-width="6"') && !lg.innerHTML.includes("stroke-dasharray") && lg.innerHTML.includes('aria-hidden="true"'));
-    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /Movements a day/.test(lg.innerHTML));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
-    month = null; F.renderFlowLegend();
-    ok("D115 sandbox: with no single month (Show forecast over the span) the legend says it is a daily average over the months",
-       lg.innerHTML.includes("A daily average, Sep 2026 to Dec 2026")   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8) */, lg.innerHTML.slice(0, 200));
-    month = 10;
+    F.renderFlowLegend();
+    // REVERSED 24 Nov 2026, 22:46 UTC (Q14, card 3b): the title "Movements a day, each way", the month line and the five
+    // band rows are gone; ONE row, an arrowhead each way and "Direction of travel", with its "i"
+    ok("⭐ D115 sandbox / 23 Oct: the key is ONE row — an arrowhead sample, 'Direction of travel' and an 'i'; no title, no month, no band rows (REVERSED 24 Nov 2026, Q14)",
+       lg.hidden === false && lg.innerHTML.includes("<span>Direction of travel</span>") && lg.innerHTML.includes('aria-controls="info-flow"')
+       && !lg.innerHTML.includes("Movements a day") && !lg.innerHTML.includes("In Oct 2026")
+       && !["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].some(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
+    ok("D115 sandbox / 24 Nov: ...its 'i' says the arrowheads show the way lorries travel, each on its own side, and are not vehicles (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       lg.innerHTML.includes("The arrowheads show the way lorries travel, each direction on its own side of the line. They are not vehicles.")
+       && !lg.innerHTML.includes("dots") && !lg.innerHTML.includes("Each direction has its own lane") && lg.innerHTML.includes('aria-label="About the arrowheads"'));
+    ok("D115 sandbox / 24 Nov: the sample is a line with an arrowhead each way, at the closure sample's scale, no dash, no white lane (NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 1 && (lg.innerHTML.match(/<polygon /g) || []).length === 2
+       && !lg.innerHTML.includes("<circle") && !lg.innerHTML.includes("stroke-dasharray") && lg.innerHTML.includes('aria-hidden="true"'));
+    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /lorries/.test(lg.innerHTML));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8); NARROWED 24 Nov 2026 (Q14)
     focus = true; F.renderFlowLegend();
     ok("D115 sandbox: the council view (no flow drawn there) hides the legend", lg.hidden === true);
+    F.setFlowMarks(1000);
+    ok("24 Nov (sandbox): and makes no arrowheads while it is on", dots() === 0);
     focus = false; a1_data.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); F.drawFlow();
-    ok("D115 sandbox: a month with nothing approved draws no lane and shows no legend", feats().length === 0 && lg.hidden === true);
+    ok("D115 sandbox: a month with nothing approved has no lane with movements and shows no legend", feats().length === 0 && F.FLOW.lit.length === 0 && lg.hidden === true);
     // a re-add while playing marches on at once (the basemap switch)
     a1_data.features.forEach(f => { if (f.properties && f.properties.route_id !== "R4") f.properties.is_forecast = true; });
   }
@@ -6612,8 +6614,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      (code.match(/'line-color': '#ffffff', 'line-width': ABN_CASING_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
      && (code.match(/'line-color': ABN_LINE, 'line-width': ABN_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
      && (src.match(/an ink line each/g) || []).length === 0 && !html.includes("an ink line each") && /* NARROWED 28 Oct 2026 (task 0a): the sentence is the i box's, in the markup */ html.includes("each as its route in the month it moves") && src.includes("'The raspberry line: the load’s own line. Rings: '")   /* NARROWED 23 Oct 2026 afternoon: raspberry */ && src.includes("background:#fff;border:2px solid ${ABN_DOT[k]}"));
-  ok("23 Oct: the words follow — no 'violet dash', no 'Closer dashes' left in the page; the flow legend says wider lane",
-     !/violet dash/i.test(code) && !/Closer dashes/.test(code) && !/Violet dashes:/.test(code) && /' a day' : 'Movements a day'/.test(code));   // NARROWED 28 Oct 2026 (task 0a): "Movements a day, each way" (was "Wider lane = more"); code, not src: a comment may say what was
+  ok("23 Oct: the words follow — no 'violet dash', no 'Closer dashes' left in the page; the flow key says 'Direction of travel' (NARROWED 24 Nov 2026, Q14: no 'Movements a day' title)",
+     !/violet dash/i.test(code) && !/Closer dashes/.test(code) && !/Violet dashes:/.test(code) && code.includes("'<span>Direction of travel</span>'"));   // NARROWED 28 Oct 2026 (task 0a): "Movements a day, each way" (was "Wider lane = more"); code, not src: a comment may say what was
 }
 
 // ---- 23 Oct 2026 (afternoon): the abnormal loads on the public map's figures bar and in the animation — the user's five answers
@@ -7157,10 +7159,12 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
 
   // ---- the light's dots
-  ok("8d: the dots layer: white with a thin ink edge, radius by zoom, on its own source, quietened with the lanes in the council view and removed with them",
-     /id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE,[\s\S]{0,400}'circle-stroke-color': '#1F2024'/.test(code)
-     && code.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")
-     && (code.match(/'forecast-flow','forecast-flow-light','forecast-cap-badge'\]/g) || []).length === 2 && !/flowPulse\(|line-progress/.test(code));
+  // NARROWED 24 Nov 2026 (card 3): the ring is the darkest band blue and the radius one size on screen (the gaps are px
+  // on screen at every zoom); the lanes' layer left the council list and the removal lists
+  ok("8d: the flow's marks layer: one arrowhead picture with a thin dark blue outline, on its own source, quietened in the council view and removed with the forecast layers (NARROWED 24 Nov 2026; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
+     /id: 'forecast-flow-light', type: 'symbol', source: FLOW_LIGHT_SOURCE,[\s\S]{0,400}'icon-image': FLOW_MARK_IMG/.test(code) && /g\.strokeStyle = FLOW_MARK_RING;/.test(code)
+     && code.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow-light', 'forecast-cap-badge'];")
+     && (code.match(/'forecast-casing','forecast-flow-light','forecast-cap-badge'\]/g) || []).length === 2 && !/flowPulse\(|line-progress/.test(code));
   const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
   ok("8d: the user guide names Standard, Standard satellite and the Light row in a few words; the technical guide says the engine is 3.33.0",
      guide.includes("Standard (3D buildings and landmarks when zoomed in), Standard satellite,") && guide.includes("On Standard a Light row sets the time of day (Day, Dawn, Dusk, Night).")
@@ -7244,8 +7248,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && /<div class="info-pop" id="info-collisions" hidden><p id="collision-when">/.test(html));
   ok("0a card 2: the visitors' abnormal loads — one short line ('1 this month · 8–12 Mar 2027'), the explanation behind the 'i'",
      /<div class="info-pop" id="info-abnormal-public" hidden>/.test(html) && code.includes("'None this month'"));
-  ok("0a card 2: the flow key's title says it ('Movements a day, each way'); its paragraph is behind an 'i' that stays open across a rebuild",
-     code.includes("', each way</b>'") && code.includes("const was = document.getElementById('info-flow'), open = !!(was && !was.hidden);"));
+  ok("0a card 2: the flow key's row says it ('Direction of travel'); its paragraph is behind an 'i' that stays open across a rebuild (NARROWED 24 Nov 2026, Q14: was the title 'Movements a day, each way')",
+     code.includes("'<span>Direction of travel</span>'") && code.includes("const was = document.getElementById('info-flow'), open = !!(was && !was.hidden);"));
   ok("⭐ 0a card 3: the road closures' provider is on the map's credit line (the source's attribution), not printed in the panel",
      /addSource\('restrictions-source', \{ type:'geojson', data: RESTR\.data,\s*attribution: \(RESTR\.provider && RESTR\.provider\.name\) \|\| '' \}\)/.test(code)
      && !code.includes("'Source: ' + cat.provider.name"));
@@ -7268,7 +7272,9 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("⭐ 0a card 5: the site NAMES are a layer (they were never drawn), filtered and shown with their marks; the marks make room for names",
      /id: 'location-names', type: 'symbol', source: 'routes-source'/.test(code)
      && /map\.setFilter\('location-names', \['all', \['==', \['get', 'type'\], 'Node'\], \['in', \['get', 'loc_kind'\], \['literal', visibleLocKinds\(\)\]\]\]\);/.test(code)
-     && /'icon-allow-overlap': true, 'icon-ignore-placement': false,/.test(code) && !/'icon-ignore-placement': true/.test(code));
+     && /'icon-allow-overlap': true, 'icon-ignore-placement': false,/.test(code)
+     // NARROWED 24 Nov 2026 (Q14, card 3b): ONE layer may ignore placement, the flow's arrowheads, so they never push a name away
+     && (code.match(/'icon-ignore-placement': true/g) || []).length === 1 && /id: 'forecast-flow-light', type: 'symbol'[\s\S]{0,400}'icon-ignore-placement': true/.test(code));
   ok("0a: a layer already done carries a marker that draws nothing (text-translate-anchor 'map', its default) beside its signature; a re-added layer has none, so it is done again",
      code.includes("if (!force && LABELS.done.get(id) === sig && map.getPaintProperty(id, 'text-translate-anchor') === 'map') return;")
      && code.includes("map.setPaintProperty(id, 'text-translate-anchor', 'map');") && !/new WeakMap/.test(code.slice(code.indexOf("const LABEL_MODES"), code.indexOf("function syncLabelsSwitch"))));

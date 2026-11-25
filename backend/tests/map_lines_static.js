@@ -164,14 +164,15 @@ ok("C12 measured: the lightest blue on its white casing and on the Light basemap
 ok("C13 the sign blue (heat map Off) parts from its white casing at ≥ 4.5:1", contrast("#0B4EA2", "#FFFFFF") >= 4.5);
 
 // ---------------------------------------------------------------------------------------------------------------
-console.log("D. The flow's lanes (Group B replaces them): kept working, and no lane on a line too thin to hold it");
-ok("D1 kept: the lanes, their widths and their light are as they were (Group B's task)",
-   html.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];") && html.includes("const FLOW_OFFSET = -1.75;")
-   && html.includes("const FLOW_STILL_OPACITY = 0.35;") && html.includes("const FLOW_PULSES = 3;"));
-ok("D2 a lane (1.6 px, 1.75 px off the middle) does not fit a 3 px line, so while a heat map is on the first band has no lane",
-   1.75 + 1.6 / 2 > 3 / 2
-   && /function flowWidthExpr\(hideFirst\)\{[\s\S]{0,300}hideFirst \? 0 : FLOW_WIDTHS\[0\]/.test(html)
-   && acm.includes("map.setPaintProperty('forecast-flow', 'line-width', flowWidthExpr(heat && !focus));"));
+// REVERSED 24 Nov 2026 (claude/map-lines-flow, card 3): Group B replaced the lanes with dots; the lanes' pins here are
+// reversed to "gone", the dots' own checks are in map_lines_flow.js
+console.log("D. The flow's lanes: replaced by the dots (Group B, map_lines_flow.js)");
+ok("D1 REVERSED 24 Nov 2026 (card 3): the lanes, their widths, their offset, their still opacity and their three lights are gone",
+   !html.includes("const FLOW_WIDTHS") && !html.includes("const FLOW_OFFSET")
+   && !html.includes("const FLOW_STILL_OPACITY") && !html.includes("const FLOW_PULSES") && html.includes("const FLOW_MARK_GAP = 90;"));   // NARROWED 24 Nov 2026 (Q14, card 3b): arrowheads, not dots
+ok("D2 REVERSED 24 Nov 2026 (card 3): no lane width to fit to a line, so the heat map sets none (flowWidthExpr and hideFirst gone)",
+   !/function flowWidthExpr/.test(html) && !/hideFirst/.test(html)
+   && !acm.includes("'forecast-flow'") && !acm.includes("flowWidthExpr"));
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("E. Card 9: the alternatives, a thinner neutral grey");
