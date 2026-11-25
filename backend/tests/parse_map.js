@@ -2785,8 +2785,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): ONE width in EVERY mode again, 5 on
   // 7.6 px; LINE_BAND_WIDTHS, LINE_BAND_PAD and bandWidthExpr are GONE; the shared sections take the same two widths at
   // their adder (three uses of the line width, four of the casing)
-  ok("⭐ width by volume (NARROWED 25 Nov 2026): one width in every mode (5 / 7.6 px); no width step by band, no interpolation, the band helpers gone",
-     code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
+  ok("⭐ width by volume (NARROWED 25 Nov 2026): one width in every mode (4 / 6.6 px; 25 Nov, John: 'TRY 4 PX'); no width step by band, no interpolation, the band helpers gone",
+     code.includes("const FORECAST_LINE_WIDTH = 4;") && code.includes("const FORECAST_CASING_WIDTH = 6.6;")
      && !code.includes("LINE_BAND_WIDTHS") && !code.includes("LINE_BAND_PAD") && !code.includes("bandWidthExpr")
      && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
      && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv|f_co2)'\]/.test(code)
@@ -5921,8 +5921,8 @@ ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one);
   // are not drawn there (flowWidthExpr(true): width 0 on the first band) until the dots replace them
   // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width in every mode, so every band
   // has its lane again: flowWidthExpr takes no argument and applyCarbonMode no longer re-sets the lanes' width
-  ok("⭐ D115: the blue under the lanes is the road, NOT offset; one width in every mode (5 / 7.6 px), a lane on every band (NARROWED 25 Nov 2026)",
-     code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
+  ok("⭐ D115: the blue under the lanes is the road, NOT offset; one width in every mode (4 / 6.6 px; 25 Nov, John: 'TRY 4 PX'), a lane on every band (NARROWED 25 Nov 2026)",
+     code.includes("const FORECAST_LINE_WIDTH = 4;") && code.includes("const FORECAST_CASING_WIDTH = 6.6;")
      && !code.includes("CARBON_LINE_WIDTH") && !code.includes("ROAD_LOAD_LINE_WIDTH")
      && !code.includes("flowWidthExpr(heat") && !code.includes("hideFirst")
      && /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], FLOW_WIDTHS\[0\]\];/.test(code)
