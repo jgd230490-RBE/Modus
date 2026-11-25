@@ -52,8 +52,9 @@ ok("1 type: every canvas text on a chart is IBM Plex Sans (the Routes map's sign
    canvasFaces.length >= 10 && notPlex.length === 0, notPlex.join(" | "));
 ok("1 type: Chart.js draws its own axes and keys in IBM Plex Sans (guarded: a stub Chart has no font object)",
    html.includes("if(window.Chart.defaults.font) window.Chart.defaults.font.family = \"'IBM Plex Sans', system-ui, sans-serif\";"));
-ok("1 type: a chart's downloaded picture and the record's picture name IBM Plex Sans first",
-   (html.match(/font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"/g) || []).length === 2);
+// 25 Nov 2026 (Dashboard rethink A2, gate dials): the gate dials' picture is a third, so 2 -> 3
+ok("1 type: a chart's downloaded picture, the record's picture and the gate dials' picture name IBM Plex Sans first",
+   (html.match(/font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"/g) || []).length === 3);
 
 // ---- 2 greys -------------------------------------------------------------------------------------------------------
 const twAt = html.indexOf('<script src="/vendor/tailwind-play-3.4.17.js"></script>');
