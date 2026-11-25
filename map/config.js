@@ -27,7 +27,6 @@ window.CONFIG = {
     brandDark:         "#1F2024",  // ink (headings)
     forecast:          "#0B4EA2",  // the forecast line, heat map Off: one sign blue
     forecastCasing:    "#FFFFFF",  // the white casing under a forecast line (light grounds)
-    forecastLabelHalo: "#0B4EA2",  // halo behind forecast labels (24 Nov 2026: the sign blue)
     selection:         "#DC2626",  // a clicked/selected route
     peak:              "#DC2626",  // alerts / peak values (theme red)
     green:             "#059669"   // success / confirmations
