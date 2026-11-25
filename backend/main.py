@@ -7642,10 +7642,14 @@ def public_traffic_limits():
                 lim["limit"] = {k: lim["limit"][k] for k in ("value", "counts", "basis")}
                 mv = lim["limit"]["counts"] == "movements"
                 for v in lim["months"].values():
+                    # 24 Nov 2026 (card 7; seen on live: "159 … 81 in, 77 out", 158): the card's in / out, split as the
+                    # bulletin prints them, so they add up to the figure as shown (bulletin_doc.tl_split_parts)
+                    if mv:
+                        v["in_shown"], v["out_shown"] = bulletin_doc.tl_split_parts(
+                            v["value"], lim["limit"]["value"], v.get("in_per_day"), v.get("out_per_day"))
                     # the popup's route table: each route's own figure a day, in the limit's unit (nothing else)
-                    v["routes"] = [{"route_id": r["route_id"],
-                                    "a_day": round(r["in_per_day"] + r["out_per_day"] if mv else r["visits_per_day"], 1)}
-                                   for r in v.get("routes") or []]
+                    # 24 Nov 2026 (card 7): whole numbers that add up, the road card's rule (section_select.limit_rows)
+                    v["routes"] = section_select.limit_rows(v.get("routes") or [], movements=mv)
             return read_cache.json_bytes(body)
     body = read_cache.cached(TRAFFIC_LIMITS_CACHE, (MONTH_COUNT,), build)
     return Response(content=body, media_type="application/json")
