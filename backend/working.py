@@ -48,6 +48,11 @@ BUSY_STATUS = 423
 # name: the job as the refusal names it; plural: "are running / they finish"; page: where it is pressed;
 # may: who may start it (admin = an admin LOGIN, planner = a planner or an admin, staff = any staff sign-in);
 # kept: what a stopped line says is kept
+# 25 Nov 2026 (the Routes page rethink, Q9: "Make primary" is gone from what a person reads; the button is "Use Alt 1
+# as the main route"): the "Working" list's name for that job. Card 6 did not draw it: proposed to John, ONE constant
+# so his word changes it in one place (the line reads "R050: main route change stopped"). The key stays make_primary.
+MAIN_ROUTE_JOB = "Main route change"
+
 KINDS = {
     "route_all":    {"name": "Route all", "plural": False, "by": "page", "page": "routes", "may": "admin",
                      "kept": "the routes worked out are kept"},
@@ -57,7 +62,7 @@ KINDS = {
                      "kept": "the routes worked out are kept"},
     "route_again":  {"name": "Route again", "plural": False, "by": "page", "page": "routes", "may": "admin",
                      "kept": "the routes worked out are kept"},
-    "make_primary": {"name": "Make primary", "plural": False, "by": "held", "page": "routes", "may": "admin", "kept": ""},
+    "make_primary": {"name": MAIN_ROUTE_JOB, "plural": False, "by": "held", "page": "routes", "may": "admin", "kept": ""},
     "import":       {"name": "Replace from a file", "plural": False, "by": "held", "page": "config", "may": "admin",
                      "kept": ""},
     "community":    {"name": "The community places fetch", "plural": False, "by": "server", "page": "config",
@@ -181,7 +186,7 @@ def line(kind, state, done=0, total=None, subject=None, detail=None):
         if state == "done":
             return f"{rid}: {lab} made the main route"
         if state == "stopped":
-            return f"{rid}: Make primary stopped"
+            return f"{rid}: {MAIN_ROUTE_JOB[0].lower() + MAIN_ROUTE_JOB[1:]} stopped"
         return f"{rid}: making {lab} the main route"
     if kind == "import":
         return "Organisation file: " + {"done": "replaced", "stopped": "replace stopped"}.get(state, "replacing")

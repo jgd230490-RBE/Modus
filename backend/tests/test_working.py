@@ -499,8 +499,9 @@ if working:
     ok("7. a held job (Make primary) is running while this process holds it", working.listing(ADMIN)["jobs"][0]["state"] == "running")
     working._HELD.clear()
     row = working.listing(ADMIN)["jobs"][0]
+    # REVERSED 25 Nov 2026 (the Routes page rethink, Q9: "Make primary" gone where a person reads; John: "Yes, as recommended"): the stopped line read "R050: Make primary stopped"
     ok("⭐ 7. ...and reads stopped at once when the process no longer holds it (a restart), with no Carry on and a close",
-       row["state"] == "stopped" and row["line"] == "R050: Make primary stopped" and row["can_carry"] is False
+       row["state"] == "stopped" and row["line"] == "R050: main route change stopped" and row["can_carry"] is False
        and row["can_close"] is True and working.refusal("route_all") is None, str(row))
     db.execute("UPDATE working_jobs SET beat_at = ?, started_at = ? WHERE tenant_id = ? AND id = ?", (iso(31), iso(31), T, h["id"]))
     ok("7. ...and leaves the list after 30 minutes", working.listing(ADMIN)["jobs"] == [])
@@ -689,6 +690,16 @@ if working:
     ok("11. the technical guide's paragraph: the record, the stopped gap and the refusal",
        'id="t4-working"' in TG and "working_jobs" in TG and "working.GAP" in TG and "423" in TG
        and "db.NO_DATA_TABLES" in TG[TG.index('id="t4-working"'):TG.index('id="t4-working"') + 1200])
+
+# 25 Nov 2026 (the Routes page rethink, Q9): the job's name is ONE constant (proposed to John: "Main route change"),
+# and no line the list can write says "Make primary"
+if working:
+    ok("⭐ Q9. the main-route job's name is working.MAIN_ROUTE_JOB, its stopped line follows it, and 'Make primary' is gone",
+       working.KINDS["make_primary"]["name"] == working.MAIN_ROUTE_JOB == "Main route change"
+       and working.line("make_primary", "stopped", 0, None, "R050", {"label": "Alt 1"}) == "R050: main route change stopped"
+       and not any("Make primary" in working.line("make_primary", st, 0, None, "R050", {"label": "Alt 1"})
+                   for st in ("running", "done", "stopped"))
+       and "Make primary" not in working.sentence("make_primary", "route_all"))
 
 if not working:
     # the code before this branch: every starred check above fails by name (none of them can run without the module)
