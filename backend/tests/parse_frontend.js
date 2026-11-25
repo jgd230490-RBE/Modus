@@ -5558,8 +5558,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("🔴 ROUTES PAGE: the box, the popups and the full screen columns print no back-end word and no status number",
      ![box, pop, lst, det].some(s => /\b(api|endpoint|server|token|cached|geometry|bake[ds]?|HERE)\b/.test(s.replace(/data-[a-z-]+=|\/\/[^\n]*/g, "")))
      && !/r\.status/.test(dmr.slice(dmr.indexOf("const rlRead"), dmr.indexOf("const toggleRLayer"))));
-  ok("⭐ ROUTES PAGE (2.1-7): out green, back amber, solid, each left of its travel, white arrows on the leg's colour; the picked route a blue halo",
-     code.includes('const LEG_OUT = "#059669", LEG_BACK = "#F59E0B", SEL_HALO = "#1D4ED8";')
+  // REVERSED 24 Nov 2026 (Routes rethink, Q3 and Q4; John: "Yes, as recommended"): out ink, back grey (the public map's pair), the
+  // sign blue for a pick (was out green #059669, back amber #F59E0B, the halo #1D4ED8)
+  ok("⭐ ROUTES PAGE (2.1-7, REVERSED 24 Nov): out ink, back grey, solid, each left of its travel, white arrows on the leg's colour; the sign blue for a pick",
+     code.includes('const LEG_OUT = "#3A3C41", LEG_BACK = "#8E9197", SEL_HALO = "#0B4EA2";') && !code.includes('const LEG_OUT = "#059669"')
      && code.includes('const LEG_COLOR_EXPR = ["match", ["get", "leg"], "return", LEG_BACK, LEG_OUT];')
      && code.includes('const LEG_OFFSET = ["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5];')
      && dmr.includes('id: "route-arrows", type: "symbol"') && dmr.includes('"icon-halo-color": LEG_COLOR_EXPR'));

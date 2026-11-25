@@ -254,10 +254,15 @@ ok("⭐ 3. 'No other option is clearly better.'", getattr(RB, "NONE_BETTER_WORDS
 SRC = read("backend", "route_best.py")
 CODE = "\n".join(l.split("#")[0] for l in SRC.splitlines())          # comments may quote the old words
 ok("⭐ 3. the rule's sentences carry no 'head': 'clearly ahead on any head' and 'level on every head' are gone",
-   "clearly ahead on any head" not in CODE and "level on every head" not in CODE and "level on every measure" in CODE)
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the short line's empty case reads "the same on every measure" (it read "level on every
+   # measure"; nothing says ahead or level now)
+   "clearly ahead on any head" not in CODE and "level on every head" not in CODE and "the same on every measure" in CODE
+   and "level on every measure" not in CODE)
 HTML = read("frontend", "index.html")
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "clearly better on one measure and worse on none" (it read "clearly ahead … behind on none")
 ok("⭐ 3. the card's 'i' box says 'measure', not 'head'",
-   "clearly ahead on one measure and behind on none" in HTML and "ahead on one head" not in HTML)
+   "clearly better on one measure and worse on none" in HTML and "ahead on one head" not in HTML
+   and "clearly ahead on one measure" not in HTML)
 
 
 # =========================================================================== #
@@ -287,13 +292,14 @@ def demo(use, alts):
 # (driving 90 min, so a 2.4 min gap is under the rule's 3 % and the time is "the same", as on live)
 LONGER = demo(M(20, 0, 17, 3, 0.4, 3, 40.0, 90.0, 100.0, 5, 40.0),
               [(1, M(20, 0, 12, 3, 0.4, 3, 40.4, 91.0, 102.4, 5, 31.8))])
-ok("⭐ 4. a LONGER suggestion opens with what it gains: '5 fewer left turns and 8.2 kg CO₂e less a trip, for 2.5 min "
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "left-hand turns" (it read "left turns")
+ok("⭐ 4. a LONGER suggestion opens with what it gains: '5 fewer left-hand turns and 8.2 kg CO₂e less a trip, for 2.5 min "
    "longer a round trip.'", LONGER["answer"] == RB.SUGGESTED and LONGER["why"] ==
-   "5 fewer left turns and 8.2 kg CO₂e less a trip, for 2.5 min longer a round trip.", LONGER["why"])
+   "5 fewer left-hand turns and 8.2 kg CO₂e less a trip, for 2.5 min longer a round trip.", LONGER["why"])
 QUICKER = demo(M(20, 0, 17, 3, 0.4, 3, 40.0, 50.0, 104.0, 5, 40.0),
                [(1, M(20, 0, 12, 3, 0.4, 3, 39.0, 46.0, 100.5, 5, 39.9))])
-ok("4. a quicker suggestion keeps the time first, in halves: '3.5 min quicker a round trip, with 5 fewer left turns.'",
-   QUICKER["answer"] == RB.SUGGESTED and QUICKER["why"] == "3.5 min quicker a round trip, with 5 fewer left turns.",
+ok("4. a quicker suggestion keeps the time first, in halves: '3.5 min quicker a round trip, with 5 fewer left-hand turns.'",
+   QUICKER["answer"] == RB.SUGGESTED and QUICKER["why"] == "3.5 min quicker a round trip, with 5 fewer left-hand turns.",
    QUICKER["why"])
 # two trade-offs: Alt 1 fewer left turns but more carbon; Alt 2 the same kind of trade
 TWO = demo(M(20, 0, 17, 3, 0.4, 3, 40.0, 50.0, 100.0, 5, 40.0),
