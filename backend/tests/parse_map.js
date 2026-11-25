@@ -3701,14 +3701,15 @@ ok("reduced motion: no motion while playing when it matches — the arrowheads s
     // 25 Nov 2026 (one width again): the band widths the sandbox was handed on 24 Nov are gone with them
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks", "labelAnchor",
-        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
+        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow", "FLOW_LANES_SHOWN",
         blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff, carbonLabelPoints };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {}, () => undefined,
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
         // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
         // review): else no window (null), as the page now says
-        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null);
+        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null,
+        false);   // 25 Nov 2026: the old lanes are not shown (FLOW_LANES_SHOWN, the flow block's switch)
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
     if (blkApi) {
@@ -6026,7 +6027,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
        guide.includes("each direction on its own side, on the left as driven") && guide.includes("<strong>They show the way, not how many</strong>")
        && guide.includes("they drift the way the lorries go") && guide.includes("paused, or with reduced motion set on your device, they stand still")
        && !guide.includes("white dashes run along the blue routes from origin to destination") && !guide.includes("A wider lane means more movements a day")
-       && !guide.includes("The closer the dots"));
+       && !guide.includes("The closer the dots")
+       && guide.includes("Every line is one width; the darker its blue, the more movements a day") && !guide.includes("own lane"));   // 25 Nov 2026: static's one-width sentence kept
   }
 
   // ---- the block, run against a fake map and DOM ----

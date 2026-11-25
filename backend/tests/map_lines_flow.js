@@ -40,6 +40,10 @@ ok("A1 no lane layer, no lanes' source, no lane widths, offset, still opacity or
    !/'forecast-flow'/.test(code) && !html.includes("const FLOW_SOURCE") && !html.includes("'flow-source'")
    && !/const FLOW_(WIDTHS|OFFSET|STILL_OPACITY|PULSES|PULSE_LEN|PULSE_SPEED)\b/.test(html)
    && !/flowWidthExpr|placeFlowLayer|setFlowPulse/.test(code));
+// 25 Nov 2026: lines-static hid the old lanes on the 4 px line behind FLOW_LANES_SHOWN (false) until this branch landed;
+// here the lanes are gone, so the switch and its hidden key branch go with them, and the arrowheads show
+ok("A1b static's stop-gap is gone: no FLOW_LANES_SHOWN switch, the arrowheads' layer is visible outside a council view",
+   !/FLOW_LANES_SHOWN/.test(html) && /visibility: councilFocus\(\) \? 'none' : 'visible', 'icon-image': FLOW_MARK_IMG/.test(html));
 ok("A2 no dots and no bands in the flow (Q14 reopened Q6): no dot gaps, dot speed, dot size, circle layer or band step",
    !/FLOW_DOT_|flowDotPoints|setFlowDots|flowBand|FLOW_STOPS|flowSample\(/.test(code) && !/type: 'circle'/.test(fblk));
 ok("A3 kept: the lanes are still worked out from the legs (buildFlowLanes) with each lane's movements (fl_mv)",

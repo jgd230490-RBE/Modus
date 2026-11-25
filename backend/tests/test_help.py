@@ -1135,7 +1135,8 @@ ok3("🔴 0a: no 'Existing rail network' left in the user guide (the panel optio
 # NARROWED 24 Nov 2026 (card 3, then card 3b, Q14): the flow is arrowheads, the way and not the amount; no lanes, no dots
 ok3("0a: the flow in §8.3 is arrowheads that show the way, not how many (no 'Closer dashes', no wider lane, no dots), keyed 'Direction of travel' (NARROWED 24 Nov 2026)",
     "<strong>They show the way, not how many</strong>" in _ug0a and "Closer dashes" not in _ug0a and "A wider lane" not in _ug0a and "The closer the dots" not in _ug0a
-    and "<em>Direction of travel</em>" in _ug0a and "<em>Movements a day, each way</em>" not in _ug0a)
+    and "<em>Direction of travel</em>" in _ug0a and "<em>Movements a day, each way</em>" not in _ug0a
+    and "Every line is one width; the darker its blue, the more movements a day" in _ug0a)   # 25 Nov 2026: static's one-width sentence kept beside the arrowheads
 ok3("0a: the technical guide says the map no longer draws the existing rail corridor",
     "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
 
