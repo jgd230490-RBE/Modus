@@ -3550,7 +3550,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && ["demandCfg", "progressCfg", "costCfg", "topCfg", "tripsCfg", "fleetCfg", "co2Cfg", "splitCfg"].every(k => new RegExp("<ChartHead [^\\n]*\\n\\s*<ChartCanvas config=\\{" + k + "\\}").test(_wall))
      && !_db.slice(0, _db.indexOf('<div className="wall-charts">')).includes("<ChartHead "));
   ok("DESIGN: the headlines say what the number is measured against (delivered of plan, planned vs the model, share of tonnes, per tonne)",
-     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.plannedToDate)} t planned to date`')
+     // NARROWED 25 Nov 2026 (the Dashboard rethink A1; John: "Yes, complete week"): both sides to the cut week, named
+     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualToCut)} t reported of ${bigNum(K.plannedToDate)} t planned to ${K.cutWords}`')
      && _wall.includes('"the fair-price model"') && _wall.includes("% of the tonnes in view`") && _wall.includes("kg for each tonne moved`"));
   // REVERSED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile screen opens with the first one to go over in the next 8
   // weeks (red) or run out (amber), else "None over in the next 8 weeks", and how many more; the places with no capacity by name

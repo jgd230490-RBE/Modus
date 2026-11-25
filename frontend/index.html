@@ -1764,10 +1764,10 @@ const INFO = {
   // 24 Nov 2026 (the Dashboard rethink, A1): the strip's own "i" boxes, each at most 2 sentences and 30 words; the big
   // screen keeps the older entries above and below
   "dash.fig.vehicles": { title: "Vehicles needed", text: "The most vehicles any one month needs, adding up every line in view. A line with no route worked out yet is left out.", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
-  "dash.fig.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered against the tonnes planned to date. Within the shortfall share set on Config → Planning it is on plan; further under, it is flagged.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
+  "dash.fig.delivered": { title: "Delivered against plan", text: "Tonnes reported against tonnes planned, both to the last whole week reported. Within the shortfall share on Config → Planning it is on plan; further under, it is flagged.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
   "dash.fig.target": { title: "Carbon target", text: "How far the approved plan is under or over the carbon target with the agreed Carbon planner decisions, then as forecast. All-in: making the material, transport and waste disposal.", guide: "6-5-reading-the-carbon-target", tech: "t1-carbon" },
   "dash.week": { title: "Planned this week", text: "The tonnes and loads planned for the Look-ahead's commit week. The status counts last week's lines short by more than the share set on Config → Planning.", guide: "6-3-commit-view-this-week-by-day" },
-  "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned up to and including this month. The second line gives the share of the whole plan in view. A month nobody has reported counts as not yet delivered.",
+  "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned, both to the last whole week reported. The second line gives the share of the whole plan in view. A line nobody has reported counts as undelivered.",
     how: "Actuals are typed each week on Look-ahead → Account. A day's actual rolls into its week.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
   "dash.carbon": { title: "Transport carbon", text: "The lorry carbon of the routed lines in view, in tonnes of CO₂e: the loaded leg there, and as much of the empty way back as each route charges (Data → Routes). Lines with no route yet are left out.",
     how: "Trips × (loaded distance × the vehicle's laden factor + return distance × the route's return share × its empty factor). The factors are the government's per vehicle-km, 100 % and 0 % laden, on Config → Vehicles.", source: "DESNZ greenhouse gas conversion factors, 2026", guide: "3-1-filters-and-the-six-cards", tech: "t1-return" },
@@ -1857,7 +1857,7 @@ const INFO = {
   "dash.chart.co2": { title: "Carbon over time", text: "Transport carbon in each month, in tonnes of CO₂e, on routed lines.", tech: "t1-carbon" },
   "dash.chart.split": { title: "Material split", text: "The share of the planned quantity taken by each material, for the lines in view." },
   "dash.col.dist": { title: "Distance per trip", text: "The route's distance for one trip: the round trip, unless the route says loaded only.", tech: "t1-distance" },
-  "dash.col.delivered": { title: "Delivered", text: "Reported week actuals ÷ planned, over the months in view.", tech: "t1-delivered" },
+  "dash.col.delivered": { title: "Delivered", text: "Reported week actuals ÷ planned, both to the last whole week reported.", tech: "t1-delivered" },
   "dash.col.peak": { title: "Peak vehicles", text: "The most vehicles any one month needs on this line.", tech: "t1-vehicles" },
   "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the commit week, in the unit chosen above. In Tonnes, click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
     how: "A day follows the week ÷ 5 until it is typed. Monday to Friday only: Saturday and Sunday are held at 0 and not shown. Confirm locks the whole week as the haulier sheet. Figures are planning figures, not plated weights.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-trips" },
@@ -3093,8 +3093,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     // to the clicked line when there is one
     const narrowed = lineKey ? filtered.filter(r => keyOf(r) === lineKey) : filtered;
     const n = hi - lo + 1;
-    // 10 Nov 2026 (finding 19): "delivered against plan" divides by the tonnes planned up to and including this month
-    const _now = new Date(), nowIdx = (_now.getFullYear() - months.start_year) * 12 + _now.getMonth() + 1;
+    // 25 Nov 2026 (the Dashboard rethink A1; John: "Yes, complete week"): "delivered against plan" sets the actuals of
+    // the weeks up to the latest COMPLETE reported week against the plan of the same weeks, both from the read
+    // (planned_to_cut_t / actual_to_cut_t; totals.delivered_to names the week). It was every actual ÷ the plan up to
+    // and including this month (10 Nov, finding 19).
     const labels = []; for(let i = lo; i <= hi; i++) labels.push(monthAxis(i, months.start_year));
     // 11 Oct 2026 — orange-led: the material with the most tonnes over the WHOLE programme takes slot 1
     // (the brand orange), the next slot 2, and so on. Ranked on every row, not the filtered ones, so a
@@ -3106,7 +3108,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     const tripsM = Z(), co2M = Z(), tonnesM = Z(), plannedM = Z(), fairM = Z(), vehM = Z(), actualM = Z();
     const split = {}; mats.forEach(m => split[m] = 0);
     const rAgg = {};
-    const T = { t: 0, tNow: 0, trips: 0, km: 0, co2: 0, co2L: 0, co2E: 0, tkm: 0, planned: 0, plannedT: 0, plannedTrips: 0, plannedKm: 0, plannedN: 0, targetN: 0,
+    const T = { t: 0, tCut: 0, actualCut: null, trips: 0, km: 0, co2: 0, co2L: 0, co2E: 0, tkm: 0, planned: 0, plannedT: 0, plannedTrips: 0, plannedKm: 0, plannedN: 0, targetN: 0,
                 fair: 0, fairT: 0, fairTrips: 0, fairKm: 0, fairN: 0, baked: 0, bakedT: 0,
                 actualT: null, actualEur: null, reportedN: 0, reportedT: 0 };
     filtered.forEach(r => {
@@ -3116,16 +3118,17 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         key, route_id: r.route_id, discipline: r.discipline || "", section_id: r.section_id || "", ipt: r.ipt || "—",
         origin: r.origin_name, dest: r.dest_name, vehicle: r.vehicle_type, vehicle_short: r.vehicle_short,
         dist: r.km_trip, cycleH: (r.cycle_min != null ? r.cycle_min / 60 : null), capacityPerDay: r.cycles_per_vehicle_day,
-        material: r.material_type, baked: !!r.baked, t: 0, tNow: 0, trips: 0, km: 0, bkm: 0, co2: 0, peakVeh: null, planned: null, fair: null, source: null, flags: new Set(),
+        material: r.material_type, baked: !!r.baked, t: 0, tCut: 0, actualCut: null, trips: 0, km: 0, bkm: 0, co2: 0, peakVeh: null, planned: null, fair: null, source: null, flags: new Set(),
         actualT: null, limit: null,
       });
       if(r.limit && !a.limit) a.limit = r.limit;          // 13 Oct 2026 (W6): ROAD LIMIT, the same route and vehicle every month
       const bk = (r.basis_km || 0) * r.trips;
-      a.t += r.tonnes; if(r.month_index <= nowIdx) a.tNow += r.tonnes; a.trips += r.trips; a.km += r.km || 0; a.bkm += bk; a.co2 += r.co2_t || 0;
+      a.t += r.tonnes; a.tCut += r.planned_to_cut_t || 0; a.trips += r.trips; a.km += r.km || 0; a.bkm += bk; a.co2 += r.co2_t || 0;
       if(r.vehicles != null) a.peakVeh = Math.max(a.peakVeh || 0, r.vehicles);
       if(r.planned && r.planned.eur != null){ a.planned = (a.planned || 0) + r.planned.eur; a.source = r.planned.source; }
       if(r.fair && r.fair.eur != null){ a.fair = (a.fair || 0) + r.fair.eur; (r.fair.flags || []).forEach(x => a.flags.add(x)); }
       if(r.actual_tonnes != null) a.actualT = (a.actualT || 0) + r.actual_tonnes;
+      if(r.actual_to_cut_t != null) a.actualCut = (a.actualCut || 0) + r.actual_to_cut_t;
     });
     narrowed.forEach(r => {
       const k = r.month_index - lo;
@@ -3134,13 +3137,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       tripsM[k] += r.trips; tonnesM[k] += r.tonnes; co2M[k] += r.co2_t || 0; vehM[k] += r.vehicles || 0;
       plannedM[k] += (r.planned && r.planned.eur) || 0; fairM[k] += (r.fair && r.fair.eur) || 0;
       actualM[k] += r.actual_tonnes || 0;
-      T.t += r.tonnes; if(r.month_index <= nowIdx) T.tNow += r.tonnes; T.trips += r.trips; T.km += r.km || 0; T.co2 += r.co2_t || 0; T.tkm += r.tonne_km || 0;
+      T.t += r.tonnes; T.tCut += r.planned_to_cut_t || 0; T.trips += r.trips; T.km += r.km || 0; T.co2 += r.co2_t || 0; T.tkm += r.tonne_km || 0;
       T.co2L += r.co2_loaded_t || 0; T.co2E += r.co2_empty_t || 0;       // 8 Nov 2026: the two legs apart
       const bk = (r.basis_km || 0) * r.trips;
       if(r.baked){ T.baked += 1; T.bakedT += r.tonnes; }
       if(r.planned && r.planned.eur != null){ T.planned += r.planned.eur; T.plannedT += r.tonnes; T.plannedTrips += r.trips; T.plannedKm += bk; T.plannedN += 1; if(r.planned.source === "target") T.targetN += 1; }
       if(r.fair && r.fair.eur != null){ T.fair += r.fair.eur; T.fairT += r.tonnes; T.fairTrips += r.trips; T.fairKm += bk; T.fairN += 1; }
       if(r.actual_tonnes != null){ T.actualT = (T.actualT || 0) + r.actual_tonnes; T.reportedN += 1; T.reportedT += r.tonnes; }
+      if(r.actual_to_cut_t != null) T.actualCut = (T.actualCut || 0) + r.actual_to_cut_t;
       if(r.actual_eur != null) T.actualEur = (T.actualEur || 0) + r.actual_eur;
     });
     const per = (eur, t, trips, km) => eur == null ? null : { eur, per_t: t > 0 ? eur / t : null, per_trip: trips > 0 ? eur / trips : null, per_km: km > 0 ? eur / km : null };
@@ -3148,7 +3152,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       ...a, intensity: a.t > 0 && a.baked ? (a.co2 * 1000 / a.t) : null,
       plannedU: per(a.planned, a.t, a.trips, a.bkm), fairU: per(a.fair, a.t, a.trips, a.bkm),
       fairPerT: (a.fair != null && a.t > 0) ? a.fair / a.t : null, flags: [...a.flags],
-      deliveredPct: (a.actualT != null && a.tNow > 0) ? a.actualT * 100 / a.tNow : null,
+      deliveredPct: (a.actualCut != null && a.tCut > 0) ? a.actualCut * 100 / a.tCut : null,
     }));
     let peakIdx = 0; for(let i = 1; i < n; i++) if(tonnesM[i] > tonnesM[peakIdx]) peakIdx = i;
     let fleetIdx = 0; for(let i = 1; i < n; i++) if(vehM[i] > vehM[fleetIdx]) fleetIdx = i;
@@ -3160,9 +3164,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
               peakFleet: vehM.some(x => x > 0) ? vehM[fleetIdx] : 0, peakFleetMonth: vehM.some(x => x > 0) ? labels[fleetIdx] : "—",
               planned: per(T.plannedN ? T.planned : null, T.plannedT, T.plannedTrips, T.plannedKm), plannedN: T.plannedN, targetN: T.targetN,
               fair: per(T.fairN ? T.fair : null, T.fairT, T.fairTrips, T.fairKm), fairN: T.fairN,
-              // delivered to date — reported tonnes over ALL the tonnes in view (an unreported month is not yet delivered)
+              // delivered against plan: both sides to the latest complete reported week (an unreported line counts as not
+              // yet delivered); the whole plan's share keeps every reported tonne
               actualT: T.actualT, actualEur: T.actualEur, reportedN: T.reportedN, reportedT: T.reportedT,
-              deliveredPct: pctOf(T.actualT, T.tNow), deliveredWholePct: pctOf(T.actualT, T.t), plannedToDate: T.tNow },
+              deliveredPct: pctOf(T.actualCut, T.tCut), deliveredWholePct: pctOf(T.actualT, T.t), plannedToDate: T.tCut,
+              actualToCut: T.actualCut, cutWords: dashCutWords(data.totals && data.totals.delivered_to) },
       lines: narrowed.length, baked: T.baked, unbakedRoutes: routeRows.filter(r => !r.baked).length,
       empty: filtered.length === 0,
     };
@@ -3454,10 +3460,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             <Card k="week" label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} st={wkTot ? dcWeek : null}
                   lines={wkTot ? [`${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · ${grp(acct.delivered)} of ${grp(acct.lines)} held` : ""}`, sites.length ? "at these sites" : null] : [weekErr ? "this week did not load" : "loading this week"]}
                   info={{ id: "dash.week" }} />
-            <Card k="delivered" label="Delivered against plan" value={K.deliveredPct == null ? "—" : <>{K.deliveredPct.toFixed(0)} % <small className="dc-unit">to date</small></>}
+            <Card k="delivered" label="Delivered against plan" value={K.deliveredPct == null ? "—" : <>{K.deliveredPct.toFixed(0)} % <small className="dc-unit">to {K.cutWords}</small></>}
                   bar={K.deliveredPct == null ? null : <DashPlanBar pct={K.deliveredPct} />} st={dcDel}
-                  lines={[K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.plannedToDate)} t`]}
-                  info={{ id: "dash.fig.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered of ${grp(K.plannedToDate)} t planned to date: ${K.deliveredWholePct == null ? "—" : K.deliveredWholePct.toFixed(0)} % of the whole plan in view (${grp(K.totT)} t).` }} />
+                  lines={[K.actualT == null ? "nothing reported yet" : K.deliveredPct == null ? "no whole week reported yet" : `${bigNum(K.actualToCut)} t of ${bigNum(K.plannedToDate)} t`]}
+                  info={{ id: "dash.fig.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualToCut)} t delivered of ${grp(K.plannedToDate)} t planned, both to Sunday ${K.cutWords}. ${K.deliveredWholePct == null ? "—" : K.deliveredWholePct.toFixed(0)} % of the whole plan in view (${grp(K.totT)} t).` }} />
             <Card k="target" label="Carbon target" value={dcCt.value} st={dcCt.st} st2={dcCt.st2} lines={dcCt.lines} edge={dcCt.edge === undefined ? null : dcCt.edge}
                   info={{ id: "dash.fig.target", value: ctOk(ct) ? [ctTargetLine(ct), ...ctProgress(ct)].join(". ") + "." : `${CT_NONE} ${CT_WHO}` }} />
           </div></div>
@@ -3510,8 +3516,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         <Group title="Delivered to date" tone="var(--ok-text)">
           <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `reported on ${K.reportedN} of ${D.lines} plan lines`} tone="var(--ok-text)"
                info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} plan line${K.reportedN === 1 ? "" : "s"}` }} />
-          <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.plannedToDate)} t planned to date`} tone="var(--ok-text)"
-               info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To date: ${grp(K.actualT)} t delivered ÷ ${grp(K.plannedToDate)} t planned up to this month. Whole plan: ÷ ${grp(K.totT)} t planned in view.` }} />
+          <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : K.deliveredPct == null ? "no whole week reported yet" : `${bigNum(K.plannedToDate)} t planned to ${K.cutWords}`} tone="var(--ok-text)"
+               info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To ${K.cutWords}: ${grp(K.actualToCut)} t delivered ÷ ${grp(K.plannedToDate)} t planned. Whole plan: ${grp(K.actualT)} t ÷ ${grp(K.totT)} t planned in view.` }} />
           <Fig value={K.actualEur == null ? "—" : `${CUR()}` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()}${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
                info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()}${grp(K.actualEur)} typed` }} />
           <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
@@ -3661,8 +3667,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         <Group title="Delivered to date" tone="var(--ok-text)">
           <Fig value={K.actualT == null ? "—" : bigNum(K.actualT)} label="tonnes moved" sub={K.actualT == null ? "nothing reported yet" : `reported on ${K.reportedN} of ${D.lines} plan lines`} tone="var(--ok-text)"
                info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} plan line${K.reportedN === 1 ? "" : "s"}` }} />
-          <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.plannedToDate)} t planned to date`} tone="var(--ok-text)"
-               info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To date: ${grp(K.actualT)} t delivered ÷ ${grp(K.plannedToDate)} t planned up to this month. Whole plan: ÷ ${grp(K.totT)} t planned in view.` }} />
+          <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : K.deliveredPct == null ? "no whole week reported yet" : `${bigNum(K.plannedToDate)} t planned to ${K.cutWords}`} tone="var(--ok-text)"
+               info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To ${K.cutWords}: ${grp(K.actualToCut)} t delivered ÷ ${grp(K.plannedToDate)} t planned. Whole plan: ${grp(K.actualT)} t ÷ ${grp(K.totT)} t planned in view.` }} />
           <Fig value={K.actualEur == null ? "—" : `${CUR()}` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()}${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
                info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()}${grp(K.actualEur)} typed` }} />
           <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
@@ -3703,7 +3709,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          {fill && <ChartHead value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} label="of the plan delivered" tone="var(--chart-2)" note={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t reported of ${bigNum(K.plannedToDate)} t planned to date`} />}
+          {fill && <ChartHead value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} label="of the plan delivered" tone="var(--chart-2)" note={K.actualT == null ? "nothing reported yet" : K.deliveredPct == null ? "no whole week reported yet" : `${bigNum(K.actualToCut)} t reported of ${bigNum(K.plannedToDate)} t planned to ${K.cutWords}`} />}
           <ChartCanvas config={progressCfg} size="lg" />
         </div>
         <div className="card p-4 chart-card">
@@ -8748,6 +8754,12 @@ function dashWeekStatus(acct){
   if((acct.delivered || 0) >= acct.lines) return { tone: "ok", word: "Every line held last week" };
   if(waiting > 0) return { tone: "none", word: `${grp(waiting)} not reported last week` };
   return { tone: "ok", word: "None short last week" };
+}
+// 25 Nov 2026: the cut week's Sunday in words ("22 Nov"), from the read's totals.delivered_to; null when no whole week
+// is reported yet
+function dashCutWords(dt){
+  const m = String((dt && dt.ends) || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${+m[3]} ${MONTHS[+m[2] - 1]}` : null;
 }
 // Delivered against plan: within the organisation's shortfall share under plan (planning.short_flag_pct, absent = 10)
 // a dot; more than that under plan a diamond, never a square; ahead of plan a dot.

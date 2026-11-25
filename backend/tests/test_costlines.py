@@ -531,6 +531,39 @@ ok("the Look-ahead prints the unit triple (€/t · €/trip · €/km) under pl
    and 'const unitList = (u) => unitTriple(u, { sep: ", " });' in _fe)
 ok("🔴 no cost on the public map", "costing/lines" not in open(os.path.join(ROOT, "map", "index.html"), encoding="utf-8").read())
 
+# 25 Nov 2026 (the Dashboard rethink A1; John: "Yes, complete week"): Delivered against plan sets both sides to the latest
+# COMPLETE week (its Sunday before today) with an actual typed on a visible line. The two helpers, on stand-in weeks;
+# "today" is passed in, so nothing here follows the real calendar.
+_M = 11
+_sun = lambda w: weeks.week_span(_M, w)[1]
+_K1, _K2 = ("R1", _M, "", ""), ("R2", _M, "", "")
+_wr = {_K1: {1: (100.0, 90.0), 2: (100.0, 100.0), 3: (100.0, 95.0), 4: (100.0, 40.0)},   # week 4 typed Mon-Wed
+       _K2: {1: (50.0, None), 2: (150.0, 120.0)}, ("R1", _M - 1, "", ""): {1: (10.0, 10.0)}}
+_today = _sun(4) - datetime.timedelta(days=3)            # Thursday of week 4: week 3 is the last complete one
+_cut = costlines._cut_week({_K1, _K2, ("R1", _M - 1, "", "")}, _wr, _today)
+ok("⭐ the cut is the latest COMPLETE week with an actual (week 3 here: week 4 is still running, its Mon-Wed typed)",
+   _cut is not None and _cut[:2] == (_M, 3) and _cut[2] == _sun(3), _cut)
+ok("...a week counts as complete only from the day after its Sunday",
+   costlines._cut_week({_K1}, _wr, _sun(3))[:2] == (_M, 2) and costlines._cut_week({_K1}, _wr, _sun(3) + datetime.timedelta(days=1))[:2] == (_M, 3))
+ok("...only the caller's visible line-months count, and none reported gives no cut",
+   costlines._cut_week({_K2}, _wr, _today)[:2] == (_M, 2) and costlines._cut_week({("R9", _M, "", "")}, _wr, _today) is None
+   and costlines._cut_week(set(), _wr, _today) is None)
+_id = lambda q: q
+ok("⭐ the cut month: the plan of weeks 1..3 as its weeks share it (300 of 400 = 75 % of 1,000 t), the actuals of weeks 1..3 only (285)",
+   costlines._to_cut(1000.0, _M, _wr[_K1], _cut, _id) == (750.0, 285.0))
+ok("...an earlier month: all its plan and all its actuals; a later month: nothing",
+   costlines._to_cut(10.0, _M - 1, _wr[("R1", _M - 1, "", "")], _cut, _id) == (10.0, 10.0) and costlines._to_cut(500.0, _M + 1, {}, _cut, _id) == (0.0, None))
+ok("...a line nobody reported in the cut weeks keeps its plan and no actual (it counts as not yet delivered)",
+   costlines._to_cut(200.0, _M, {1: (50.0, None), 2: (150.0, None)}, _cut, _id) == (200.0, None))
+_n = weeks.weeks_in_month(_M)
+ok("...a line-month with no weeks stored is shared evenly over the month's weeks (3 of %d)" % _n,
+   abs(costlines._to_cut(100.0, _M, None, _cut, _id)[0] - 100.0 * 3 / _n) < 1e-9)
+ok("...no cut at all: nothing on either side", costlines._to_cut(100.0, _M, _wr[_K1], None, _id) == (0.0, None))
+ok("the read names the cut in its totals and gives both sides on every line (the Dashboard sums them)",
+   all(k in _r for k in ("planned_to_cut_t", "actual_to_cut_t")) if (_r := (costlines.lines(acc={"role": "planner"})["lines"] or [{}])[0]) else False)
+_tot = costlines.lines(acc={"role": "planner"})["totals"]
+ok("...totals: delivered_to (or None), planned_to_cut_t, actual_to_cut_t", all(k in _tot for k in ("delivered_to", "planned_to_cut_t", "actual_to_cut_t")))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

@@ -25,7 +25,7 @@ function ok(label, cond, extra) {
 }
 const fn = (name) => { const i = code.indexOf("\nfunction " + name + "("); const j = code.indexOf("\n}\n", i); return i < 0 ? "" : code.slice(i + 1, j + 3); };
 const constLine = (name) => { const m = code.match(new RegExp("\\nconst " + name + " = [^\\n]*\\n")); return m ? m[0] : ""; };
-const NAMES = ["DashBars", "DashPlanBar", "dashRoadShort", "dashLimitStatus", "dashWeekStatus", "dashShortPct", "dashDeliveredStatus", "dashTargetCell"];
+const NAMES = ["dashCutWords", "DashBars", "DashPlanBar", "dashRoadShort", "dashLimitStatus", "dashWeekStatus", "dashShortPct", "dashDeliveredStatus", "dashTargetCell"];
 const missing = NAMES.filter(n => !fn(n));
 ok("⭐ the strip's helpers are top-level functions in the page: " + NAMES.join(", "), !missing.length, missing);
 if (missing.length) { report(); }
@@ -125,6 +125,25 @@ ok("loading → '—' 'loading'; a failed read → '—' 'did not load'; neither
 ok("the cell decides nothing itself: it reads the server's verdicts (on_target_*, gap_*), never compares a figure with the target",
    /on_target_with_decisions/.test(fn("dashTargetCell")) && !/target_t\s*[-<>]/.test(fn("dashTargetCell")) && !/approved_t|(^|[^_a-z])with_decisions_t/.test(fn("dashTargetCell")));
 
+// ------------------------------------------------------------------ 5b. Delivered against plan: to the last COMPLETE week
+// (25 Nov 2026, John: "Yes, complete week"). The read gives the cut; the page names its Sunday and sums both sides to it.
+ok("⭐ the cut's Sunday in words: '22 Nov'; no cut → null (no date invented)",
+   P.dashCutWords({ month_index: 11, week_index: 3, ends: "2026-11-22" }) === "22 Nov" && P.dashCutWords({ ends: "2027-01-03" }) === "3 Jan"
+   && P.dashCutWords(null) === null && P.dashCutWords({}) === null);
+{
+  const D = code.slice(code.indexOf("const D = useMemo(() => {"), code.indexOf("}, [data, status, material, vehicle, ipt, discipline, fromM, toM, unit, factors, months, lineKey"));
+  ok("⭐ ONE base for the share wherever the Dashboard shows it: the figure, the route table's column and the chart all read planned_to_cut_t / actual_to_cut_t",
+     D.includes("T.tCut += r.planned_to_cut_t || 0") && D.includes("if(r.actual_to_cut_t != null) T.actualCut = (T.actualCut || 0) + r.actual_to_cut_t;")
+     && D.includes("deliveredPct: pctOf(T.actualCut, T.tCut)") && D.includes("a.actualCut * 100 / a.tCut")
+     && D.includes("cutWords: dashCutWords(data.totals && data.totals.delivered_to)") && !/nowIdx|tNow/.test(D));
+  ok("⭐ the page works no date out of the clock for this share (the cut comes from the read)", !/new Date\(\)/.test(D));
+}
+const cl = fs.readFileSync(path.join(ROOT, "backend", "costlines.py"), "utf8").replace(/\r\n?/g, "\n");
+ok("⭐ the read: a complete week is one whose Sunday is before today, with an actual typed on a visible line; totals name it",
+   cl.includes("if sun < today and (best is None or sun > best[2]):") && cl.includes('"delivered_to": ({"month_index": cut[0], "week_index": cut[1], "ends": cut[2].isoformat()} if cut else None),')
+   && cl.includes('"planned_to_cut_t": round(p_cut, 3), "actual_to_cut_t":'));
+ok("CLP monitoring keeps its own rule (D-I4): clp.py still shares the plan to its own latest typed week", fs.readFileSync(path.join(ROOT, "backend", "clp.py"), "utf8").includes("lw = _recorded_to(cl, shown, as_week=True)"));
+
 // ------------------------------------------------------------------ 6. the small bars
 const bars = draw(React.createElement(P.DashBars, { values: [10, 20, 40, 30], cur: 2 }));
 ok("⭐ one bar a month, this month in ink (dc-cur), the rest grey (dc-oth), hidden from readers",
@@ -160,9 +179,9 @@ ok("⭐ the bars: Material, Lorry movements (with the over month's mark), Vehicl
    && /<Card k="vehicles"[^]*?<DashBars values=\{D\.vehM\}/.test(strip) && /<Card k="delivered"[^]*?<DashPlanBar pct=\{K\.deliveredPct\} \/>/.test(strip)
    && card.includes("{bar && !phone && <div className=\"dc-bar\">{bar}</div>}"));
 ok("⭐ the label's last word is tied to its 'i' (it never wraps alone)", card.includes('<span className="dc-nw">{last}{info && <InfoTip'));
-ok("⭐ the drawing's words: 'deliveries in and out', 'N loads · N of N held', 'X t of Y t', '% to date'",
+ok("⭐ the drawing's words: 'deliveries in and out', 'N loads · N of N held', 'X t of Y t', '% to <the cut's Sunday>' (25 Nov: John's complete week)",
    strip.includes("`${grp(Math.round(loadsPerDay))} deliveries in and out`") && strip.includes("loads${acct && acct.lines ? ` · ${grp(acct.delivered)} of ${grp(acct.lines)} held` : \"\"}")
-   && strip.includes("`${bigNum(K.actualT)} t of ${bigNum(K.plannedToDate)} t`") && strip.includes('% <small className="dc-unit">to date</small>'));
+   && strip.includes("`${bigNum(K.actualToCut)} t of ${bigNum(K.plannedToDate)} t`") && strip.includes('% <small className="dc-unit">to {K.cutWords}</small>'));
 ok("⭐ the whole plan's share moved into Delivered's 'i' (no second line)", /dash\.fig\.delivered[^]*?% of the whole plan in view/.test(strip));
 
 // ------------------------------------------------------------------ 8. the traffic limits read ONCE at load, shared with the fold
