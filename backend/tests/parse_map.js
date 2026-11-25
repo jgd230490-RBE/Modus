@@ -3485,7 +3485,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("⭐ council view: while a By council box is ticked the routes are thin pale grey with no casing, flow dashes or cap badges, and the route labels hide",
      blkCode.includes("const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;")
      && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
-     && blkCode.includes("COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });")
+     && /COUNCIL_QUIET_LAYERS\.forEach\(l => \{ if \(map\.getLayer\(l\)\) map\.setLayoutProperty\(l, 'visibility',\s*\(focus \|\| \(!FLOW_LANES_SHOWN && l\.indexOf\('forecast-flow'\) === 0\)\) \? 'none' : 'visible'\); \}\);/.test(blkCode)   /* NARROWED 25 Nov 2026 (FLOW_LANES_SHOWN false: the old lanes are not shown on a 4 px line; claude/map-lines-flow replaces them with arrowheads) */
      && blkCode.includes("function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }"));
   ok("⭐ council view: ticking a council box turns the heat map Off; picking Volume or Carbon unticks the council boxes (one picture at a time); both write the link",
      code.includes("if (on) { const off = document.getElementById('heat-off'); if (off && !off.checked) { off.checked = true; if (typeof scheduleViewWrite === 'function') scheduleViewWrite(); } }")
@@ -3700,14 +3700,15 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
     // 25 Nov 2026 (one width again): the band widths the sandbox was handed on 24 Nov are gone with them
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks", "labelAnchor",
-        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
+        "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow", "FLOW_LANES_SHOWN",
         blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff, carbonLabelPoints };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {}, () => undefined,
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
         // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
         // review): else no window (null), as the page now says
-        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null);
+        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null,
+        false);   // 25 Nov 2026: the old lanes are not shown (FLOW_LANES_SHOWN, the flow block's switch)
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
     if (blkApi) {
@@ -3966,8 +3967,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           ok("council view (sandbox): the mode block leaves the network's paint alone (no inbound-lines layer touched)", !fmap.layers["inbound-lines"]);
           delete globalThis.areaTierOn;
           B.refreshMapModes(); await flush();
-          ok("council view (sandbox): unticked, the casing and flow are back and the routes take the mode's paint again",
-             fmap.layers["forecast-casing"].layout.visibility === "visible" && fmap.layers["forecast-flow"].layout.visibility === "visible"
+          // NARROWED 25 Nov 2026: the flow stays hidden while FLOW_LANES_SHOWN is false (the old lanes on a 4 px line; claude/map-lines-flow replaces them)
+          ok("council view (sandbox): unticked, the casing is back, the flow stays hidden while the lanes are not shown, and the routes take the mode's paint again",
+             fmap.layers["forecast-casing"].layout.visibility === "visible" && fmap.layers["forecast-flow"].layout.visibility === "none"
              && fmap.layers["forecast-layer"].paint["line-color"] !== "#A8A29E");
         }
         // a failed carbon read
@@ -6023,9 +6025,11 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
 
   {
     const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
-    ok("D115: the in-app guide (§8.3) describes the lanes, the fixed bands, the shared-road total and the dashes standing still when paused",
-       guide.includes("each direction has its own lane, on the left as driven") && guide.includes("<strong>A wider lane means more movements a day</strong> each way, on five fixed bands (under 10, 10 to 25, 25 to 50, 50 to 100, 100 and over)")   /* NARROWED 28 Oct 2026 (task 0a): the lanes are widths now, as drawn since 23 Oct */
-       && guide.includes("Where routes share a road, its lane shows their total") && guide.includes("paused, or with reduced motion set on your device, the lanes stand still")
+    // REVERSED 25 Nov 2026 (FLOW_LANES_SHOWN false; claude/map-lines-flow replaces the lanes with arrowheads): the guide
+    // no longer describes lanes; it was: own lane on the left, a wider lane = more, the shared-road total, standing still
+    ok("D115 / 25 Nov: the in-app guide (§8.3) describes no lane, no width step and no light, and says one width with the amount by the blue (REVERSED 25 Nov 2026)",
+       !guide.includes("own lane") && !guide.includes("A wider lane means more movements a day") && !guide.includes("the lanes stand still")
+       && guide.includes("Every line is one width; the darker its blue, the more movements a day")
        && !guide.includes("white dashes run along the blue routes from origin to destination"));
   }
 
@@ -6071,7 +6075,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   try {
     api = new Function("map", "document", "a1_data", "modeRoutesPassing", "councilFocus", "mapModeMonth", "forecastWindow", "rlEsc", "monthLabel",
       "stepRanges", "VOLUME_STOPS", "ROUTE_VOLUME_STOPS", "CONFIG", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "raiseMarks",
-      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowLightPoints, laneMetric, FLOW_LIGHT_SOURCE, setFlowPulse, renderFlowLegend, flowSample };")(
+      fblk + "\nreturn { FLOW, FLOW_LANES_SHOWN, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowLightPoints, laneMetric, FLOW_LIGHT_SOURCE, setFlowPulse, renderFlowLegend, flowSample };")(
       fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 6, 8.5, () => {});
   } catch (e) { err = e.message; }
   ok("⭐ D115 sandbox: the flow block runs against a fake map and DOM", !!api, err);
@@ -6180,20 +6184,25 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
        fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY && dots() === 0);
     // the legend
     const lg = el("flow-legend");
-    ok("⭐ D115 sandbox / 23 Oct: the legend says 'Wider lane = more movements a day', each way, the month, and the five band figures",
-       lg.hidden === false && lg.innerHTML.includes("<b style=\"margin:0\">Movements a day, each way</b>") && lg.innerHTML.includes("In Oct 2026") && lg.innerHTML.includes('aria-controls="info-flow"')   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): the title says it, the paragraph behind an i */
-       && ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].every(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
-    ok("D115 sandbox / 23 Oct: ...that each direction is its own lane on the left, the lane shows a shared road's total, the light moves while Play runs, the bands are fixed",
-       lg.innerHTML.includes("Each direction has its own lane, on the left.") && !lg.innerHTML.includes("while the timeline plays")
-       && lg.innerHTML.includes("Where routes share a road, the lane shows their total") && lg.innerHTML.includes("While Play runs, a light moves along each lane the way its lorries go")
-       && !lg.innerHTML.includes("a spacing means the same number in every month"));
-    ok("D115 sandbox / 23 Oct: each band's sample is drawn as the map draws it (a solid white lane of the band's width on the 6 px blue, no dash)",
-       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-width="1.6"') && lg.innerHTML.includes('stroke-width="3.8"')
-       && lg.innerHTML.includes('stroke-opacity="0.9"') && lg.innerHTML.includes('stroke-width="6"') && !lg.innerHTML.includes("stroke-dasharray") && lg.innerHTML.includes('aria-hidden="true"'));
-    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /Movements a day/.test(lg.innerHTML));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
+    // REVERSED 25 Nov 2026 (FLOW_LANES_SHOWN false: on a 4 px line the old white lanes, up to 3.8 px at 1.75 px off the
+    // middle, drew wider than the casing, so they are kept in the code but not shown, and their key goes with them until
+    // claude/map-lines-flow replaces them with arrowheads). The five legend pins of 23 / 28 Oct below now check the lane
+    // block is GONE from the key; the text still sits in renderFlowLegend behind the switch, pinned there at source level.
+    ok("⭐ D115 sandbox / 25 Nov: the lanes are not shown: both lane layers are added with visibility none (REVERSED 25 Nov 2026)",
+       F.FLOW_LANES_SHOWN === false && fl.layout.visibility === "none"
+       && !!fmap.layers["forecast-flow-light"] && fmap.layers["forecast-flow-light"].layout.visibility === "none");
+    ok("⭐ D115 sandbox / 25 Nov: with no diversion the key's lane box is hidden and carries no 'each way' title, month or band figure (REVERSED 25 Nov 2026; was: the legend says the title, the month and the five band figures)",
+       lg.hidden === true && !lg.innerHTML.includes("each way") && !lg.innerHTML.includes("In Oct 2026")
+       && !["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].some(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
+    ok("D115 sandbox / 25 Nov: the lane sentences are not on screen, but stay in the code behind the switch for claude/map-lines-flow (REVERSED 25 Nov 2026)",
+       !lg.innerHTML.includes("Each direction has its own lane") && fcode.includes("if (!FLOW_LANES_SHOWN) { box.hidden = !(on && divRow); box.innerHTML = (on && divRow) ? divRow : ''; return; }")
+       && fblk.includes("Each direction has its own lane, on the left.") && fblk.includes("While Play runs, a light moves along each lane the way its lorries go"));
+    ok("D115 sandbox / 25 Nov: no band sample is drawn in the key (REVERSED 25 Nov 2026; was: five white-lane samples)",
+       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 0 && !lg.innerHTML.includes("stroke-dasharray"));
+    ok("D115 sandbox: the legend names no team id and never says trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML));   // NARROWED 25 Nov 2026 (no "Movements a day" while the lanes are not shown)
     month = null; F.renderFlowLegend();
-    ok("D115 sandbox: with no single month (Show forecast over the span) the legend says it is a daily average over the months",
-       lg.innerHTML.includes("A daily average, Sep 2026 to Dec 2026")   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8) */, lg.innerHTML.slice(0, 200));
+    ok("D115 sandbox: with no single month the lane box stays hidden too, no 'A daily average' line (REVERSED 25 Nov 2026)",
+       lg.hidden === true && !lg.innerHTML.includes("A daily average"), lg.innerHTML.slice(0, 200));
     month = 10;
     focus = true; F.renderFlowLegend();
     ok("D115 sandbox: the council view (no flow drawn there) hides the legend", lg.hidden === true);

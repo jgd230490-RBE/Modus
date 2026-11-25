@@ -1032,8 +1032,11 @@ ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1
 # with a white edge and the pinch points rings (not violet dashes and dots); the flow is a light along solid lanes (no dashes)
 ok("23 Oct: chapter 14 says the staff map draws each load's line in raspberry (NARROWED 23 Oct 2026 afternoon; ink that morning) with a white edge and a ring at each pinch point, never violet dashes",
    "draws each line in raspberry with a white edge, and a ring at each potential pinch point" in src and "violet dashes" not in src and "in ink with a white edge" not in src)
-ok("23 Oct: the technical guide says a light runs along each lane only while Play runs and the lane's width is its band, never that dashes move",
-   "A light runs along each lane only while Play runs, and the lanes stand still under reduced motion; the lane's width is its band." in _tg
+# NARROWED 25 Nov 2026 (FLOW_LANES_SHOWN false; claude/map-lines-flow replaces the lanes with arrowheads): the guide says the
+# lanes are not shown, and when shown the light runs only while Play runs; still never that dashes move
+ok("23 Oct / 25 Nov: the technical guide says the lanes are not shown since 25 Nov and, when shown, a light runs along each lane only while Play runs, never that dashes move (NARROWED 25 Nov 2026)",
+   "Since 25 Nov 2026 NOT SHOWN (<code>FLOW_LANES_SHOWN</code> false)" in _tg
+   and "a light along each lane only while Play runs" in _tg
    and "The dashes move only while Play runs" not in _tg)
 
 # ---- 23 Oct 2026: the abnormal loads on the public map's figures bar and in the animation ----
@@ -1129,9 +1132,12 @@ ok3("0a: the moved panel notes are in §8.2 (survey bridge, boundary ticks, chai
         "A dimmed disruption-zone row has none in force", "how many other ways the routing found", "<strong>Credits</strong>"]))
 ok3("🔴 0a: no 'Existing rail network' left in the user guide (the panel option and its Sources row are gone)",
     "Existing rail network" not in _ug0a)
-ok3("0a: the flow in §8.3 is lanes whose WIDTH is the movements (no 'Closer dashes'), keyed 'Movements a day, each way'",
-    "<strong>A wider lane means more movements a day</strong>" in _ug0a and "Closer dashes" not in _ug0a
-    and "<em>Movements a day, each way</em>" in _ug0a)
+# REVERSED 25 Nov 2026 (FLOW_LANES_SHOWN false: the old lanes are not shown on a 4 px line; claude/map-lines-flow
+# replaces them with arrowheads): §8.3 no longer describes lanes or their key, and says the blue alone carries the amount
+ok3("0a / 25 Nov: §8.3 describes no lane (no 'wider lane', no 'Closer dashes', no 'Movements a day, each way' key) and says one width, the darker the blue the more (REVERSED 25 Nov 2026)",
+    "<strong>A wider lane means more movements a day</strong>" not in _ug0a and "Closer dashes" not in _ug0a
+    and "<em>Movements a day, each way</em>" not in _ug0a and "own lane" not in _ug0a
+    and "Every line is one width; the darker its blue, the more movements a day" in _ug0a)
 ok3("0a: the technical guide says the map no longer draws the existing rail corridor",
     "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
 

@@ -8152,7 +8152,8 @@
             map.setPaintProperty('forecast-layer', 'line-color', paint);
             map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : FORECAST_LINE_WIDTH);
         }
-        COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
+        COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility',
+            (focus || (!FLOW_LANES_SHOWN && l.indexOf('forecast-flow') === 0)) ? 'none' : 'visible'); });
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', caseW);
         // the amber diversion edge takes the casing's place, at the casing's width (29 Oct)
         if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);
@@ -8427,6 +8428,12 @@
     //: time (60 -> 10-22 fps playing, measured). It is now FLOW_PULSES dots a lane on a small point source of their own
     //: (setData a frame: 60 fps on v3 and on 2.14, measured), the lanes untouched. Same spacing, same speed, same meaning.
     const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];
+    //: 25 Nov 2026 (the mother session's reading of the 4 px line, for the short time until claude/map-lines-flow lands):
+    //: at 4 px the old white lanes (up to 3.8 px at 1.75 px off the middle) are wider than the 6.6 px casing, so the
+    //: busiest roads drew solid white. The lanes and their light are kept in the code but NOT SHOWN (visibility none),
+    //: Play only steps the months, and the key's lane rows go (the diversion row stays). claude/map-lines-flow replaces
+    //: the lanes with arrowheads and this switch with them.
+    const FLOW_LANES_SHOWN = false;
     const FLOW_STILL_OPACITY = 0.35;
     const FLOW_PULSES = 3;
     const FLOW_PULSE_LEN = 0.07;
@@ -8564,14 +8571,14 @@
         if (!map.getSource(FLOW_SOURCE)) { map.addSource(FLOW_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, lineMetrics: true }); FLOW.drawn = null; }
         if (!map.getLayer('forecast-flow')) {
             map.addLayer({ id: 'forecast-flow', type: 'line', source: FLOW_SOURCE,
-                layout: { 'line-cap': 'round', 'line-join': 'round', visibility: councilFocus() ? 'none' : 'visible' },
+                layout: { 'line-cap': 'round', 'line-join': 'round', visibility: (councilFocus() || !FLOW_LANES_SHOWN) ? 'none' : 'visible' },
                 paint: { 'line-color': '#ffffff', 'line-width': flowWidthExpr(), 'line-opacity': FLOW_STILL_OPACITY, 'line-offset': FLOW_OFFSET } });
         }
         // the light's dots: their own small source, above the names like the abnormal load's dot
         if (!map.getSource(FLOW_LIGHT_SOURCE)) map.addSource(FLOW_LIGHT_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         if (!map.getLayer('forecast-flow-light')) {
             map.addLayer({ id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE,
-                layout: { visibility: councilFocus() ? 'none' : 'visible' },
+                layout: { visibility: (councilFocus() || !FLOW_LANES_SHOWN) ? 'none' : 'visible' },
                 paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 2.2, 12, 3, 16, 3.8], 'circle-color': '#ffffff',
                          'circle-stroke-color': '#1F2024', 'circle-stroke-width': 1, 'circle-opacity': 0.95, 'circle-stroke-opacity': 0.85 } });
             if (_flowRAF != null) setFlowPulse(_pulseT);   // re-added while playing (a basemap switch): the light runs on
@@ -8648,6 +8655,10 @@
         const box = document.getElementById('flow-legend');
         if (!box) return;
         const on = !!map.getLayer('forecast-flow') && !councilFocus() && FLOW.count > 0;
+        const divRow = (typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
+            ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '';
+        // 25 Nov 2026: the lanes are not shown (FLOW_LANES_SHOWN), so their five rows go and only the diversion row stays
+        if (!FLOW_LANES_SHOWN) { box.hidden = !(on && divRow); box.innerHTML = (on && divRow) ? divRow : ''; return; }
         box.hidden = !on;
         if (!on) return;
         const m = mapModeMonth(), win = m ? null : (forecastWindow() || []);
