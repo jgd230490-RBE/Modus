@@ -537,14 +537,7 @@ def status():
         n["all"] += 1
         n["ksi"] += 1 if ksi else 0
         n["vru"] += 1 if (r["vru_json"] or "[]") != "[]" else 0
-    state = (row or {}).get("state") or "never"
-    if state == "running" and row and row.get("started_at"):
-        try:
-            if datetime.now(timezone.utc) - datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")) > STALE_RUN:
-                state = "failed"
-                det.setdefault("error", "the last fetch stopped without finishing (the server restarted?)")
-        except ValueError:
-            pass
+    state = _run_state(row, det)
     years = det.get("years") or []
     return {"state": state, "started_at": (row or {}).get("started_at"), "fetched_at": (row or {}).get("fetched_at"),
             "by": (row or {}).get("by_whom"), "error": det.get("error"), "notes": det.get("notes") or [],
@@ -555,6 +548,31 @@ def status():
             "hours": bool(det.get("hours")),
             "credit": credit_line() if n["all"] or alt["all"] or years else "",
             "name": LAYER_NAME, "what": WHAT}
+
+
+def _run_state(row, det):
+    """The state of the last fetch as it READS: a 'running' row older than STALE_RUN is a dead run ('failed', and `det`
+    gains the reason). One rule, read by status() and run_state()."""
+    state = (row or {}).get("state") or "never"
+    if state == "running" and row and row.get("started_at"):
+        try:
+            if datetime.now(timezone.utc) - datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")) > STALE_RUN:
+                state = "failed"
+                det.setdefault("error", "the last fetch stopped without finishing (the server restarted?)")
+        except ValueError:
+            pass
+    return state
+
+
+def run_state():
+    """23 Nov 2026 (the "Working" list, working.py): the fetch's own state from its one row, no counts (status() reads
+    every stored collision): `state` as status() gives it, when it started, when it last finished, who started it."""
+    row = _meta_row()
+    det = _detail(row)
+    state = _run_state(row, det)
+    started = (row or {}).get("started_at")
+    return {"state": state, "started_at": started, "last": started, "fetched_at": (row or {}).get("fetched_at"),
+            "by": (row or {}).get("by_whom"), "error": det.get("error")}
 
 
 def period_words(years):
@@ -716,13 +734,14 @@ def refresh(by=None, fetchers=None, index=None, today=None):
 
 def start_refresh(by=None, sync=False, **kw):
     import fetch_guard
+    import working
     tenant = db.current_tenant()
     # 29 Oct 2026: one big fetch at a time — the community layer's and this one together took live over its memory
+    # 23 Nov 2026 (the "Working" list): one long job at a time, of ANY kind, said in the one sentence (working.refusal);
+    # it replaces "a fetch is already running" and fetch_guard's two sentences
     with fetch_guard.LOCK, _LOCK:
         st = status()
-        if st["state"] == "running":
-            return dict(st, started=False, message="a fetch is already running")
-        busy = fetch_guard.other_running("collisions")
+        busy = working.refusal("collisions")
         if busy:
             return dict(st, started=False, message=busy)
         _write_meta("running", dict(_detail(_meta_row()), error=None), by=by, started_at=_now())
