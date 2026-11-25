@@ -778,6 +778,8 @@ ok("⭐ 9 source: the summary page's step 3 reads as card 6 draws it, 'Involving
    and 'SUM_HGV = "Involving an HGV"' in _sumsrc and '"Left-hand turns"' in _sumsrc
    and not re.search(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode),
    re.findall(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode))
+ok("9 source: the figures table's row keeps HGV in capitals ('involving an HGV'; a .lower() printed 'involving an hgv')",
+   'rows.append(("   " + SUM_HGV[0].lower() + SUM_HGV[1:], ' in _sumsrc and "SUM_HGV.lower()" not in _sumsrc)
 ok("9 source: an answer kept in older words is read in the new ones before the page draws it (route_best.answer_words)",
    '"answer": route_best.answer_words(r["answer"])' in _doc)
 ok("9 source: stored data only: the summary is gathered through route_best (no fetch), inside gather",

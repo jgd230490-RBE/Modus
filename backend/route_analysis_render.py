@@ -1304,7 +1304,7 @@ def _sum_table(doc, x, y, w, B):
     rows = []
     if B["history"] == "current":
         rows.append((f"Collisions on the road, {B['period']}", lambda k: _n(k["counts"].get("collisions")), None))
-        rows.append(("   " + SUM_HGV.lower(), lambda k: _n(k["counts"].get("goods")), None))
+        rows.append(("   " + SUM_HGV[0].lower() + SUM_HGV[1:], lambda k: _n(k["counts"].get("goods")), None))
     else:
         rows.append(("Collisions on the road", lambda k: "not compared", None))
 
