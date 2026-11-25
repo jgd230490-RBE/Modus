@@ -348,6 +348,17 @@ def restriction_status(bucket="commit", route_id=None, acc=None, today=None):
             "week": source.get("week"), "commit_week": full.get("commit_week")}
 
 
+def _team_only(acc):
+    """A team login's own team, in its words ("North Team"), as the Lorry plan says it; None for everyone else."""
+    if not (acc and acc.get("ipt")):
+        return None
+    try:
+        import export
+        return export._team_namer()(acc["ipt"]) or None
+    except Exception:                                    # noqa: BLE001
+        return None
+
+
 def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today=None):
     acc = acc if acc is not None else access.current()
     factors = None
@@ -368,6 +379,13 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     # totals for what the caller can see — decorate() ran on the full set above
     derived.decorate(commit, cache=cache, routes=routes, cost=cost)
     commit["statuses"] = list(days.DAY_STATUSES)
+    # 25 Nov 2026 (the Look-ahead rethink, task A): every line's SITE by one rule (la_sites.site_of) and the week added
+    # up by site, in the order of Data → Locations, for the caller's own lines only; a team login says so once
+    import la_sites
+    where = la_sites.places()
+    la_sites.stamp(visible, routes, where)
+    commit["sites"] = la_sites.roll_up(visible, where)
+    commit["team_only"] = _team_only(acc)
 
     out = {"bucket": commit.get("bucket"), "commit_week": cw, "today_week": full.get("today_week"),
            "today": (today or datetime.date.today()).isoformat(),
@@ -381,6 +399,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     acct_all = account_rows(mi, wi, route_id=route_id)
     acct = dict(acct_all)
     acct["rows"] = access.filter_lines(acct_all["rows"], acc)
+    la_sites.stamp(acct["rows"], routes, where)          # 25 Nov 2026 (task A): the site on every Account row
     import conversions
     factors = conversions.load_factors()
     t = 0.0
@@ -451,6 +470,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     # horizon, filtered
     hz = horizon_rows(mi, wi, route_id=route_id)
     hz["rows"] = access.filter_lines(hz["rows"], acc)
+    la_sites.stamp(hz["rows"], routes, where)            # 25 Nov 2026 (task A): the site on every Horizon row
     hz["stock"] = horizon_stock(mi)
     out["horizon"] = hz
 
