@@ -449,13 +449,8 @@
         .mode-legend .ml-steps{ display:flex; gap:2px; margin:4px 0 2px; }
         .mode-legend .ml-steps i{ flex:1; height:14px; display:block; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:3px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
-        /* 24 Nov 2026 (the route lines mockup, card 2, Direction 2): a band's row is a short line in its colour AT its width
-           (LINE_BAND_WIDTHS), in a fixed 22 x 14 box so the words line up */
-        .mode-legend .ml-ln{ display:inline-flex; align-items:center; width:22px; height:14px; flex:0 0 22px; }
-        .mode-legend .ml-ln i{ display:block; width:100%; border-radius:0; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         /* 12 Nov 2026 (card A-F2b, dark grounds): on the Dark look the near-black outline vanished round the darkest blues */
         html[data-look="dark"] .mode-legend .ml-steps i, html[data-look="dark"] .mode-legend .ml-sw{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }
-        html[data-look="dark"] .mode-legend .ml-ln i{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }
         .mode-legend .ml-foot{ margin-top:6px; color:var(--muted); }
         /* 16 Oct 2026 (D115): the flow legend — a sample of each spacing as drawn, then its band */
         #flow-legend{ margin-top:12px; }
@@ -2526,25 +2521,13 @@
     // each at first, 1.6 to 3.8 px by band since 23 Oct 2026, 1.75 px either side of the middle: FLOW_WIDTHS, FLOW_OFFSET)
     // sit inside the blue with a gap between them.
     // Still one width for every route: the width carries no figure.
-    // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q4 = Direction 2, card 2): with a heat
-    // map on, the line's WIDTH carries its band too, the same band as its colour (LINE_BAND_WIDTHS, bandWidthExpr): the
-    // busy roads are found without the key and the picture survives grey print and colour blindness. This reverses
-    // 12 Oct's "line width by volume leave out" and "a line's width never carries a figure". With the heat map Off the
-    // line is ONE sign blue at ONE width (FORECAST_LINE_WIDTH on FORECAST_CASING_WIDTH, a white casing): which routes run,
-    // never how much.
+    // 24 Nov reversed, 25 Nov restored at John's word: one width. On 24 Nov (Q4 = Direction 2 of the route lines mockup)
+    // a heat map's band set the line's width as well as its colour; on 25 Nov John: "all lines should be the same
+    // thickess", so 12 Oct's rule stands again: a forecast line and a shared section are ONE width in every mode (heat
+    // map Off, Volume, Carbon), FORECAST_LINE_WIDTH on FORECAST_CASING_WIDTH, a white casing; the amount is told by the
+    // five blues only. With the heat map Off the line is the one sign blue: which routes run, never how much.
     const FORECAST_LINE_WIDTH = 5;
     const FORECAST_CASING_WIDTH = 7.6;
-    //: the five bands' widths (px), the heat map's own five bands (under 10 · 10-25 · 25-50 · 50-100 · 100 and over
-    //: movements a day for Volume; the carbon stops for Carbon); the casing LINE_BAND_PAD wider than the line it lifts
-    const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];
-    const LINE_BAND_PAD = 2.4;
-    //: a step on prop at the given ascending stops: the band's width (+ pad for a casing). A line with no figure (a
-    //: carbon line with none) takes the first band's width
-    function bandWidthExpr(prop, stops, pad){
-        const e = ['step', ['to-number', ['get', prop], 0], LINE_BAND_WIDTHS[0] + (pad || 0)];
-        stops.forEach((st, i) => { e.push(st, LINE_BAND_WIDTHS[i + 1] + (pad || 0)); });
-        return e;
-    }
     //: working days in a planning month, as the public feed reports it. 22 only until
     //: the first feed answers — never a second copy of the figure.
     let FORECAST_WORKING_DAYS = 22;
@@ -7785,8 +7768,8 @@
     //: 20 t load), in which case they are twenty times larger and the legend names the unit
     const ROUTE_VOLUME_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? VOLUME_STOPS.map(s => s * 20) : VOLUME_STOPS;
     // 16 Oct 2026 (D115): 6 / 8.5 (were 5 / 7.5), the forecast line's width, so the flow's lanes fit every mode
-    // REVERSED 24 Nov 2026 (Q4, Direction 2): a shared section's width is its band too, as its colour
-    // (bandWidthExpr('rl_mv', rlStops()), the casing LINE_BAND_PAD wider): ROAD_LOAD_LINE_WIDTH / _CASING_WIDTH are gone
+    // 24 Nov reversed, 25 Nov restored at John's word: one width. A shared section is drawn at the forecast line's own
+    // width (FORECAST_LINE_WIDTH on FORECAST_CASING_WIDTH), its band told by its blue only
     //: 19 Oct 2026 (the user: "labels too wordy and noisy, perhaps a small icon label with a legend explaining what the
     //: number is"): the run's label is its NUMBER on a badge with a two-way arrow ("118"; was "118 two-way / day · 7
     //: routes"), what it counts said once in the heat map's key; the route count is in the section's card on click. A
@@ -7865,7 +7848,8 @@
     const CARBON_NONE = '#A8A29E';
     //: the four stops as fractions of the programme's largest route-month, rounded to two significant figures
     const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];
-    // REVERSED 24 Nov 2026 (Q4): CARBON_LINE_WIDTH / CARBON_CASING_WIDTH are gone; a carbon line's width is its carbon band
+    // 24 Nov 2026: CARBON_LINE_WIDTH / CARBON_CASING_WIDTH are gone; 25 Nov (one width again) a carbon line is
+    // FORECAST_LINE_WIDTH on FORECAST_CASING_WIDTH like every forecast line
     const RL = { cache: {}, pending: {}, error: {}, month: null, wired: false };
 
     function modeOn(id){ const cb = document.getElementById(id); return !!(cb && cb.checked); }
@@ -8015,10 +7999,10 @@
         if (map.getLayer('road-load-line')) return;
         map.addLayer({ id: 'road-load-casing', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': bandWidthExpr('rl_mv', rlStops(), LINE_BAND_PAD), 'line-opacity': 1 } }, labelAnchor());
+            paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': FORECAST_CASING_WIDTH, 'line-opacity': 1 } }, labelAnchor());
         map.addLayer({ id: 'road-load-line', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': bandWidthExpr('rl_mv', rlStops(), 0), 'line-opacity': 1 } }, labelAnchor());
+            paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': FORECAST_LINE_WIDTH, 'line-opacity': 1 } }, labelAnchor());
         try { addPillBadges(map); } catch (e) {}
         map.addLayer({ id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,
             filter: ['>=', ['get', 'rl_mv'], ROAD_LOAD_BADGE_MIN],
@@ -8127,20 +8111,16 @@
         const focus = councilFocus();
         const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;
         const heat = vol || co2;
-        // 24 Nov 2026 (Q4, Direction 2): the width by the same band as the colour; Off: one width
-        const bandW = pad => vol ? bandWidthExpr('f_avg', ROUTE_VOLUME_STOPS, pad) : bandWidthExpr('f_co2', stops, pad);
-        const caseW = heat ? bandW(LINE_BAND_PAD) : FORECAST_CASING_WIDTH;
+        // 24 Nov reversed, 25 Nov restored at John's word: one width in every mode, the band by colour only
+        const caseW = FORECAST_CASING_WIDTH;
         if (map.getLayer('forecast-layer')) {
             map.setPaintProperty('forecast-layer', 'line-color', paint);
-            map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? bandW(0) : FORECAST_LINE_WIDTH);
+            map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : FORECAST_LINE_WIDTH);
         }
         COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', caseW);
-        // the amber diversion edge takes the casing's place, at the casing's width (29 Oct), so it follows the band too
+        // the amber diversion edge takes the casing's place, at the casing's width (29 Oct)
         if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);
-        // the flow's lanes (1.6 px a lane, 1.75 px off the middle) do not fit inside a 3 px line: on the first band they
-        // are not drawn while a heat map is on (the moving dots replace the lanes in their own build)
-        if (map.getLayer('forecast-flow')) map.setPaintProperty('forecast-flow', 'line-width', flowWidthExpr(heat && !focus));
         HEAT_LINES_ON = heat && !focus; restyleHeatEdge();
         if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }
         else {
@@ -8149,8 +8129,8 @@
         }
         if (map.getLayer('road-load-line')) {
             map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', rlStops()));
-            map.setPaintProperty('road-load-line', 'line-width', bandWidthExpr('rl_mv', rlStops(), 0));
-            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', bandWidthExpr('rl_mv', rlStops(), LINE_BAND_PAD));
+            map.setPaintProperty('road-load-line', 'line-width', FORECAST_LINE_WIDTH);
+            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', FORECAST_CASING_WIDTH);
             if (map.getLayer('road-load-labels')) map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);
         }
         if (typeof renderFlowLegend === 'function') renderFlowLegend();   // 16 Oct (D115): the flow legend follows the council view
@@ -8172,7 +8152,7 @@
                     const other = ROUTE_VOLUME_STOPS !== VOLUME_STOPS;
                     rlBox.innerHTML = '<b>Volume · ' + CW().lower + ' in ' + rlEsc(monthLabel(m)) + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
-                        // 24 Nov 2026 (card 2): each band's row is its line, colour and width, as the map draws it
+                        // 25 Nov 2026 (one width again): each band's row is its colour only (24 Nov drew its line at its width)
                         stepRanges(rlStops(), '').map((t, i) => '<div class="ml-row">' + bandSample(i) + t + '</div>').join('') +
                         // 19 Oct 2026: the badges' key — what the number on the road is; 24 Nov 2026 (Q6): only while the
                         // badges are drawn (Labels "All")
@@ -8214,9 +8194,9 @@
         const moreEl = document.getElementById('heat-info-more');
         if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;
     }
-    // 24 Nov 2026 (card 2): the key's sample of band i, the line in the band's blue at the band's width
+    // the key's sample of band i: its blue only (25 Nov 2026, one width again: no width step in the key)
     function bandSample(i){
-        return '<span class="ml-ln" aria-hidden="true"><i style="background:' + CARBON_RAMP[i] + ';height:' + LINE_BAND_WIDTHS[i] + 'px"></i></span>';
+        return '<span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>';
     }
     // 24 Nov 2026 (Q6, card 4): the badges on the lines are drawn under Labels "All" only, and the key's badge row with them
     function badgesOn(){ return typeof LABELS !== 'undefined' && LABELS.mode === 'all'; }
@@ -8577,9 +8557,8 @@
         try { if (next) map.moveLayer('forecast-flow', next); else map.moveLayer('forecast-flow'); } catch (e) {}
     }
     // the lane's width by its figure: a step on fl_mv at the five bands' stops
-    function flowWidthExpr(hideFirst){
-        // 24 Nov 2026: hideFirst (a heat map on, its first band's line 3 px wide): no lane on the first band
-        const e = ['step', ['to-number', ['get', 'fl_mv'], 0], hideFirst ? 0 : FLOW_WIDTHS[0]];
+    function flowWidthExpr(){
+        const e = ['step', ['to-number', ['get', 'fl_mv'], 0], FLOW_WIDTHS[0]];
         FLOW_STOPS.forEach((s, i) => { e.push(s, FLOW_WIDTHS[i + 1]); });
         return e;
     }

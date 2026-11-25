@@ -2782,12 +2782,16 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // with the heat map OFF it is still ONE width (5 / 7.5 px... 5 on 7.6). Still no interpolated width by volume, and
   // the old per-route FORECAST_VOL_STOPS / forecastWidth stay gone. The adders still name the Off width (twice the line,
   // three times the casing: the diversion edge takes the casing's place at its width until applyCarbonMode re-sets it)
-  ok("⭐ width by volume (REVERSED 24 Nov 2026): Off is one width (5 / 7.6 px); with a heat map on the width is a STEP by the colour's own band, never an interpolation",
+  // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): ONE width in EVERY mode again, 5 on
+  // 7.6 px; LINE_BAND_WIDTHS, LINE_BAND_PAD and bandWidthExpr are GONE; the shared sections take the same two widths at
+  // their adder (three uses of the line width, four of the casing)
+  ok("⭐ width by volume (NARROWED 25 Nov 2026): one width in every mode (5 / 7.6 px); no width step by band, no interpolation, the band helpers gone",
      code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
-     && code.includes("const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];") && code.includes("const LINE_BAND_PAD = 2.4;")
+     && !code.includes("LINE_BAND_WIDTHS") && !code.includes("LINE_BAND_PAD") && !code.includes("bandWidthExpr")
      && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
      && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv|f_co2)'\]/.test(code)
-     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 3
+     && !/'line-width':\s?\['step', \['to-number', \['get', '(f_avg|rl_mv|f_co2)'\]/.test(code)
+     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 3 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 4
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
   ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // the drawer's half of review bug (d)
@@ -3366,13 +3370,15 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // ---- road load: the source, the line, the label, the card ----
   // REVERSED 24 Nov 2026 (John, Q4 = Direction 2): the section's width is its band too, the SAME step on the same stops as
   // its colour (bandWidthExpr('rl_mv', rlStops()), the casing LINE_BAND_PAD wider); ROAD_LOAD_LINE_WIDTH / _CASING are gone
-  ok("⭐ C1: a road-load SOURCE and a line layer coloured by two-way movements a day on FIXED, ascending stops (REVERSED 24 Nov 2026: and its width by the same band)",
+  // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): the section is the forecast line's one width again
+  ok("⭐ C1: a road-load SOURCE and a line layer coloured by two-way movements a day on FIXED, ascending stops (NARROWED 25 Nov 2026: one width, FORECAST_LINE_WIDTH on FORECAST_CASING_WIDTH)",
      blkCode.includes("map.addSource('road-load-source', { type: 'geojson'")
      && !blkCode.includes("ROAD_LOAD_STOPS") && !blkCode.includes("roadLoadWidth")
      && blkCode.includes("const VOLUME_STOPS = [10, 25, 50, 100];")
      && !code.includes("ROAD_LOAD_LINE_WIDTH") && !code.includes("ROAD_LOAD_CASING_WIDTH")
-     && /id: 'road-load-line', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': bandWidthExpr\('rl_mv', rlStops\(\), 0\)/.test(blkCode)
-     && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': bandWidthExpr\('rl_mv', rlStops\(\), LINE_BAND_PAD\)/.test(blkCode));
+     && /id: 'road-load-line', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': FORECAST_LINE_WIDTH,/.test(blkCode)
+     && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': FORECAST_CASING_WIDTH,/.test(blkCode)
+     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-width', FORECAST_LINE_WIDTH);"));
   ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
      /id: 'road-load-line'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.brand,/.test(blkCode)
      && /id: 'road-load-casing'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.forecastCasing,/.test(blkCode));
@@ -3515,11 +3521,12 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // share of a route, a different quantity on the same ramp); Volume paints the routes by f_avg AND the shared sections
   // by rl_mv on the same fixed stops. Colour only, one width (rule 1).
   // NARROWED 24 Nov 2026 (Q4, Direction 2): "one width" holds for the heat map Off only; on, the width is the colour's band
-  ok("⭐ heat map: Volume paints routes (f_avg) and shared sections (rl_mv) on the volume stops; Carbon paints the routes only; the width by the same band (NARROWED 24 Nov 2026)",
+  // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width in every mode again (the council view's thin grey aside)
+  ok("⭐ heat map: Volume paints routes (f_avg) and shared sections (rl_mv) on the volume stops; Carbon paints the routes only; one width in every mode (NARROWED 25 Nov 2026)",
      // NARROWED 12 Oct 2026 (night): the council view (By council on) paints the routes thin and grey before either mode
      blkCode.includes("const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;")
-     && blkCode.includes("const bandW = pad => vol ? bandWidthExpr('f_avg', ROUTE_VOLUME_STOPS, pad) : bandWidthExpr('f_co2', stops, pad);")
-     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? bandW(0) : FORECAST_LINE_WIDTH);")
+     && !blkCode.includes("bandW") && blkCode.includes("const caseW = FORECAST_CASING_WIDTH;")
+     && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : FORECAST_LINE_WIDTH);")
      // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default): the sections on the stops in the count (rlStops(): VOLUME_STOPS × PV())
      && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', rlStops()));")
      && !blkCode.includes("carbonColor('rl_co2'") && !blkCode.includes("paintRuns")
@@ -3658,24 +3665,17 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
       11: { month: 11, notes: ["Approved volume this month runs on no shared road section."], runs: [] } };
     let blkApi = null, blkErr = "";
     const fmap = mkMap();
-    // 24 Nov 2026 (Q4, Direction 2): the page's own band widths (defined beside FORECAST_LINE_WIDTH), and the flow's width
-    // step the heat map now re-sets (a stand-in: the flow block is run in its own sandbox below)
-    let bandApi = { bandWidthExpr: () => "BW", LINE_BAND_PAD: 2.4 };
-    try { bandApi = new Function(src.slice(src.indexOf("    const LINE_BAND_WIDTHS = "), src.indexOf("    //: working days in a planning month")) + "\nreturn { bandWidthExpr, LINE_BAND_PAD, LINE_BAND_WIDTHS };")(); } catch (e) { blkErr = "band widths: " + e.message; }
+    // 25 Nov 2026 (one width again): the band widths the sandbox was handed on 24 Nov are gone with them
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks", "labelAnchor",
         "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
-        "bandWidthExpr", "LINE_BAND_PAD", "flowWidthExpr", "LINE_BAND_WIDTHS",
         blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff, carbonLabelPoints };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {}, () => undefined,
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
         // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
         // review): else no window (null), as the page now says
-        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null,
-        bandApi.bandWidthExpr, bandApi.LINE_BAND_PAD, h => (h ? "FLOW0" : "FLOW"),
-        // 24 Nov 2026 (card 2): the key draws each band's line at its width (bandSample reads the page's own widths)
-        bandApi.LINE_BAND_WIDTHS || [3, 4.5, 6, 8, 10]);
+        () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null);
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
     if (blkApi) {
@@ -3787,7 +3787,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         delete globalThis.LABELS; B.renderModeLegends(10);
         {
           const fl0 = fmap.layers["forecast-layer"].paint, rl0 = fmap.layers["road-load-line"].paint;
-          ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], the width by the same band (REVERSED 24 Nov 2026)",
+          ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], one width (NARROWED 25 Nov 2026)",
          // REVERSED 11 Nov 2026 (card A-F2b): the five blues re-stepped; same band, new hex
              JSON.stringify(fl0["line-color"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], "#72A7FF", 10, "#006AFD", 25, "#0051C4", 50, "#00388E", 100, "#00215B"])
              // REVERSED 9 Nov 2026 (2.1-11b question B): the sections are in movements, on the stops × 2 (the same blues for the same lorries)
@@ -3795,10 +3795,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
              // NARROWED 16 Oct 2026 (D115): one width, 6 / 8.5 px (were 5 / 7.5), so the flow's lanes fit
              // REVERSED 24 Nov 2026 (John, Q4 = Direction 2): the width is a step on the SAME property and stops as the colour,
              // 3 / 4.5 / 6 / 8 / 10 px, the casing 2.4 px wider; the sections on their own stops (× 2); the first band's lanes go
-             && JSON.stringify(fl0["line-width"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], 3, 10, 4.5, 25, 6, 50, 8, 100, 10])
-             && JSON.stringify(rl0["line-width"]) === JSON.stringify(["step", ["to-number", ["get", "rl_mv"], 0], 3, 20, 4.5, 50, 6, 100, 8, 200, 10])
-             && JSON.stringify(fmap.layers["forecast-casing"].paint["line-width"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], 5.4, 10, 6.9, 25, 8.4, 50, 10.4, 100, 12.4])
-             && JSON.stringify(fmap.layers["road-load-casing"].paint["line-width"]) === JSON.stringify(["step", ["to-number", ["get", "rl_mv"], 0], 5.4, 20, 6.9, 50, 8.4, 100, 10.4, 200, 12.4])
+             // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): the routes and the sections are the forecast line's ONE width
+             // (the sandbox's FORECAST_LINE_WIDTH "FLW" on FORECAST_CASING_WIDTH "FCW"), whatever the band
+             && fl0["line-width"] === "FLW" && rl0["line-width"] === "FLW"
+             && fmap.layers["forecast-casing"].paint["line-width"] === "FCW" && fmap.layers["road-load-casing"].paint["line-width"] === "FCW"
              && !fmap.layers["carbon-route-labels"] && B.heatMode() === "volume", JSON.stringify(fl0));
         }
         B.refreshMapModes(); await flush(); B.refreshMapModes(); await flush();
@@ -3823,12 +3823,12 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         el("toggle-carbon").checked = true;
         ok("heat map: with both ids ticked (an old road-load.carbon link) the mode is Volume, never both", B.heatMode() === "volume");
         el("toggle-road-load").checked = false; B.toggleCarbon(); await flush(); await flush();
-        ok("⭐ C1: picking Carbon takes the shared sections away and paints the ROUTES by f_co2 on the blue ramp, the width by the carbon band (REVERSED 24 Nov 2026)",
+        ok("⭐ C1: picking Carbon takes the shared sections away and paints the ROUTES by f_co2 on the blue ramp, one width (NARROWED 25 Nov 2026)",
            !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"]
            && fmap.layers["forecast-layer"].paint["line-color"][0] === "case" && fmap.layers["forecast-layer"].paint["line-color"][2][1][1][1] === "f_co2"
            // REVERSED 24 Nov 2026 (Q4): the width is a step on f_co2 at the carbon stops (was one width, 6 px)
-           && JSON.stringify(fmap.layers["forecast-layer"].paint["line-width"].slice(0, 3)) === JSON.stringify(["step", ["to-number", ["get", "f_co2"], 0], 3])
-           && fmap.layers["forecast-layer"].paint["line-width"].filter((x, i) => i >= 3 && i % 2 === 0).join() === "4.5,6,8,10" && !!fmap.layers["carbon-route-labels"]
+           // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width again, the forecast line's own
+           && fmap.layers["forecast-layer"].paint["line-width"] === "FLW" && !!fmap.layers["carbon-route-labels"]
            && el("road-load-legend").hidden === true);
         // NARROWED 12 Oct 2026 (evening): per route (carbon never paints the shared sections now)
         ok("⭐ C1: the carbon legend: per route, the five ranges from the fixed stops, 'excludes 3 lines with no stored road route'",
@@ -3865,11 +3865,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         el("toggle-road-load").checked = false; B.toggleRoadLoad(); await flush();
         const fl = fmap.layers["forecast-layer"].paint;
         // REVERSED 24 Nov 2026 (Q4, Direction 2): by the carbon band, the casing 2.4 px wider (was a fixed 6 / 8.5 px)
-        ok("⭐ C1: Road load off, Carbon on: the road-load source and layers go, the FORECAST routes are painted by f_co2, the width by its band (REVERSED 24 Nov 2026)",
+        // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width again (FLW on FCW in the sandbox)
+        ok("⭐ C1: Road load off, Carbon on: the road-load source and layers go, the FORECAST routes are painted by f_co2, one width (NARROWED 25 Nov 2026)",
            !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && fl["line-color"][2][1][1][1] === "f_co2"
-           && fl["line-width"][0] === "step" && fl["line-width"][1][1][1] === "f_co2" && fl["line-width"][2] === 3
-           && JSON.stringify(fl["line-width"].filter((x, i) => i >= 3 && i % 2 === 1)) === JSON.stringify(B.carbonStops(55.5))
-           && fmap.layers["forecast-casing"].paint["line-width"][2] === 5.4 && fmap.layers["forecast-casing"].paint["line-width"][fmap.layers["forecast-casing"].paint["line-width"].length - 1] === 12.4);
+           && fl["line-width"] === "FLW" && fmap.layers["forecast-casing"].paint["line-width"] === "FCW");
         ok("browser check 12 Oct: Road load off removes the label-point source too", !fmap.sources["road-load-label-source"] && !fmap.layers["road-load-labels"]);
         ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): a route with no carbon figure gets no badge
@@ -5920,11 +5919,13 @@ ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one);
   // NARROWED 24 Nov 2026 (John, Q4 = Direction 2): one width with the heat map Off (5 / 7.6 px); Volume, Carbon and the
   // shared sections by band (3 to 10 px). On the first band (3 px) the lanes no longer fit, so with a heat map on they
   // are not drawn there (flowWidthExpr(true): width 0 on the first band) until the dots replace them
-  ok("⭐ D115: the blue under the lanes is the road, NOT offset; Off one width (5 / 7.6 px), a heat map's lines by band, and no lane on a 3 px line (NARROWED 24 Nov 2026)",
+  // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width in every mode, so every band
+  // has its lane again: flowWidthExpr takes no argument and applyCarbonMode no longer re-sets the lanes' width
+  ok("⭐ D115: the blue under the lanes is the road, NOT offset; one width in every mode (5 / 7.6 px), a lane on every band (NARROWED 25 Nov 2026)",
      code.includes("const FORECAST_LINE_WIDTH = 5;") && code.includes("const FORECAST_CASING_WIDTH = 7.6;")
      && !code.includes("CARBON_LINE_WIDTH") && !code.includes("ROAD_LOAD_LINE_WIDTH")
-     && code.includes("map.setPaintProperty('forecast-flow', 'line-width', flowWidthExpr(heat && !focus));")
-     && /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], hideFirst \? 0 : FLOW_WIDTHS\[0\]\];/.test(code)
+     && !code.includes("flowWidthExpr(heat") && !code.includes("hideFirst")
+     && /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], FLOW_WIDTHS\[0\]\];/.test(code)
      && !/id:'forecast-(layer|casing)'[^\n]*line-offset/.test(code));
   ok("D115: two lanes fit inside the blue with a gap between them (|offset| - width/2 > 0, |offset| + width/2 <= half the line)",
      1.75 - 2.5 / 2 > 0 && 1.75 + 2.5 / 2 <= 6 / 2);
@@ -5940,7 +5941,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   // REVERSED 23 Oct 2026: the band expression's outputs are NUMBERS (the lane widths), which need no ['literal', …]
   ok("⭐ D115 / 23 Oct: the width step's outputs are the five lane widths, plain numbers at the five stops",
      // NARROWED 24 Nov 2026: the first band's width is 0 while a heat map is on (hideFirst), its own width otherwise
-     /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], hideFirst \? 0 : FLOW_WIDTHS\[0\]\];/.test(fcode)
+     // NARROWED 25 Nov 2026 (one width again): the first band always has its own width
+     /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], FLOW_WIDTHS\[0\]\];/.test(fcode)
      && /e\.push\(s, FLOW_WIDTHS\[i \+ 1\]\);/.test(fcode));
   // REVERSED 23 Oct 2026: no march step; the light's phase runs from the frame clock at one speed on every lane
   ok("⭐ D115 / 23 Oct: ONE speed for every lane (FLOW_PULSE_SPEED), FLOW_PULSES points a lane, no FLOW_STEP",
