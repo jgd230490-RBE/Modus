@@ -477,6 +477,25 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      row that wraps on a narrow window is divided too. Each screen keeps its own order inside a cell. */
   .fig-strip{display:grid;gap:0 !important;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);overflow:hidden;background:none;}
   .fig-strip>*{border:0 !important;border-radius:0 !important;background:none !important;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line) !important;margin:-1px 0 0 -1px;min-width:0;}
+  /* 25 Nov 2026 (the Look-ahead rethink, B1, card 2; Q8, Q9): the Look-ahead's strips. As the Dashboard's top figures, each
+     cell carries its own top edge (the 2 px ink line, or 4 px in the status's colour: .la-fig-warn) and the columns follow
+     the strip's OWN width (.la-figs-box is a size container): two a row under 560 px, four (then three) to 1,000 px, seven
+     from 1,000 px; Last week's four (.la-figs-4) are four from 560 px. A label over the figure, at most one second line. */
+  .la-figs-box{container-type:inline-size;}
+  .la-sofar{color:var(--navy);text-decoration:underline;text-underline-offset:2px;font-weight:500;background:none;border:0;padding:0;cursor:pointer;}   /* 25 Nov 2026 (B1): Last week's one quiet link */
+  .la-sofar:hover{text-decoration:none;}
+  .fig-strip.la-figs{grid-template-columns:repeat(2,minmax(0,1fr));border-top:0;}
+  .fig-strip.la-figs>*{box-shadow:inset 1px 0 0 var(--line),inset 0 2px 0 var(--ink) !important;margin:0 0 0 -1px;padding:12px 12px 10px !important;}
+  .fig-strip.la-figs>.la-fig-warn{position:relative;}
+  .fig-strip.la-figs>.la-fig-warn::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--gold);}   /* the status edge over the 2 px ink line */
+  @container (min-width:560px){.fig-strip.la-figs{grid-template-columns:repeat(4,minmax(0,1fr));}}
+  @container (min-width:1000px){.fig-strip.la-figs:not(.la-figs-4){grid-template-columns:repeat(7,minmax(0,1fr));}}
+  .la-fig-label{display:flex;align-items:center;gap:4px;font-size:13px;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .la-fig-num{font-family:var(--f-head);margin-top:2px;}
+  .la-fig-unit{font-family:var(--f-text);font-size:13px;font-weight:400;letter-spacing:0;color:var(--muted);margin-left:4px;}
+  .la-fig-sub{font-size:12px;line-height:16px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .la-fig-sub.warn-line{color:var(--warn-text);font-weight:600;}
+  .la-fig-sub.warn-line>span:first-child::before{width:8px;height:8px;margin:0 6px 1px 1px;}
   /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
   .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;background:none;overflow:hidden;}
   .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;padding-left:12px !important;padding-right:12px !important;}
@@ -2017,20 +2036,25 @@ const INFO = {
   "dash.col.dist": { title: "Distance per trip", text: "The route's distance for one trip: the round trip, unless the route says loaded only.", tech: "t1-distance" },
   "dash.col.delivered": { title: "Delivered", text: "Reported week actuals ÷ planned, over the months in view.", tech: "t1-delivered" },
   "dash.col.peak": { title: "Peak vehicles", text: "The most vehicles any one month needs on this line.", tech: "t1-vehicles" },
-  "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the commit week, in the unit chosen above. In Tonnes, click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
+  "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the week, in the unit chosen above. In Tonnes, click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
     how: "A day follows the week ÷ 5 until it is typed. Monday to Friday only: Saturday and Sunday are held at 0 and not shown. Confirm locks the whole week as the haulier sheet. Figures are planning figures, not plated weights.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-trips" },
   "la.variance": { title: "Difference", text: "Planned against actual, in words: short or over. Amber: short by more than the share set on Config → Planning. An empty actual is not zero: it is not reported.",
     how: "Nothing is added when you save an actual: only Add to this week writes into the commit week, and only if that week is not already confirmed.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
-  "la.spread": { title: "Add to this week", text: "Divides the shortfall not yet added across the remaining weekdays of the commit week (all of Monday to Friday when it has not started). A second press adds only what the first did not.",
-    how: "Saturday and Sunday stay 0 unless you type them. It is refused if the commit week is confirmed.", guide: "6-4-account-view-what-actually-happened-last-week" },
-  "la.cost_quote": { title: "Planned cost", text: "The route's own rates, or the target rate from Config where the route has none (marked target). + BAF is the same quote with the fuel surcharge; the quote is never replaced.",
-    how: "The cost variance compares the actual against the quote, not the surcharged figure. BAF = (diesel index ÷ base − 1) × fuel share.", guide: "9-5-money-settings", tech: "t1-cost" },
+  "la.spread": { title: "Add to this week", text: "Divides the shortfall not yet added across the remaining weekdays of the following week (all of Monday to Friday when it has not started). A second press adds only what the first did not.",
+    how: "Saturday and Sunday stay 0 unless you type them. It is refused if that week is confirmed.", guide: "6-4-account-view-what-actually-happened-last-week" },
+  "la.cost_quote": { title: "Planned cost", text: "The route's own rates, or the target rate from Config where the route has none (marked target). + fuel surcharge is the same quote with the surcharge; the quote is never replaced.",
+    how: "The cost variance compares the actual against the quote, not the surcharged figure. Fuel surcharge = (diesel index ÷ base − 1) × fuel share.", guide: "9-5-money-settings", tech: "t1-cost" },
+  // 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the sentences cut from the strip's cells, two sentences, 30 words at most
+  "la.fig_diesel": { title: "Diesel, per litre", text: "This week's diesel pump price, published weekly or typed by an admin on Config. Older than eight days: stale, the last good price kept.",
+    how: "It sets the fair price and the fuel surcharge. The surcharge's base is set by the first Confirm week: Last week's Fuel card says it.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-cost" },
+  "la.fig_cost": { title: "Planned cost", text: "Each line's own route rate, or the target rate where it has none (at target). Fair price: what the cost model says it should cost, never a quote.",
+    how: "\"n of m priced\" shows when a line has neither a rate nor a target. The fuel surcharge is never added to this figure.", guide: "9-5-money-settings", tech: "t1-cost" },
   "la.cost_fair": { title: "Fair cost (model)", text: "What the job should cost from the vehicle, distance, tonnage, month and the diesel price, at the coefficients on Config. A floor for negotiation, never a quote.", guide: "9-5-money-settings", tech: "t1-fair" },
   "la.cost_actual": { title: "Actual cost", text: "The confirmed cost of this week, as invoiced or agreed. Typed, never worked out.", guide: "6-4-account-view-what-actually-happened-last-week" },
   "la.stock": { title: "Stockpiles", text: "Type what came out of each stockpile this week. Left empty, the plan is used.",
     how: "Opening = the balance at the end of the week before. In = the week actuals delivered here; a line nobody recorded counts its plan, shown in grey. Closing = opening + in − out. Next 8 weeks: whether it goes over or runs out.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
-  "la.horizon": { title: "The weeks ahead", text: "Week totals for the weeks after the commit week, so hauliers are not sent a four-week daily spreadsheet. Confirm lives on the Commit view.",
-    how: "The blue column is the commit week: the week that holds today, or next week by the switch above. It is the only week with daily rows.", guide: "6-5-horizon-view" },
+  "la.horizon": { title: "The weeks ahead", text: "Week totals for the weeks after this week, so hauliers are not sent a four-week daily spreadsheet. Confirm lives on This week and Next week.",
+    how: "The blue column is this week, the week that holds today. It is the only week with daily rows.", guide: "6-5-horizon-view" },
   "fc.cost": { title: "Planned and fair cost", text: "Planned: the route's typed rates, or the Config target rate. Fair: the cost model from the vehicle, distance, tonnage, month and diesel price. Each figure's per tonne, per trip and per mile or km is in the row's details.",
     guide: "9-5-money-settings", tech: "t1-fair" },
   "units": { title: "Loads, tonnes or lorries", text: "The unit for the table's figures. Loads are loaded trips. Lorries are the vehicles needed: on a day, or in a line's busiest month. The other units are in each row's details, behind its arrow.",
@@ -12330,18 +12354,30 @@ function WsPill({ ws }){
   if(!ws) return null;
   return <span className="tg tg-plain text-xs font-semibold">{ws}</span>;
 }
-function LaKpi({ value, caption, tone }){
-  // a long value steps its size down before it would be cut off ("£1.43…" read as a price); 10 Nov 2026 (finding 20):
-  // from 7 characters, since "£57,833" and "162,438" (comma thousands, no space to wrap at) ran 6–7 px past the tile
-  const len = String(value == null ? "" : value).length;
+// 25 Nov 2026 (the Look-ahead rethink, task B1, card 2, Q8 and Q9): a figure of the Look-ahead's strip is a LABEL over the
+// figure (13 px grey, one line), the figure in Sora with a small unit after it, and at most ONE short second line: grey, or
+// a warning (`warn`: the diamond and amber words). `edge` "warn" gives the cell the 4 px top edge in the status's colour (the
+// Dashboard's "status edge"): only "Delivered last week" takes it, while its amber status shows. No small bars. The figure
+// steps down a size from 8 characters ("1,234,567" tonne-miles), as before from 7 when the noun sat under it.
+function LaKpi({ label, value, unit, sub, warn, edge, info, tone }){
+  const v = String(value == null ? "" : value);
+  const len = v.length;
   return (
-    <div className="px-4 py-3 min-w-0" data-la-kpi="1" title={String(value == null ? "" : value)}>
-      <div className={"kpi-num font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")}
-        style={{ color: tone === "red" ? "var(--red)" : tone === "warn" ? "var(--warn-text)" : "var(--navy-deep)" }}>{value}</div>
-      <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
+    <div className={"px-4 py-3 min-w-0" + (edge ? " la-fig-" + edge : "")} data-la-kpi="1" data-la-fig={label} title={v + (unit ? " " + unit : "")}>
+      <div className="la-fig-label">{label}{info || null}</div>
+      <div className={"kpi-num la-fig-num font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-base" : len > 9 ? "text-lg" : len > 7 ? "text-xl" : "text-2xl")}
+        style={{ color: tone === "warn" ? "var(--warn-text)" : "var(--navy-deep)" }}>{v}{unit && <span className="la-fig-unit">{unit}</span>}</div>
+      {sub ? <div className={"la-fig-sub" + (warn ? " warn-line" : "")} data-la-fig-sub={warn ? "warn" : "plain"}><span>{sub}</span></div> : null}
     </div>
   );
 }
+// 25 Nov 2026 (B1): a day in this year without its year ("23 Nov"), another year's with it; the closures line's time in UK
+// time as Config's cfgWhen reads it (the page holds no time zone of the organisation's own: Europe/London, as cfgWhen)
+const laDay = (iso) => { if(!iso) return ""; const d = new Date(String(iso).slice(0, 10) + "T00:00:00"); if(isNaN(d)) return String(iso); return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() === new Date().getFullYear() ? "" : " " + d.getFullYear()}`; };
+const laWhen = (s) => { if(!s) return ""; const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); if(isNaN(d)) return String(s);
+  const o = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" };
+  if(d.getUTCFullYear() !== new Date().getUTCFullYear()) o.year = "numeric";
+  return d.toLocaleString("en-GB", o); };
 // ---- 14 Oct 2026 (bundle G, W17): the committed week at each gate --------------------------------------
 // The page's own read carries it (lookahead.page → gates_week, from gate_arrivals.week_by_day): each gate's planned
 // arrivals a day — every team's lorries, from the grid's own day trips — against what it can check in (its open minutes
@@ -12788,7 +12824,8 @@ function GatesWeek({ gw, initialOpen }){
 const RAIL_LABEL = { SHORTAGE: "Shortage", DAYS_NE_WEEK: "Days ≠ week", STOCKPILE_OVER: "Stockpile over",
                      // 27 Oct 2026 (stockpile forecast, D7): goes over or runs out within 8 weeks; runs out this week
                      STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",
-                     ROUTE_CAP: "Route cap", IPT_SHARE: "Share", RESTRICTION: "Restriction",
+                     // 25 Nov 2026 (the Look-ahead rethink, B1, Q18): "<team word> share", spelt out, through TEAM() as it reads
+                     ROUTE_CAP: "Route cap", get IPT_SHARE(){ return TEAM() + " share"; }, RESTRICTION: "Restriction",
                      LIMIT: "Road limit", UNBAKED: "Not routed", PARENT_CHANGED: "Month changed",
                      // 14 Oct 2026 (bundle G, W17)
                      GATE_OVER: "Gate over capacity", GATE_NEAR: "Gate near capacity",
@@ -12805,7 +12842,8 @@ const RAIL_LABEL = { SHORTAGE: "Shortage", DAYS_NE_WEEK: "Days ≠ week", STOCKP
 const capsWord = (w) => (/^[A-ZÄÖÜÕŠŽ0-9 ≠-]{4,}$/.test(String(w || "")) ? String(w)[0] + String(w).slice(1).toLowerCase() : w);   // 10 Nov 2026 (card 12)
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? capsWord(f.label) : ((table || RAIL_LABEL)[f.code] || f.code);
 // the grid's short words for each flag (the rail spells some out longer: RAIL_LABEL)
-const LINE_FLAG_LABEL = { UNBAKED: "Not routed", IPT_SHARE: "Share", ROUTE_CAP: "Cap", DAYS_NE_WEEK: "Days ≠ week",
+// 25 Nov 2026 (the Look-ahead rethink, B1, Q18): "Route cap" for "Cap", "<team word> share" for "Share" (spelt out, as the rail)
+const LINE_FLAG_LABEL = { UNBAKED: "Not routed", get IPT_SHARE(){ return TEAM() + " share"; }, ROUTE_CAP: "Route cap", DAYS_NE_WEEK: "Days ≠ week",
                   STOCKPILE_OVER: "Stockpile over", RESTRICTION: "Restriction", LIMIT: "Road limit", SHORTAGE: "Short", PARENT_CHANGED: "Month changed",
                   GATE_OVER: "Gate over", GATE_NEAR: "Gate near", STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",
                   NO_WAY_ROUND: "No way round",
@@ -12957,11 +12995,14 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   const noCountry = rawCountry === "--" || !!idx.no_country;
   const country = noCountry ? "no country" : rawCountry;
   const exVat = hasIndex && idx.ex_vat_per_l != null ? `${CUR()}${(+idx.ex_vat_per_l).toFixed(3)} per litre ex-VAT` : null;
+  // 25 Nov 2026 (the Look-ahead rethink, B1, Q18): "fuel surcharge", never "BAF", on the Look-ahead's own screens (its Last
+  // week row is mode "strip"); Config's row keeps its words until its own change
+  const SUR = mode === "config" ? "BAF" : "Fuel surcharge";
   const bafTxt = sum.baf_pct != null
-    ? `BAF ${sum.baf_pct >= 0 ? "+" : ""}${(sum.baf_pct * 100).toFixed(2)} % of quote`
-    : sum.baf_reason === "no base" ? "BAF: set a base on Confirm week"
-    : sum.baf_reason === "no share" ? "BAF: type a fuel share"
-    : "BAF: no index";
+    ? `${SUR} ${sum.baf_pct >= 0 ? "+" : ""}${(sum.baf_pct * 100).toFixed(2)} % of quote`
+    : sum.baf_reason === "no base" ? `${SUR}: set a base on Confirm week`
+    : sum.baf_reason === "no share" ? `${SUR}: type a fuel share`
+    : `${SUR}: no index`;
   const baseTxt = fuelS.baf_base_eur_per_l != null ? `base ${CUR()}${(+fuelS.baf_base_eur_per_l).toFixed(3)} · ${fuelDate(fuelS.baf_base_bulletin_date)}` : "no base locked";
   const staleChip = hasIndex && idx.stale ? <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span> : null;
   const inputCls = "border border-slate-300 rounded px-1.5 py-0.5 text-xs text-right tabular-nums w-20";
@@ -13036,15 +13077,18 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     );
   }
   if(mode === "compact"){
+    // 25 Nov 2026 (B1, card 2): the strip's "Diesel, per litre" cell: the price, its date as its one second line ("23 Nov",
+    // "typed 23 Nov"), a stale price as the diamond and "stale"; the country, "published" and the surcharge base leave the
+    // strip (the "i", and Last week's Fuel card, which says the surcharge in words)
+    const typed = !(autoIdx && idx.source !== "manual");
     return (
-      <div className="px-4 py-3 min-w-0" data-fuel-widget="compact" title={hasIndex ? String(price) : ""}>
-        <div className="text-lg leading-8 font-bold tabular-nums truncate" style={{ color: "var(--navy-deep)" }}>
-          {hasIndex ? priceTight : <span className="text-base text-amber-700">Index unavailable</span>}{staleChip}
+      <div className="px-4 py-3 min-w-0" data-fuel-widget="compact" data-la-fig="Diesel, per litre" title={hasIndex ? String(price) : ""}>
+        <div className="la-fig-label">Diesel, per litre<InfoTip id="la.fig_diesel" /></div>
+        <div className="kpi-num la-fig-num leading-8 font-semibold tabular-nums truncate text-2xl" style={{ color: "var(--navy-deep)" }}>
+          {hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)}` : <span className="text-base" style={{ color: "var(--warn-text)" }}>Index unavailable</span>}
         </div>
-        <div className="text-xs text-slate-500 mt-0.5">
-          diesel {country} · {hasIndex ? `${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}` : "type a price on Config"}{rf.running ? " · updating…" : ""}
-        </div>
-        <div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>
+        {hasIndex && idx.stale ? <div className="la-fig-sub warn-line" data-la-fig-sub="warn"><span>stale · {typed ? "typed " : ""}{laDay(idx.bulletin_date)}</span></div>
+          : <div className="la-fig-sub" data-la-fig-sub="plain"><span>{hasIndex ? `${typed ? "typed " : ""}${laDay(idx.bulletin_date)}` : (canType ? "type a price on Config" : "not set")}{rf.running ? " · updating…" : ""}</span></div>}
       </div>
     );
   }
@@ -13061,7 +13105,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
           {!rf.running && idx.last_error && hasIndex && <span className="text-xs" style={{ color: "var(--red)" }} title={idx.last_error}>· update failed {fuelDate(String(idx.last_attempt_at || "").slice(0, 10))}; showing the last price</span>}
         </div>
         {setting("yard_eur_per_l", `Yard ${CUR()}/L`, "—", "What the haulier pays at the yard. Optional. Never replaces the published price.")}
-        {setting("share_pct", "Fuel share %", "—", "Fuel's share of the haulage price, 0–100. Empty = no BAF line.")}
+        {setting("share_pct", "Fuel share %", "—", `Fuel's share of the haulage price, 0–100. Empty = no ${mode === "config" ? "BAF line" : "fuel surcharge"}.`)}
         <span className="text-xs font-semibold tabular-nums" style={{ color: sum.baf_pct != null ? "var(--navy)" : "var(--muted)" }} title={baseTxt}>{bafTxt}</span>
         <span className="text-xs text-slate-500">{baseTxt}</span>
         <span className="ml-auto">{attribution}</span>
@@ -13106,8 +13150,15 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   // day columns narrow, so Monday to Friday and the week fit at 768 with the rail folded; more days scroll, the route held
   const laTab = useMQ(TABLET_MQ);
   const { months } = meta;
-  const [view, setView] = useState(() => { if(initialView) return initialView; try { return localStorage.getItem("modus_la_view") || "commit"; } catch(e){ return "commit"; } });
-  const [bucket, setBucket] = useState("commit");        // 'commit' = the week containing today · 'next' = the Thursday process
+  // 25 Nov 2026 (the Look-ahead rethink, B1, Q17): the weeks ARE the tabs, "Last week · This week · Next week · Weeks ahead",
+  // for "Account · Commit · Horizon" and the small "this week | next week" switch. `tab` is the one choice; the view and the
+  // week the page reads follow from it. "sofar" is the running week's account (John, 25 Nov 2026: "Yes, as recommended"):
+  // the Last week tab's quiet link "This week so far", what the switch's "next week" gave Account before. The remembered
+  // tab (modus_la_view) keeps its old values: account, commit, horizon; "next" is new; "sofar" is remembered as Last week.
+  const LA_TABS = ["account", "commit", "next", "horizon", "sofar"];
+  const [tab, setTab] = useState(() => { if(initialView && LA_TABS.includes(initialView)) return initialView; try { const v = localStorage.getItem("modus_la_view"); return LA_TABS.includes(v) && v !== "sofar" ? v : "commit"; } catch(e){ return "commit"; } });
+  const view = tab === "next" ? "commit" : tab === "sofar" ? "account" : tab;   // the pane: commit · account · horizon
+  const bucket = tab === "next" || tab === "sofar" ? "next" : "commit";        // 'commit' = the week containing today · 'next' = the Thursday process
   const [page, setPage] = useState(initialPage || null);
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
@@ -13130,7 +13181,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   const sitesAll = (list, open) => laTab ? siteTabMany(list.map(siteKey), open) : siteDeskMany(list.map(siteKey), !open);
   const [confirming, setConfirming] = useState(false);   // the whole-week flag dialog
   const [flags, setFlags] = useState({ weather: "", wetness: "", traffic: "", other: "" });
-  const pick = (v) => { setView(v); try { localStorage.setItem("modus_la_view", v); } catch(e){} };
+  const pick = (v) => { setTab(v); try { localStorage.setItem("modus_la_view", v === "sofar" ? "account" : v); } catch(e){} };
 
   // Road restrictions (Tark Tee for EE, National Highways closures for GB — H1) — the page
   // carries the STORED per-route check (a DB read).
@@ -13197,7 +13248,9 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   // the provider's own words for the status line — "Road restrictions (Tark Tee)" /
   // "Road closures (National Highways)"; a tenant with no provider never sees the line
   const ttName = ttSrc.restrictions_ui_label || "Road restrictions";
-  const ttShort = (ttName.includes("(") ? ttName.slice(ttName.indexOf("(") + 1, -1) : ttName);
+  // 25 Nov 2026 (B1): the line names no source: the label up to its bracket ("Road closures"), and how many routes wait
+  const ttFirst = ttName.split(" (")[0].trim() || "Road restrictions";
+  const ttUnchecked = (ttSrc.restrictions_unchecked || []).length;
   const today = page ? page.today : null;
   // Mon–Fri only (10 Sep, the human). The weekend days still exist at 0 in the database
   // — the sum rule and the export see them — but the grid does not show them.
@@ -13297,13 +13350,18 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
 
   const fld = "w-24 border border-slate-300 rounded px-1.5 py-0.5 text-sm text-right tabular-nums outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
   const pill = (id, label) => (
-    <button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>
+    <button key={id} type="button" onClick={() => pick(id)} className="ws-tab" data-la-tab-id={id} aria-current={tab === id || (id === "account" && tab === "sofar") ? "page" : undefined}>{label}</button>
   );
+  // 25 Nov 2026 (B1): the place line and the subtitle lose "Commit", "Account" and "Horizon": "Track · This week",
+  // "23–29 Nov 2026 · Mon to Fri". Last week's line carries the one quiet link "This week so far" (John's yes, 25 Nov).
+  const LA_TAB_WORD = { account: "Last week", commit: "This week", next: "Next week", horizon: "Weeks ahead", sofar: "This week so far" };
+  const acctSpan = spanLabel(account.week && account.week.from, account.week && account.week.to);
   const subtitle = view === "account"
-    ? `Account is last week only · ${spanLabel(account.week && account.week.from, account.week && account.week.to)} · type what actually moved`
+    ? (tab === "sofar" ? <>{acctSpan} · type what has moved so far</>
+       : <>{acctSpan} · type what actually moved · <button type="button" className="la-sofar" data-la-sofar="1" onClick={() => pick("sofar")}>This week so far</button></>)
     : view === "commit"
-    ? `Commit week is ${spanLabel(cw.from, cw.to)}${bucket === "next" ? " · next week, by the switch" : ""} · Mon–Fri only`
-    : `Horizon is weeks, not days · ${monthLabelAbs(horizon.from_month || cw.month_index || 1, months.start_year)} + ${monthLabelAbs((horizon.to_month || (cw.month_index || 1) + 1), months.start_year)} · make-ready only`;
+    ? `${spanLabel(cw.from, cw.to)} · Mon to Fri`
+    : `Weeks, not days · ${monthLabelAbs(horizon.from_month || cw.month_index || 1, months.start_year)} + ${monthLabelAbs((horizon.to_month || (cw.month_index || 1) + 1), months.start_year)} · make-ready only`;
 
   // 25 Nov 2026 (task A): ONE forecast line's row and its details (W6's RowDetails, unchanged in what it holds). Under a
   // site it is named by where it comes from ("From Northfield Quarry"), an out line by where it goes ("Out, to …"), then
@@ -13387,7 +13445,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
         <RdItem t="Discipline">{line.discipline || null}</RdItem>
         <RdItem t="Section">{c.section_id || "None set"}</RdItem>
         <RdItem t="Material">{c.material_type || "—"}</RdItem>
-        <RdItem t="Vehicle">{veh}</RdItem>
+        <RdItem t="Lorry">{veh}</RdItem>
         <RdItem t="Vehicle, full name">{c.vehicle_type && vehLabel(c.vehicle_type) !== veh ? vehLabel(c.vehicle_type) : null}</RdItem>
         <RdItem t="This week">{laWeekWords(w.status)}</RdItem>
         <RdItem t="Diversion">{c.diversion && c.diversion.share > 0
@@ -13407,17 +13465,17 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
         <RdItem t="Week">{`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)}`}</RdItem>
         <RdItem t="Week, tonnes">{wd.tonnes != null ? grp(wd.tonnes, 1) : null}</RdItem>
         <RdItem t="Week, loads">{wd.trips != null ? grp(wd.trips) : null}</RdItem>
-        <RdItem t="Week, peak lorries">{c.baked ? grp(wd.vehicles_peak) : "Needs this line's route worked out for its vehicle"}</RdItem>
+        <RdItem t="Week, peak lorries">{c.baked ? grp(wd.vehicles_peak) : "Needs this line's route worked out for its lorry"}</RdItem>
         {c.baked ? <>
           <RdItem t={`${DU()} a trip`}>{`${grp(dist(c.km_trip))}${c.return_baked ? "" : ", outbound only: the return is not routed yet"}`}</RdItem>
           <RdItem t={`${DU()} this week`}>{grp(dist(wd.km))}</RdItem>
           <RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}, ${c.km_basis === "loaded" ? "loaded leg" : "round trip"}`}</RdItem>
           <RdItem t="Cycle">{`${grp(c.cycle_min)} min${c.cycle_source === "here" ? "" : ", return estimated"}`}</RdItem>
-          <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break" : c.lorry_day.limited_by === "driver_day" ? "one driver's 13 h day" : "one round trip does not fit a driver's day: one lorry a trip"})` : "") : null}</RdItem>
+          <RdItem t="Round trips a lorry a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break" : c.lorry_day.limited_by === "driver_day" ? "one driver's 13 h day" : "one round trip does not fit a driver's day: one lorry a trip"})` : "") : null}</RdItem>
         </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${vehLabel(c.payload_fallback)} fallback)` : ""}.`}</RdItem>}
         <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()}${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
         <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
-        <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>
+        <RdItem t="Plus the fuel surcharge">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>
         <RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}${fairWords(c.fair.flags) ? ", " + fairWords(c.fair.flags) : ""}` : null}</RdItem>
         <RdItem t="Fair, per unit">{wd.fair_eur != null && wd.fair_units && wd.fair_units.per_t != null ? unitList(wd.fair_units) : null}</RdItem>
         <RdItem t="Fuel" wide>{wd.fair_eur != null && c.fair ? `${grp(c.fair.litres_trip, 1)} L a trip at ${CUR()}${c.fair.index_eur_per_l} a litre, fuel ${grp(c.fair.fuel_share_pct)} % of the cost` : null}</RdItem>
@@ -13427,20 +13485,13 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
 
   return (
     <div className="max-w-[1500px] mx-auto p-5">
-      <PageHeader title="Look-ahead" kicker={view === "commit" ? "Track · commit week" : view === "account" ? "Track · last week" : "Track · horizon"} subtitle={page ? subtitle : "Loading the commit week…"} />
+      <PageHeader title="Look-ahead" kicker={"Track · " + LA_TAB_WORD[tab]} subtitle={page ? subtitle : "Loading the week…"} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4" data-guide="lookahead-tabs">
-        {pill("account", "Account")}
-        {pill("commit", bucket === "next" ? "Commit · next week" : "Commit · this week")}
-        {pill("horizon", "Horizon")}
-        {/* the Thursday switch: which bucket the Commit and Account views look at */}
-        <span className="ml-2 inline-flex rounded-lg border border-slate-300 overflow-hidden text-xs">
-          {[["commit", "this week"], ["next", "next week"]].map(([b, l]) => (
-            <button key={b} onClick={() => setBucket(b)} className="px-2.5 py-1.5 font-semibold"
-              title={b === "next" ? "Commit NEXT week's plan now (e.g. on a Thursday). Its days are created when you open it." : "The week that contains today"}
-              style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}>{l}</button>
-          ))}
-        </span>
+        {pill("account", "Last week")}
+        {pill("commit", "This week")}
+        {pill("next", "Next week")}
+        {pill("horizon", "Weeks ahead")}
         {view === "commit" && (
           <span className="ml-auto flex items-center gap-2">
             <button onClick={() => download("xlsx")} disabled={!!busy || !lines.length}
@@ -13471,20 +13522,34 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
       {!page ? <div className="p-8 text-center text-slate-400">Loading…</div>
       : view === "commit" ? (
         <>
-          {/* KPI strip — six cards; only the shortage is coloured */}
-          <div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">
-            <LaKpi value={`${grp(totals.planned_t)} t`} caption="planned this week" />
-            <LaKpi value={grp(totals.trips)} caption="loads" />
-            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles a day at the peak" + (totals.excludes_unbaked ? " · lines not routed yet left out" : "") + (lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? ` · ${grp(Math.max(...Object.values(lorryPlan.chained.by_day)))} with each yard's lorries chained` : "")} />
-            <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} on the routes`} />
-            {/* 10 Sep evening: the diesel index, right of t·km — the same widget as Account and Config */}
+          {/* 25 Nov 2026 (the Look-ahead rethink, task B1, card 2; Q8, Q9): SEVEN figures, a label over each and at most one
+              short second line, 57 words to 27; the cut sentences are in each "i" and the guide. One status: "Delivered last
+              week" takes the 4 px amber edge while a line is short past the organisation's share. No small bars. */}
+          {(() => {
+            const chainN = lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? Math.max(...Object.values(lorryPlan.chained.by_day)) : null;
+            const shortT = laShortT(account), shortN = account.short_flagged || 0;
+            const costInfo = [totals.eur_target_lines ? `${totals.eur_target_lines} of ${totals.lines} lines at the target rate.` : "",
+              totals.eur_partial ? `Some lines are priced without the per-${DU()} term.` : "",
+              totals.eur_adj != null ? `With the fuel surcharge: ${CUR()}${grp(totals.eur_adj)}.` : ""].filter(Boolean).join(" ");
+            return (
+          <div className="la-figs-box mb-3">
+          <div className="fig-strip la-figs" data-fig-strip="lookahead">
+            <LaKpi label="Planned" value={grp(totals.planned_t)} unit="t" />
+            <LaKpi label="Loads" value={grp(totals.trips)} />
+            <LaKpi label="Lorries, busiest day" value={grp(totals.vehicles_peak)}
+              sub={totals.excludes_unbaked ? "some lines not routed" : chainN != null ? `${grp(chainN)} if chained` : null} warn={!!totals.excludes_unbaked} />
+            <LaKpi label={DU() === "mi" ? "Tonne-miles" : "Tonne-km"} value={grp(dist(totals.tonne_km))} />
+            {/* 10 Sep evening: the diesel index, right of the tonne-miles — the same widget as Account and Config */}
             <FuelWidget mode="compact" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
-            <LaKpi value={totals.eur == null ? "—" : `${CUR()}` + grp(totals.eur)}
-              caption={totals.eur == null ? `planned ${CUR()} · no rate typed, no target set`
-                : `planned ${CUR()} · ${totals.eur_lines} of ${totals.lines} lines priced${totals.eur_target_lines ? ` · ${totals.eur_target_lines} at target` : ""}${totals.eur_partial ? " · partial" : ""}${totals.eur_adj != null ? ` · + BAF ${CUR()}${grp(totals.eur_adj)}` : ""}${totals.fair_eur != null ? ` · fair ${CUR()}${grp(totals.fair_eur)} (model, ${totals.fair_lines} of ${totals.lines})` : ""}`} />
-            <LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week" />
-            <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week" />
+            <LaKpi label="Planned cost" value={totals.eur == null ? "—" : `${CUR()}` + grp(totals.eur)} info={<InfoTip id="la.fig_cost" value={costInfo} />}
+              sub={totals.eur == null ? "no rate set" : totals.eur_lines < totals.lines ? `${totals.eur_lines} of ${totals.lines} priced` : totals.fair_eur != null ? `fair price ${CUR()}${grp(totals.fair_eur)}` : null}
+              warn={totals.eur != null && totals.eur_lines < totals.lines} />
+            <LaKpi label={bucket === "next" ? "Delivered this week" : "Delivered last week"} value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} unit={account.lines ? "lines" : null}
+              sub={shortN > 0 ? `${shortN} short · ${grp(shortT)} t` : shortT > 0 ? `${grp(shortT)} t to carry` : null} warn={shortN > 0} edge={shortN > 0 ? "warn" : null} />
           </div>
+          </div>
+            );
+          })()}
 
           {/* 25 Nov 2026 (task A, Q7): the flags as ONE line, each a shape, its word and its site as a link; shortages apart.
               Each flag's sentence stays in its line's details. */}
@@ -13493,27 +13558,31 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
               provider (status "off"/"skipped" with no provider) sees nothing here. */}
           {lines.length > 0 && ttSrc.restrictions !== "skipped" && ttSrc.restrictions !== "off" && ttSrc.restrictions_provider && (
             <div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700 warn-line")}>
-              <span>
-                {ttRunning ? `${ttName.split(" (")[0]}: checking`
-                 : ttSrc.restrictions === "ok" ? `${ttName}: checked ${(ttSrc.restrictions_checked_at || "").replace("T", " ").slice(0, 16)} UTC${ttSrc.restrictions_week ? ` · flags shown for the week ${ttSrc.restrictions_week[0]} → ${ttSrc.restrictions_week[1]}` : ""}`
-                 : ttSrc.restrictions === "partial" ? `${ttName}: ${(ttSrc.restrictions_unchecked || []).join(", ")} not checked since the route was worked out — the rest as of ${(ttSrc.restrictions_checked_at || "").slice(0, 10)}`
-                 : `${ttName}: NOT checked for these routes — that is not the same as "no restrictions".`}
+              {/* 25 Nov 2026 (the Look-ahead rethink, B1, card 1; Q18): no source, no ISO date, no "UTC", a count of routes and
+                  never their codes: "Road closures checked 24 Nov, 14:56 · Check again" (20 words to 7). The first words are
+                  the provider's own label up to its bracket; the time is UK time (laWhen). */}
+              <span data-la-closures={ttRunning ? "running" : ttSrc.restrictions || "none"}>
+                {ttRunning ? `${ttFirst}: checking…`
+                 : ttSrc.restrictions === "ok" ? `${ttFirst} checked ${laWhen(ttSrc.restrictions_checked_at)}`
+                 : ttSrc.restrictions === "partial" ? `${ttFirst}: ${ttUnchecked} ${ttUnchecked === 1 ? "route" : "routes"} not checked since ${ttUnchecked === 1 ? "it was" : "they were"} re-routed`
+                 : `${ttFirst} not checked for these routes`}
               </span>
+              {!ttRunning && <span aria-hidden="true">·</span>}
               {!ttRunning && (
                 <button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>
-                  {ttSrc.restrictions === "ok" ? "re-check" : "check now"}
+                  {ttSrc.restrictions === "ok" ? "Check again" : "Check now"}
                 </button>
               )}
               {ttBusy && !ttRunning && <span role="status" data-work-busy="closures">{ttBusy}</span>}
               {ttSrc.restrictions_refresh && ttSrc.restrictions_refresh.status === "unavailable" && !ttRunning && (
-                <span style={{ color: "var(--red)" }}>· could not reach {ttShort}; showing the last check</span>
+                <span style={{ color: "var(--bad-text)" }}>· the check could not be made: showing the last one</span>
               )}
             </div>
           )}
 
           {lines.length === 0 ? (
-            <EmptyState title={`No approved forecast line in the commit week (${spanLabel(cw.from, cw.to)}).`}
-              body="Days exist only for Approved month lines. Approve a line for this month, or switch to next week." />
+            <EmptyState title={`No approved forecast line in ${bucket === "next" ? "next week" : "this week"} (${spanLabel(cw.from, cw.to)}).`}
+              body={bucket === "next" ? "Days exist only for Approved month lines. Approve a line for next week's month." : "Days exist only for Approved month lines. Approve a line for this month, or open Next week."} />
           ) : (
             // 13 Oct 2026 (W6, bundle F): RowDetails. The row: the route's two ends (primary), the team and the material
             // (chips), ONE status (the most serious flag, ROAD LIMIT first, else the week's state: decision 1), one figure a
@@ -13627,15 +13696,19 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
         <>
           {/* 10 Sep evening: the diesel index and the two fuel settings, top of the strip */}
           <FuelWidget mode="strip" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
-            {/* 10 Nov 2026 (16 Oct item 24, mockup card 2): the cards in words: the band as "within 2 % of plan", one verb (add) */}
-            <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week, within 2 % of plan" />
-            <LaKpi value={`${grp(account.actual_t)} t`} caption={`moved · ${account.reported || 0} of ${account.lines || 0} lines reported`} />
-            <LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet added to this week" />
-            <LaKpi value={String(account.open_to_calibrate || 0)} caption={account.open_to_calibrate === 1 ? "line can add its shortfall to this week" : "lines can add their shortfall to this week"} />
+          {/* 10 Nov 2026 (16 Oct item 24, mockup card 2): the cards in words: the band as "within 2 % of plan", one verb (add).
+              25 Nov 2026 (B1, card 2's second table): the same cut as the week's strip, a label over each figure, 38 words to
+              about 20; the four figures as one ruled strip (the design language: a row of figures is one strip) */}
+          <div className="la-figs-box mb-3">
+          <div className="fig-strip la-figs la-figs-4" data-fig-strip="lookahead-last">
+            <LaKpi label="Delivered" value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} unit={account.lines ? "lines" : null} sub="within 2 % of plan" />
+            <LaKpi label="Moved" value={grp(account.actual_t)} unit="t" sub={`${account.reported || 0} of ${account.lines || 0} reported`} />
+            <LaKpi label="Short" value={grp(laShortT(account))} unit="t" tone={laShortT(account) > 0 ? "warn" : undefined} sub={laShortT(account) > 0 ? "not yet added" : null} />
+            <LaKpi label="Can be added" value={String(account.open_to_calibrate || 0)} unit={account.open_to_calibrate === 1 ? "line" : "lines"} />
+          </div>
           </div>
           {!account.week || account.rows.length === 0 ? (
-            <EmptyState title="No approved line in last week." body="The Account view types what actually moved against last week's plan. There is nothing to account for yet." />
+            <EmptyState title={tab === "sofar" ? "No approved line this week." : "No approved line in last week."} body={tab === "sofar" ? "Here you type what has moved so far this week against its plan. There is nothing to type yet." : "Last week types what actually moved against last week's plan. There is nothing to account for yet."} />
           ) : (
             <>
             <div className="unit-sw mb-2" data-acct-show={acctShow}>
@@ -13695,11 +13768,11 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
                               <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
                               {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
-                              {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()}{grp(r.planned_eur_adj)}</div>}
+                              {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="The quote with the fuel surcharge. The quote above is unchanged.">+ fuel surcharge {CUR()}{grp(r.planned_eur_adj)}</div>}
                             </>}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums" style={{ color: "var(--navy)" }}>
-                            {r.planned_fair_eur == null ? <span className="text-slate-500" title="No fair price: the route is not routed yet for this vehicle, or the diesel index is missing">—</span>
+                            {r.planned_fair_eur == null ? <span className="text-slate-500" title="No fair price: the route is not routed yet for this lorry, or the diesel index is missing">—</span>
                               : <>{CUR()}{grp(r.planned_fair_eur)}{(r.fair_flags || []).includes("WINTER") && <span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>}{(r.fair_flags || []).includes("THAW") && <span className="ml-1 text-xs text-amber-700" title="Spring load restrictions (8 t) may apply on gravel and municipal roads — permits are free">thaw</span>}
                                   {r.fair_units && r.fair_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.fair_units)}</div>}</>}
                           </td>
@@ -13731,7 +13804,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                               // primaries on one page (rule R2); the amber row and the "short last week" card carry the attention
                               <button onClick={() => doSpread(r)} disabled={!!busy}
                                 className="btn-sec btn-sm disabled:opacity-40"
-                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>
+                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to ${tab === "sofar" ? "next" : "this"} week, divided over its remaining weekdays. Refused if that week is confirmed.`}>{tab === "sofar" ? "Add to next week" : "Add to this week"}</button>
                             )}
                           </td>
                         </tr>
@@ -13849,7 +13922,8 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             const cols = [];
             [horizon.from_month, horizon.to_month].forEach(m => weekNosOf(horizon, m).forEach(w => cols.push({ m, w })));
             const roleOf = (m, w) => { const rr = horizon.roles || {}; return Object.keys(rr).find(k => rr[k][0] === m && rr[k][1] === w) || null; };
-            const roleLbl = { account: "ACCOUNT", commit: "COMMIT", "make-ready": "MAKE-READY", "early-warning": "EARLY WARNING" };
+            // 25 Nov 2026 (B1, Q17): the week's role in the tabs' own words (were ACCOUNT and COMMIT); shown in capitals
+            const roleLbl = { account: "Last week", commit: "This week", "make-ready": "Make-ready", "early-warning": "Early warning" };
             return (
               <div className="ruled overflow-hidden">
                 <div className="overflow-auto">

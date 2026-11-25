@@ -40,7 +40,8 @@ ok("🔴 1 type: the body reads the text face", /\n  body\{margin:0;font-family:
 ok("⭐ 1 type: page headings, box titles and large figures read Sora (h1 to h4, .ct-h, .kpi-num, the rate tiles, the clock)",
    /\n  h1,h2,h3,h4,\.ct-h,\.kpi-num,\.rc-tile b,\.sim-clock\{font-family:var\(--f-head\);\}/.test(html));
 ok("1 type: the Look-ahead's figure tiles carry the figure class (Sora)",
-   html.includes('<div className={"kpi-num font-semibold tabular-nums truncate leading-8 " + (len > 12'));
+   // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1): + la-fig-num, the figure under its label
+   html.includes('<div className={"kpi-num la-fig-num font-semibold tabular-nums truncate leading-8 " + (len > 12'));
 // no Inter anywhere on the app page: CSS font lists, canvas fonts, the picture of a chart
 const interUses = html.match(/(^|[\s'",:(`])Inter(?=[\s'",;)`]|$)/gm) || [];
 ok("🔴 1 type: the word Inter names no typeface on the app page (CSS, canvas, a chart's picture)", interUses.length === 0,

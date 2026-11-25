@@ -177,7 +177,11 @@ ok("🔴 6: the desk's grid is as it was (the Site column 280 px, one Status col
    la.includes('<th className="la-stick" style={{ minWidth: 280 }}>Site</th>') && la.includes('firstStyle={{ minWidth: 280 }}')
    && la.includes("`${440 + dates.length * 96}px`"));
 // NARROWED 24 Nov 2026 (own look, B1 stage 4): the same grid, now one ruled strip (.fig-strip)
-ok("...the eight cards stay two rows of four from 768 (md:grid-cols-4), as approved on 9 Nov", la.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">'));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): SEVEN figures; the columns follow the strip's own width (a size
+// container): four (then three) a row from 560 px of the strip, seven from 1,000 px, so a tablet still reads two rows
+ok("...the seven figures stay two rows on a tablet (four, then three), as approved on 9 Nov for the eight",
+   la.includes('<div className="la-figs-box mb-3">\n          <div className="fig-strip la-figs" data-fig-strip="lookahead">')
+   && code.length > 0 && /@container \(min-width:560px\)\{\.fig-strip\.la-figs\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);\}\}/.test(html));
 
 // ---------------------------------------------------------------- card 7: Configuration → Vehicles
 const cfg = between(code, "function ConfigPage(", "\nfunction ");

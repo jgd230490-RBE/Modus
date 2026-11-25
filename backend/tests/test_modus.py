@@ -736,14 +736,16 @@ ok("frontend: the clash rail shows the code's name (the provider's for a restric
    # a flag's own sentence, with the teams' names (teamText), is in the line's details (laFlagGroups)
    "k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] };" in fe_src
    and "<RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}" not in fe_src
-   and 'const t = teamText(f.text || "")' in fe_src and 'IPT_SHARE: "Share"' in fe_src
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1): "<team word> share", through TEAM()
+   and 'const t = teamText(f.text || "")' in fe_src and 'get IPT_SHARE(){ return TEAM() + " share"; }' in fe_src and 'IPT_SHARE: "Share"' not in fe_src
    and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? capsWord(f.label) : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
    and "{f.code}</span> {f.text}" not in fe_src and 'TARK_TEE: "TARK TEE"' not in fe_src)
 ok("frontend: the map entry is not called public — the map is behind the gate",
    '{ id: "map", label: "Route map"' in fe_src and "Back to public map" not in fe_src and 'label: "Public route map"' not in fe_src)
 ok("frontend: a long KPI value steps its size down rather than being cut off, and says itself on hover",
-   '(len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")' in fe_src   # NARROWED 10 Nov 2026 (wave 2, finding 20): steps down from 7 characters ("£57,833")
-   and 'data-fuel-widget="compact" title={hasIndex ? String(price) : ""}' in fe_src)
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): steps down from 8 characters, the label over the figure
+   '(len > 12 ? "text-base" : len > 9 ? "text-lg" : len > 7 ? "text-xl" : "text-2xl")' in fe_src
+   and 'data-fuel-widget="compact" data-la-fig="Diesel, per litre" title={hasIndex ? String(price) : ""}' in fe_src)
 # NARROWED (H1): "published" rather than "bulletin" — the GB series is not a bulletin
 ok("frontend: a typed diesel price is dated as typed, a fetched one as published",
    '${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}' in fe_src)
