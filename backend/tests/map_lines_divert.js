@@ -210,6 +210,14 @@ console.log("D. The key");
      rows(false, false, [bf('16:00', '19:00'), bf('07:00', '09:00')]).includes('Used in busy hours only') && rows(false, false, []) === '');
 }
 ok("D3 the key's samples are hidden from a screen reader (the row's words say it)", fnSrc("flowKeySvg").includes('aria-hidden="true"'));
+// 25 Nov 2026: static's 2f1bc34 hid the old white lanes and gave the key an early path with its own single "goes round"
+// row, so the usual road's and the busy-hours rows never showed (seen in the merged head's audit picture at 390 px)
+{
+  const rfl = fnSrc("renderFlowLegend"), early = (rfl.match(/if \(!FLOW_LANES_SHOWN\)[^\n]*/) || [''])[0];
+  ok("⭐ D4 with the lanes hidden the key still draws divLegendRows() (all three rows), none in a council view; no old \"goes round\" row is left",
+     /const divRows = councilFocus\(\) \? '' : divLegendRows\(\);/.test(rfl) && early.includes("box.innerHTML = divRows")
+     && !html.includes("Where a route goes round a closure</div>"), early);
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("E. The guides");

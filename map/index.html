@@ -8738,10 +8738,12 @@
         const box = document.getElementById('flow-legend');
         if (!box) return;
         const on = !!map.getLayer('forecast-flow') && !councilFocus() && FLOW.count > 0;
-        const divRow = (typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
-            ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '';
-        // 25 Nov 2026: the lanes are not shown (FLOW_LANES_SHOWN), so their five rows go and only the diversion row stays
-        if (!FLOW_LANES_SHOWN) { box.hidden = !(on && divRow); box.innerHTML = (on && divRow) ? divRow : ''; return; }
+        // 25 Nov 2026: the lanes are not shown (FLOW_LANES_SHOWN), so their five rows go and only the diversion rows stay
+        // NARROWED 25 Nov 2026 (card 5, claude/map-lines-diversions): those rows are divLegendRows() (the way round, the
+        // usual road, the busy-hours road, each only while the map draws it), not the old single "goes round" row; a
+        // council view shows none, as before
+        const divRows = councilFocus() ? '' : divLegendRows();
+        if (!FLOW_LANES_SHOWN) { box.hidden = !divRows; box.innerHTML = divRows; return; }
         box.hidden = !on;
         if (!on) return;
         const m = mapModeMonth(), win = m ? null : (forecastWindow() || []);

@@ -6199,7 +6199,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
        lg.hidden === true && !lg.innerHTML.includes("each way") && !lg.innerHTML.includes("In Oct 2026")
        && !["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].some(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
     ok("D115 sandbox / 25 Nov: the lane sentences are not on screen, but stay in the code behind the switch for claude/map-lines-flow (REVERSED 25 Nov 2026)",
-       !lg.innerHTML.includes("Each direction has its own lane") && fcode.includes("if (!FLOW_LANES_SHOWN) { box.hidden = !(on && divRow); box.innerHTML = (on && divRow) ? divRow : ''; return; }")
+       !lg.innerHTML.includes("Each direction has its own lane") && fcode.includes("if (!FLOW_LANES_SHOWN) { box.hidden = !divRows; box.innerHTML = divRows; return; }")   /* NARROWED 25 Nov 2026 (card 5): the early path draws divLegendRows(), the way round, the usual road and the busy-hours rows */
        && fblk.includes("Each direction has its own lane, on the left.") && fblk.includes("While Play runs, a light moves along each lane the way its lorries go"));
     ok("D115 sandbox / 25 Nov: no band sample is drawn in the key (REVERSED 25 Nov 2026; was: five white-lane samples)",
        (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 0 && !lg.innerHTML.includes("stroke-dasharray"));
