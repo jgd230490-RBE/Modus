@@ -1558,18 +1558,26 @@ ok("ROAD CARD (2.1-4): technical T1 #t1-road-area has the two reads, the piece, 
                              "<code>GET /api/public/area-sum", "<code>PIECE_M</code> = 150 m", "<code>BOX_ENTER_KM</code> (1 m)",
                              "<code>warm()</code>", "<code>&amp;area=w,s,e,n</code>", "Not built:")))
 # 10 Nov 2026 (road card polish, John's Q1-Q6 as recommended): the rule that makes the rows add up, in both guides
-ok("ROAD CARD POLISH: user guide 8 says the table adds up in one decimal, the bold figure is whole, '1 of 12 routes', the near click, the slide and the picker's search",
-   all(w in src for w in ('id="ug-map-road-adds"', "a row&#39;s A day is its In plus its Out, and the Total is the rows added",
+# REVERSED 24 Nov 2026 (public map lines rethink, card 7, John's Q11 = (a)): every figure whole, still adding up (was one decimal)
+ok("ROAD CARD POLISH: user guide 8 says every figure is whole and the table adds up, 'under 1', '1 of 12 routes', the near click, the slide and the picker's search",
+   all(w in src for w in ('id="ug-map-road-adds"', "Every figure is a whole number and the table adds up", "<em>under 1</em>, never 0",
+                          "can read one more in than out", "a row&#39;s A day is its In plus its Out, and the Total is the rows added",
                           "the same figure the figures bar and a traffic limit give", 'id="ug-map-road-of"', "<em>1 of 12 routes</em>",
                           "a click just beside a line counts as a click on it", 'id="ug-map-area-slide"',
                           "the search empties when the list closes, the ticks stay")))
 _ug_road = src[src.index('id="ug-map-road"'):src.index('id="8-2-filters-basemaps-and-overlays"')]
-ok("ROAD CARD POLISH: the user guide's road card keeps the back end out (no tenths, no function names)",
-   not any(w in _ug_road for w in ("share_tenths", "tenth", "fitBounds", "secsel", "px")))
+ok("ROAD CARD POLISH: the user guide's road card keeps the back end out (no tenths, no decimal, no function names)",
+   not any(w in _ug_road for w in ("share_tenths", "share_whole", "tenth", "one decimal", "fitBounds", "secsel", "px")))
 ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the moved click, the 6 px reach and the slide",
-   all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_tenths</code>", "<code>idle</code>", "<code>through(pas=)</code>",
+   # REVERSED 24 Nov 2026 (card 7): share_whole replaces share_tenths; the limit card's split is the bulletin's
+   all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_whole</code>", "reversed at his word on 24 Nov",
+                             "<code>bulletin_doc.tl_split_parts</code>", "<code>in_shown</code>", "<code>idle</code>", "<code>through(pas=)</code>",
                              "<code>secselSnap</code>", "<code>CLICK_SLOP</code> = 6 px", "<code>clearBoxOfCard</code>",
-                             "the 12 Oct whole-movements rule holds everywhere else")))
+                             "the 12 Oct whole-movements rule, which holds everywhere else")))
+ok("🔴 ROAD CARD (card 7): the technical guide no longer says the card reads one decimal or names share_tenths as the rule",
+   "the table, the in / out line and Copy read one decimal" not in _tg_rs and "<code>section_select.share_tenths</code> turns" not in _tg_rs)
+ok("card 7 (A2 addition, John 24 Nov: 'Yes, both'): T1 says the council area card and the shared road section card share their in / out by wholeWords, the council card's movements whole",
+   all(w in _tg_rs for w in ("<code>wholeWords</code>", "<code>wholeShare</code>, the same rule", "the council card&#39;s movements read whole")))
 ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
    all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
 # 10 Nov 2026 (road card top: a card opened above a click lost its first lines under the figures bar)
