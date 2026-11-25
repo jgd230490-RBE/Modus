@@ -624,6 +624,7 @@ if (loaded) {
       const gaSeg = (out) => seg(out, 'data-gate-arrivals="', "</section>");
       const gOut = render("the Dashboard renders POPULATED with gate arrivals (initialGates)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GA, onOpen(){} }));
       const gP = gaSeg(gOut);
+      const gT = gP.slice(Math.max(0, gP.indexOf('data-ga-table="1"'))), gD = gP.slice(Math.max(0, gP.indexOf('data-ga-dials="1"')), Math.max(0, gP.indexOf('data-ga-table="1"')));   // 24 Nov 2026 (Dashboard rethink A2, gate dials)
       const red = GA.gates.filter(g => g.flag === "red"), untyped = GA.gates.filter(g => g.gate_minutes == null);
       ok("⭐ GATE ARRIVALS: three gates, one red, one untyped, one holding, each a row with its data attribute",
         GA.gates.length === 3 && red.length === 1 && untyped.length === 1 && GA.gates.every(g => gP.includes(`data-ga-gate="${g.gate_id}"`) && gP.includes(`data-ga-flag="${g.flag || "none"}"`))
@@ -632,9 +633,23 @@ if (loaded) {
       // which this fixture month does not reach — no chip says it)
       ok("🔴 the red gate reads 'Over gate capacity' once, the untyped 'No check-in time typed' once, the third 'Spacing holds' once — each as the chip's word",
         // 13 Oct 2026 (W6, narrowed): the chip is RowStatus; red is its "bad" tone, once
-        (gP.match(/>Over gate capacity</g) || []).length === 1 && !/>Queue likely</.test(gP) && (gP.match(/>No check-in time typed</g) || []).length === 1 && (gP.match(/>Spacing holds</g) || []).length === 1
-        && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gP.match(/data-row-status="bad"/g) || []).length === 1
-        && (gP.match(/data-row-status="none"/g) || []).length === 2 && !gP.includes('data-row-status="ok"'));
+        // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): counted in the table (gT, the fold) as before; the dials above it carry their own words, checked next
+        (gT.match(/>Over gate capacity</g) || []).length === 1 && !/>Queue likely</.test(gT) && (gT.match(/>No check-in time typed</g) || []).length === 1 && (gT.match(/>Spacing holds</g) || []).length === 1
+        && !/amber|Amber/.test(gP) && gP.includes('data-ga-flag="red"') && (gT.match(/data-row-status="bad"/g) || []).length === 1
+        && (gT.match(/data-row-status="none"/g) || []).length === 2 && !gT.includes('data-row-status="ok"'));
+      // 24 Nov 2026 (Dashboard rethink A2, gate dials): one dial a gate with arrivals, fullest first; a word ONLY on a gate that is not fine (version c); the verdict line
+      // carries the one status shape of the head
+      const gDial = (id) => { const i = gD.indexOf(`data-ga-li="${id}"`); return i < 0 ? "" : gD.slice(i, gD.indexOf("</li>", i)); };
+      const dIds = [...gD.matchAll(/data-ga-li="([^"]+)"/g)].map(m => m[1]);
+      const redG = GA.gates.find(g => g.flag === "red"), unG = GA.gates.find(g => g.gate_minutes == null), fineG = GA.gates.find(g => g.flag == null && g.gate_minutes != null);
+      ok("⭐ GATE DIALS: a dial a gate, fullest first; red 'Over capacity' in the bad tone, the untyped gate 'No check-in time typed' with '—' and no marks, the fine gate no word",
+        dIds.length === GA.gates.filter(g => g.arrivals_per_day > 0).length && dIds[0] === redG.gate_id
+        && gDial(redG.gate_id).includes('data-ga-tone="bad"') && gDial(redG.gate_id).includes(">Over capacity<") && gDial(redG.gate_id).includes(`>${redG.capacity_pct} %<`)
+        && gDial(unG.gate_id).includes('data-ga-tone="none"') && gDial(unG.gate_id).includes(">No check-in time typed<") && gDial(unG.gate_id).includes(">—<")
+        && !gDial(unG.gate_id).includes("ga-d-arc") && !gDial(unG.gate_id).includes("ga-d-cap")
+        && gDial(fineG.gate_id).includes('data-ga-tone="ok"') && !gDial(fineG.gate_id).includes("data-row-status") && gDial(fineG.gate_id).includes("ga-d-near") && gDial(fineG.gate_id).includes("ga-d-cap")
+        && gD.includes('data-ga-verdict="bad"') && gD.includes(">1 gate over capacity<") && gD.includes(">capacity<") && gD.includes(">85 %: queue likely<")
+        && gD.indexOf("data-ga-dials") < gP.indexOf('data-rd-table="gates"') && !/undefined|NaN/.test(gD), dIds.join(","));
       ok("⭐ every figure is the server's, formatted to 1 dp, with the gap in the contract's words; the check-in is a word, never a bare 0",
         // 13 Oct 2026 (W6, narrowed): the gap cell is "2.6 min", the sentence and the laden / coming-to-load split are details lines
         GA.gates.every(g => gP.includes(`>${g.arrivals_per_day.toFixed(1)}<`) && (g.gap_minutes == null || (gP.includes(`One every ${g.gap_minutes.toFixed(1)} min if arrivals are spread evenly.`) && gP.includes(`>${g.gap_minutes.toFixed(1)} min<`))))
@@ -654,12 +669,15 @@ if (loaded) {
         // the gate id is the row's data attribute for these harnesses and nothing else: stripped, no id, location id, route id or scope is left on the page
         // 13 Oct 2026 (W6, narrowed): RowDetails keys its details row by the gate id too (id / aria-controls / data-rd*,
         // attributes nobody reads on screen); those are stripped with the data attribute
-        && !/IPT ?[1-6]/.test(gP) && !/G00[1-9]|\bL[1-9]\b|\bR[1-9]\b|scheme</.test(gP.replace(/data-ga-gate="G00\d"|(?:id|aria-controls|data-rd|data-rd-details)="(?:rd-)?ga-G00\d"/g, "")));
+        && !/IPT ?[1-6]/.test(gP) && !/G00[1-9]|\bL[1-9]\b|\bR[1-9]\b|scheme</.test(gP.replace(/data-ga-gate="G00\d"|data-ga-li="G00\d"|(?:id|aria-controls|data-rd|data-rd-details)="(?:rd-)?ga-G00\d"/g, "")));   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): + the dial's data-ga-li
       ok("the month's words under the header, and the two notes under the table, in the server's words",
         // NARROWED 11 Oct 2026 (review): "every teams" was ungrammatical — "all teams together"
         // NARROWED 17 Oct 2026: the gates rest on their hours, the default gate hours where none are typed (07:00–17:00 set on
         // Config by test_gate_arrivals, which writes this fixture), never the lorry shift
-        gP.includes("Sep 2026: lorries a day at each gate, all teams together, if arrivals are spread evenly across each gate&#x27;s open hours (07:00–17:00, the default, where none are typed).")
+        // REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials): the sentence under the header left the screen (its sense is in the "i", with the month and the
+        // default hours as the "i"'s value, shown when it opens); the fold's name says what the table holds
+        !gP.includes("lorries a day at each gate, all teams together") && !gP.includes("Sep 2026: lorries a day")
+        && gP.includes("Gate by gate: the gap, the check-in time, each team&#x27;s lorries</summary>")
         && !gP.includes("h shift") && !gP.includes("every teams")
         && GA.notes.every(n => gP.includes(n.replace(/'/g, "&#x27;"))) && gP.indexOf("</table>") < gP.indexOf("Averages only, if arrivals are spread evenly"));
       const GAT = { ...GA, scope: "team", gates: GA.gates.map(g => ({ ...g, per_team: g.per_team.filter(t => t.team === "Team 2") })) };

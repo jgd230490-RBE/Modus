@@ -737,31 +737,36 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
   /* 11 Oct 2026 — the Gate arrivals panel on the Dashboard (tokens only; 14 px table text; the .ct-* family's strip) */
   .ga-strip{margin-top:12px;}
-  /* 14 Oct 2026: the gate chart (arrivals against capacity) and its key; the table folds under it */
-  .ga-chart{margin-top:10px;}
+  /* 24 Nov 2026 (the Dashboard rethink, A2: a gauge for each gate, version c): a half ring a gate, the fullest six on one line at a
+     desk, three across on a tablet, two on a phone; the arc in the status's colour (the look's tokens), a word only on a gate that
+     is not fine; one key line for the two marks. The table folds under it */
+  .ga-chart{margin-top:8px;}
+  .ga-tools{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;}
   .ga-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:4px;}
-  .ga-head-v{font-size:18px;font-weight:700;color:var(--ink);}
+  .ga-head-v .row-st{font-family:var(--f-head);font-size:16px;font-weight:600;white-space:normal;}
   .ga-next{font-size:13px;color:var(--ink);} .ga-next .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 4px;font-size:13px;}
-  .ga-key{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--muted);}
-  .ga-key i{display:inline-block;vertical-align:middle;margin-left:8px;}
-  .ga-key i:first-child{margin-left:0;}
-  /* 9 Nov 2026 (UI critique 8): a phone reads Gate arrivals as a list, not the chart — the gate's whole name, its lorries a day and
-     the share of its own capacity, a thin bar under it (amber from 85 %, red past 100 %), no key */
-  .ga-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:14px;}
-  .ga-li-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}
-  .ga-li-name{min-width:0;font-size:14px;font-weight:600;color:var(--ink);overflow-wrap:anywhere;}
-  .ga-li-name small{display:block;font-size:13px;font-weight:400;color:var(--muted);}
-  .ga-li-fig{flex:none;max-width:48%;text-align:right;font-size:13px;color:var(--muted);}
-  .ga-li-fig b{font-weight:600;color:var(--ink);}
-  .ga-li-warn .ga-li-fig{color:var(--warn-text);}
-  .ga-li-bad .ga-li-fig{color:var(--bad-text);}
+  .ga-dials{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px 12px;}
+  @media (max-width:1024px){ .ga-dials{grid-template-columns:repeat(3,minmax(0,1fr));} }
+  @media (max-width:767px){ .ga-dials{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 10px;} }
+  .ga-dials.ga-dials-phone{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 10px;}
+  .ga-dial{min-width:0;text-align:center;}
+  .ga-d-svg{display:block;width:100%;max-width:150px;height:auto;margin:0 auto;overflow:visible;}
+  .ga-d-track{fill:none;stroke:var(--line-2);stroke-width:8;}
+  .ga-d-arc{fill:none;stroke-width:8;stroke:var(--ink);}
+  .ga-d-ok .ga-d-arc{stroke:var(--green);} .ga-d-warn .ga-d-arc{stroke:var(--gold);} .ga-d-bad .ga-d-arc{stroke:var(--red);}
+  .ga-d-near{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:2 2;}
+  .ga-d-cap{stroke:var(--ink);stroke-width:2.5;}
+  .ga-d-pct{font-family:var(--f-head);font-size:15px;font-weight:600;fill:var(--ink);}
+  .ga-d-name{margin-top:2px;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ga-d-fig{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .ga-dial .row-st{margin-top:3px;font-size:12px;white-space:normal;justify-content:center;}
+  .ga-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin-top:10px;font-size:12px;color:var(--muted);}
+  .ga-key i{display:inline-block;vertical-align:-2px;margin-right:6px;}
+  .ga-key-near{width:0;height:12px;border-left:1.5px dashed var(--muted);}
+  .ga-key-cap{width:2.5px;height:14px;background:var(--ink);}
+  /* the Look-ahead's gate week (GatesWeek) keeps the thin share bar */
   .ga-pbar{height:6px;margin-top:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;}
   .ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--ink);}   /* 24 Nov 2026 (own look, B1 item 7): ink in every state; the figure's words carry amber / red */
-  .ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--ink);}
-  .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
-  .ga-key-track{width:18px;height:12px;border-radius:3px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
-  .ga-key-red{width:16px;height:10px;border-radius:3px;background:var(--red);}
-  .ga-key-gold{width:16px;height:10px;border-radius:3px;background:var(--gold);}
   /* 14 Oct 2026 (bundle G, W7): CLP monitoring — two columns from 1280 px, a wide card spans both */
   .clp-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
   @media (min-width:1280px){.clp-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.clp-card.clp-wide{grid-column:1 / -1;}}
@@ -1024,7 +1029,6 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .la-carry.is-short{color:var(--warn-text);font-weight:600;}
   .la-sub{display:block;font-size:12px;line-height:1.25;font-weight:400;color:var(--muted);}
   .gw-days{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;}
-  .ga-key-none{width:16px;height:10px;border-radius:3px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
   .ga-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);padding:6px 0;}
   .ga-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -1775,7 +1779,8 @@ const INFO = {
   "cfg.veh.english": { title: "English name", text: "The name every screen shows for this vehicle.", guide: "ug-config-vehicles" },
   "cfg.veh.minutes": { title: "Load and unload minutes", text: "Left blank, a vehicle uses the Planning defaults, shown in grey.", guide: "ug-config-vehicles" },
   "cfg.veh.euro": { title: "Euro class", text: "What hauliers are assumed to send. Used by the CLP charts only; it changes no carbon figure.", guide: "ug-config-vehicles" },
-  "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, against what the gate can check in. Amber, Queue likely, from 85 % of that; red, Over gate capacity, past it.",
+  // 24 Nov 2026 (the Dashboard rethink, A2): the 21-word sentence under the title is gone; its sense is here (30 words)
+  "dash.gates": { title: "Gate arrivals", text: "Each gate's lorries a day, every team together, spread evenly over its open hours, against what it can check in. Queue likely from 85 %; over capacity past 100 %.",
     how: "Loaded lorries count at the delivery site's gate, empty ones at the loading site's. Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
   // 14 Oct 2026 (bundle G, W7): the CLP monitoring section
   // 16 Oct 2026 (S7): the Simulation section
@@ -2517,6 +2522,93 @@ const gaMin = (m) => m == null ? "—" : `${(+m).toFixed(1)} min`;
 // status word cannot disagree (test_gate_arrivals checks it). The bar is red only when the server's flag is.
 // No check-in typed = no capacity: the bar is grey and says so, never compared.
 const gaN1 = (n) => n == null ? "—" : (+n).toFixed(1);
+// 24 Nov 2026 (the Dashboard rethink, task A2; John: "a gauge for each gate", version c, "Round 3" of
+// notes\dashboard-rethink-mockup-1124): a half ring a gate that runs to 125 % of the gate's OWN capacity, a dashed mark at
+// the 85 % step (GA_NEAR) and a solid ink mark at capacity; the arc from 0 to the gate's share in the status's colour
+// (the look's own tokens, in CSS), the share in the middle, a status word ONLY where a gate is not fine. Drawing only: the
+// share, the flag and the capacity are the server's (capacity_pct, flag, capacity_per_day); nothing is compared here.
+const GA_DIALS = 6;            // a desk shows the fullest six on one line, and any other gate the server flags (85 % or more)
+const GA_DIAL_TOP = 125;       // where the ring ends, in % of the gate's own capacity
+const GA_DIAL = { cx: 60, cy: 58, r: 45, rIn: 38, rOut: 52 };   // in the dial's 120 x 66 box
+const gaDialPt = (pct, rad) => {
+  const a = Math.PI * (1 - Math.max(0, Math.min(+pct || 0, GA_DIAL_TOP)) / GA_DIAL_TOP);
+  return [+(GA_DIAL.cx + rad * Math.cos(a)).toFixed(1), +(GA_DIAL.cy - rad * Math.sin(a)).toFixed(1)];
+};
+const gaDialArc = (pct) => { const [x0, y0] = gaDialPt(0, GA_DIAL.r), [x1, y1] = gaDialPt(Math.max(+pct || 0, 0.5), GA_DIAL.r);
+  return `M${x0} ${y0} A${GA_DIAL.r} ${GA_DIAL.r} 0 0 1 ${x1} ${y1}`; };
+const gaDialTick = (pct) => { const [x1, y1] = gaDialPt(pct, GA_DIAL.rIn), [x2, y2] = gaDialPt(pct, GA_DIAL.rOut); return { x1, y1, x2, y2 }; };
+// the dial's tone from the server's flag; no capacity (no check-in time typed) = the ring, never a colour
+const gaDialTone = (r) => r.cap == null ? "none" : r.over ? "bad" : r.near ? "warn" : "ok";
+const gaDialWord = (r) => r.cap == null ? (r.g.no_open_time ? "No open time" : "No check-in time typed") : r.over ? "Over capacity" : r.near ? "Queue likely" : null;
+const gaFullName = (g) => g.gate_name && g.gate_name !== g.location_name ? `${g.location_name}, ${g.gate_name}` : g.location_name;
+function GaDial({ r, name }){
+  const tone = gaDialTone(r), word = gaDialWord(r);
+  return (
+    <li className={"ga-dial ga-d-" + tone} data-ga-li={r.g.gate_id} data-ga-pct={r.pct == null ? "" : r.pct} data-ga-tone={tone}>
+      <svg viewBox="0 0 120 66" className="ga-d-svg" role="img" aria-label={r.pct == null ? `${gaFullName(r.g)}: no capacity` : `${gaFullName(r.g)}: ${r.pct} % of capacity`}>
+        <path className="ga-d-track" d={gaDialArc(GA_DIAL_TOP)} />
+        {r.pct != null && <path className="ga-d-arc" d={gaDialArc(r.pct)} />}
+        {r.cap != null && <line className="ga-d-near" {...gaDialTick(GA_NEAR)} />}
+        {r.cap != null && <line className="ga-d-cap" {...gaDialTick(100)} />}
+        <text className="ga-d-pct" x={GA_DIAL.cx} y="56" textAnchor="middle">{r.pct == null ? "—" : `${r.pct} %`}</text>
+      </svg>
+      <div className="ga-d-name" title={gaFullName(r.g)}>{name}</div>
+      <div className="ga-d-fig">{gaN1(r.g.arrivals_per_day)} a day{r.cap == null ? "" : ` of ${grp(r.cap)}`}</div>
+      {word && <RowStatus word={word} tone={tone} />}
+    </li>
+  );
+}
+// a token's value in the LIGHT look: a saved picture is on white whichever look is on screen
+function tokLight(name, fb){
+  try {
+    for(const sh of Array.from(document.styleSheets)){
+      let rules; try { rules = sh.cssRules; } catch(e){ continue; }
+      for(const ru of Array.from(rules || [])) if(ru.selectorText === ":root"){ const v = ru.style.getPropertyValue(name).trim(); if(v) return v; }
+    }
+  } catch(e){}
+  return tok(name, fb);
+}
+// Copy / Download: the dials shown, drawn again on a canvas in the light look (ChartTools adds the title and the scope)
+function gaDialsPicture(rows, nameOf){
+  const S = CHART_PNG_SCALE, font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif", headFont = "'Sora', 'IBM Plex Sans', system-ui, sans-serif";
+  const cols = Math.max(1, Math.min(GA_DIALS, rows.length)), K = 1.25, CW = 172, DH = Math.round(66 * K), CH = DH + 66;
+  const W = cols * CW, H = Math.max(1, Math.floor((rows.length + cols - 1) / cols)) * CH;
+  const C = { ok: tokLight("--green", ""), warn: tokLight("--gold", ""), bad: tokLight("--red", ""), track: tokLight("--line-2", ""),
+              muted: tokLight("--muted", CHART_MUTED), ink: tokLight("--ink", CHART_INK), none: tokLight("--st-none", CHART_MUTED),
+              okT: tokLight("--ok-text", CHART_INK), warnT: tokLight("--warn-text", CHART_INK), badT: tokLight("--bad-text", CHART_INK) };
+  const c = document.createElement("canvas"); c.width = W * S; c.height = H * S;
+  const x = c.getContext("2d"); x.scale(S, S);
+  const cut = (t, maxW) => { let s = String(t || ""); if(x.measureText(s).width <= maxW) return s; while(s.length > 1 && x.measureText(s + "…").width > maxW) s = s.slice(0, -1); return s + "…"; };
+  rows.forEach((r, i) => {
+    const ox = (i % cols) * CW, oy = Math.floor(i / cols) * CH, tone = gaDialTone(r), mid = ox + CW / 2;
+    x.save(); x.translate(ox + (CW - 120 * K) / 2, oy); x.scale(K, K);
+    x.lineWidth = 8; x.strokeStyle = C.track; x.beginPath(); x.arc(GA_DIAL.cx, GA_DIAL.cy, GA_DIAL.r, Math.PI, 2 * Math.PI); x.stroke();
+    if(r.pct != null){
+      const f = Math.max(0.004, Math.min(r.pct, GA_DIAL_TOP) / GA_DIAL_TOP);
+      x.strokeStyle = C[tone] || C.ink; x.beginPath(); x.arc(GA_DIAL.cx, GA_DIAL.cy, GA_DIAL.r, Math.PI, Math.PI + Math.PI * f); x.stroke();
+    }
+    if(r.cap != null){
+      const n = gaDialTick(GA_NEAR), k = gaDialTick(100);
+      x.strokeStyle = C.muted; x.lineWidth = 1.5; x.setLineDash([2, 2]); x.beginPath(); x.moveTo(n.x1, n.y1); x.lineTo(n.x2, n.y2); x.stroke();
+      x.setLineDash([]); x.strokeStyle = C.ink; x.lineWidth = 2.5; x.beginPath(); x.moveTo(k.x1, k.y1); x.lineTo(k.x2, k.y2); x.stroke();
+    }
+    x.fillStyle = C.ink; x.font = `600 15px ${headFont}`; x.textAlign = "center"; x.textBaseline = "alphabetic";
+    x.fillText(r.pct == null ? "—" : `${r.pct} %`, GA_DIAL.cx, 56);
+    x.restore();
+    x.textAlign = "center"; x.textBaseline = "top";
+    x.fillStyle = C.ink; x.font = `600 12px ${font}`; x.fillText(cut(nameOf(r), CW - 12), mid, oy + DH + 4);
+    x.fillStyle = C.muted; x.font = `12px ${font}`; x.fillText(`${gaN1(r.g.arrivals_per_day)} a day${r.cap == null ? "" : ` of ${grp(r.cap)}`}`, mid, oy + DH + 21);
+    const word = gaDialWord(r);
+    if(word){
+      x.font = `600 12px ${font}`; const tw = x.measureText(word).width, sx = mid - (tw + 16) / 2, sy = oy + DH + 44;
+      if(tone === "none"){ x.strokeStyle = C.none; x.lineWidth = 2; x.beginPath(); x.arc(sx + 5, sy, 4, 0, 2 * Math.PI); x.stroke(); }
+      else if(tone === "warn"){ x.fillStyle = C.warn; x.beginPath(); x.moveTo(sx + 5, sy - 5); x.lineTo(sx + 10, sy); x.lineTo(sx + 5, sy + 5); x.lineTo(sx, sy); x.closePath(); x.fill(); }
+      else { x.fillStyle = C.bad; x.fillRect(sx, sy - 5, 10, 10); }
+      x.fillStyle = tone === "warn" ? C.warnT : tone === "bad" ? C.badT : C.none; x.textAlign = "left"; x.textBaseline = "middle"; x.fillText(word, sx + 16, sy);
+    }
+  });
+  return { canvas: c, w: W, h: H };
+}
 // 16 Oct 2026 (S3): the busiest clock hour at each gate, from the simulation's average working day (sim.py on the server,
 // whole loads spread evenly over each gate's open hours, no pour). The server sends the lorries, the hour and what the
 // gate can check in an hour; nothing is worked out here.
@@ -2536,103 +2628,57 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
   const gates = ga.gates || [];
   const state = gates.length === 0 ? "none" : "set";
   const count = (months && months.count) || 60, startYear = (months && months.start_year) || 2026;
-  // the chart: one row a gate, the fullest first (by share of capacity; gates with none after, busiest first)
+  // the dials: one a gate, the fullest first (by share of capacity; gates with none after, busiest first)
   const rowsC = gates.filter(g => g.arrivals_per_day != null && g.arrivals_per_day > 0)
     .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red", near: g.flag === "amber" }))
     .sort((a, b) => ((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day));
   const nOverG = rowsC.filter(r => r.over).length, nNearG = rowsC.filter(r => r.near).length;
+  // 24 Nov 2026 (A2): the fullest six, and any other gate the server flags; the rest are in the fold
+  const shown = rowsC.filter((r, i) => i < GA_DIALS || r.over || r.near);
+  const dupLoc = new Set(shown.map(r => r.g.location_name).filter((n, i, all) => all.indexOf(n) !== i));
+  const dialName = (r) => dupLoc.has(r.g.location_name) && r.g.gate_name ? r.g.gate_name : r.g.location_name;
   // 11 Nov 2026 (CLOCS idea C-I1): no gate at the 85 % step this month: where the next queue is, and "Show" goes there
   const nextQ = (nOverG || nNearG) ? null : gaNextQueue(queue, month, sites);
   const nextLine = nextQ && <span className="ga-next" data-ga-next={nextQ.month}>Next queue likely: {nextQ.label}, {simGateName(nextQ.gates[0])} · <button type="button" className="link-btn" onClick={() => onMonth(nextQ.month)}>Show</button></span>;
-  // 17 Oct 2026: every gate has clock hours (typed, or the default gate hours); the words say where the default stands
+  // 17 Oct 2026: every gate has clock hours (typed, or the default gate hours); the "i" says where the default stands
   const anyDefault = gates.some(g => g.open_basis === "default");
-  const gaFs = 11;
-  const C1g = tok("--chart-1", "#E8590C"), REDg = tok("--red", "#DC2626"), NONEg = tok("--chart-none", "#A8A29E"), INKg = tok("--ink", "#1E293B"), GOLDg = tok("--gold", "#D97706");
-  const xTop = Math.max(1, ...rowsC.map(r => Math.max(r.g.arrivals_per_day, r.cap || 0)));
-  const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {
-    const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx, A = chart.chartArea; if(!x || !A) return;   // 1 = the arrivals
-    ctx.save();
-    meta.data.forEach((el, i) => { const r = rowsC[i]; if(!r) return;
-      const half = (el.height || 16) / 2 + 5;
-      let right = el.x;
-      if(r.cap){
-        // 14 Oct 2026 (W17): a short dashed tick at 85 % of capacity, the "Queue likely" step
-        const pg = x.getPixelForValue(r.g.near_per_day);
-        ctx.save(); ctx.strokeStyle = GOLDg; ctx.lineWidth = 1.5; ctx.setLineDash([3, 2]);
-        ctx.beginPath(); ctx.moveTo(pg, el.y - half + 2); ctx.lineTo(pg, el.y + half - 2); ctx.stroke(); ctx.restore();
-        const px = x.getPixelForValue(r.cap); right = Math.max(right, px);
-        ctx.strokeStyle = INKg; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
-        ctx.fillStyle = INKg; ctx.beginPath(); ctx.moveTo(px - 5, el.y - half - 7); ctx.lineTo(px + 5, el.y - half - 7); ctx.lineTo(px, el.y - half); ctx.closePath(); ctx.fill();
-      }
-      const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");
-      ctx.font = `600 ${gaFs + 1}px 'IBM Plex Sans', system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
-      ctx.fillStyle = r.over ? REDg : INKg;   // the amber step is said in words; gold text fails contrast on white
-      ctx.fillText(`${gaN1(r.g.arrivals_per_day)} a day${words}`, right + 10, el.y);
-    });
-    ctx.restore();
-  } };
-  const gaCfg = { type: "bar",
-    // a bullet chart: a pale track from 0 to the gate's capacity, the planned arrivals as the bar inside it, a marker at
-    // capacity; a gate with no check-in has no track
-    data: { labels: rowsC.map(r => r.g.location_name), datasets: [
-      { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#EDEEEF"),
-        borderColor: tok("--grey", "#E1E2E4"), borderWidth: 1, borderRadius: 3, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
-      { label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day),
-        backgroundColor: rowsC.map(r => r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 3, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 12, right: 250 } },
-      plugins: { legend: { display: false }, tooltip: { filter: (item) => item.datasetIndex === 1, callbacks: {
-        title: (items) => items.length ? `${rowsC[items[0].dataIndex].g.location_name}, ${rowsC[items[0].dataIndex].g.gate_name}` : "",
-        label: (item) => { const r = rowsC[item.dataIndex]; return [`${gaN1(r.g.arrivals_per_day)} lorries a day ${GA_SPREAD}`,
-          r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null ? "No check-in time typed: nothing compared" : `capacity ${grp(r.cap)} a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}${r.g.peak_minutes ? `, less ${r.g.peak_minutes} min of peak bands` : ""}${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`,
-          gaFlagWord(r.g)]; } } } },
-      scales: { x: { min: 0, suggestedMax: xTop, grace: "8%", grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") }, ticks: { font: { size: gaFs } },
-                     title: { display: true, text: "lorries a day", font: { size: gaFs } } },
-                y: { grid: { display: false }, ticks: { font: { size: gaFs + 1 }, callback: function(v){ const r = rowsC[v]; return r ? [cutLabel(r.g.location_name), cutLabel(r.g.gate_name)] : ""; } } } } },
-    plugins: [capMarks] };
+  const vTone = nOverG ? "bad" : nNearG ? "warn" : "ok";
+  const verdict = nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity";
+  const dialsOn = state === "set" && rowsC.length > 0;
+  const picTitle = "Gate arrivals: each gate against its capacity";
   return (
     <section className="ct-strip ga-strip" data-gate-arrivals={state} data-guide="dash-gates" aria-label="Gate arrivals">
       <div className="ct-row">
-        <h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>
-        <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => onMonth(+e.target.value)} aria-label="Month">
-          {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
-        </select></label>
+        <h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" value={anyDefault ? `${ga.label}. Where no hours are typed, a gate is open ${ga.default_hours}.` : ga.label} /></h3>
+        <div className="ga-tools">
+          <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => onMonth(+e.target.value)} aria-label="Month">
+            {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}
+          </select></label>
+          {dialsOn && <ChartTools inline title={picTitle} scope={[ga.label, sited || null]} getPlot={async () => gaDialsPicture(shown, dialName)} />}
+        </div>
       </div>
-      <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across each gate's open hours{anyDefault ? ` (${ga.default_hours}, the default, where none are typed)` : ""}.</div>
       {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month, or approve a line."}
         action={!sited && onOpen ? <button type="button" className="btn-sec" data-ga-empty-go="forecasts" onClick={() => onOpen("forecasts")}>Open Forecasts</button> : null} />}
       {state === "none" && nextLine && <div className="ga-head">{nextLine}</div>}
-      {state === "set" && rowsC.length > 0 && phone && (
-        <div className="ga-chart" data-ga-list="1">
+      {state === "set" && rowsC.length === 0 && <div className="ga-head">
+        <span className="ga-head-v" data-ga-verdict="none"><RowStatus word={`No arrivals at a gate in ${ga.label}`} tone="none" /></span>
+        {nextLine}
+      </div>}
+      {dialsOn && (
+        <div className="ga-chart" data-ga-dials="1">
           <div className="ga-head">
-            <span className="ga-head-v" style={nOverG ? { color: "var(--bad-text)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+            <span className="ga-head-v" data-ga-verdict={vTone}><RowStatus word={verdict} tone={vTone} /></span>
             {nextLine}
           </div>
-          <ul className="ga-list" aria-label="Gates, fullest first">
-            {rowsC.map(r => (
-              <li key={r.g.gate_id} className={"ga-li" + (r.over ? " ga-li-bad" : r.near ? " ga-li-warn" : "")} data-ga-li={r.g.gate_id} data-ga-pct={r.pct == null ? "" : r.pct}>
-                <div className="ga-li-top">
-                  <span className="ga-li-name">{r.g.location_name}{r.g.gate_name && r.g.gate_name !== r.g.location_name && <small>{r.g.gate_name}</small>}</span>
-                  <span className="ga-li-fig"><b>{gaN1(r.g.arrivals_per_day)}</b> a day{r.pct == null ? " · no check-in time typed" : ` · ${r.pct} %`}{r.over ? " · over capacity" : r.near ? " · queue likely" : ""}</span>
-                </div>
-                {r.pct != null && <div className="ga-pbar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, r.pct)) + "%" }}></i></div>}
-              </li>
-            ))}
+          <ul className={"ga-dials" + (phone ? " ga-dials-phone" : "")} aria-label="Gates, fullest first">
+            {shown.map(r => <GaDial key={r.g.gate_id} r={r} name={dialName(r)} />)}
           </ul>
-        </div>
-      )}
-      {state === "set" && rowsC.length > 0 && !phone && (
-        <div className="ga-chart" data-ga-chart="1">
-          <div className="ga-head">
-            <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
-            {nextLine}
-            <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the open hours ÷ the check-in time a lorry <i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
-          </div>
-          <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]} />
+          <div className="ga-key"><span><i className="ga-key-near" aria-hidden="true"></i>{GA_NEAR} %: queue likely</span><span><i className="ga-key-cap" aria-hidden="true"></i>capacity</span></div>
         </div>
       )}
       {state === "set" && (
-        // 14 Oct 2026: the table is the detail behind the chart now ("Gate by gate"), every fact kept
-        <details className="ga-more" data-ga-table="1"><summary>Gate by gate: the gap, the check-in time, the lorries of each {TEAM().toLowerCase()}</summary>
+        // 14 Oct 2026: the table is the detail behind the chart now ("Gate by gate"), every fact kept; 24 Nov 2026 (A2): the fold behind the dials, unchanged
+        <details className="ga-more" data-ga-table="1"><summary>{shown.length < gates.length ? `All ${gates.length} gates` : "Gate by gate"}: the gap, the check-in time, each {TEAM().toLowerCase()}'s lorries</summary>
         {/* 13 Oct 2026 (W6): RowDetails. The row: the location (primary) with its gate under it, the teams as at most
             two chips, one figure a cell, the status word (red only when a queue is likely, grey otherwise: the 11 Oct
             rule, so no tick and no amber here); the laden / coming-to-load split, each team figure, the

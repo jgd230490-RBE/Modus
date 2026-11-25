@@ -113,7 +113,8 @@ ok("6 place: no dot before the place line (the mark is its only sign)", !/\.kick
 ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) are ink in every state; no amber or red bar fill",
    code.includes('background: "var(--ink)" }} /></div>') && !code.includes('tone || "var(--green)"') && !/<Bar [^>]*tone=/.test(code)
    && css.includes(".ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--ink);}") && !/\.ga-li-(warn|bad) \.ga-pbar i\{/.test(css)
-   && css.includes(".ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--ink);}"));
+   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the gates' old key and its bar went with the chart (the dials' key names two marks); none is coloured
+   && !css.includes(".ga-key-bar{") && !/\.ga-key-(near|cap)\{[^}]*var\(--(red|gold|warn|bad)/.test(css));
 // ---------------------------------------------------------------- stage 8: a chosen tab or day is an underline only
 ok("8 select: a chosen tab is sign blue words on a 2 px sign blue underline, no tint or outline; a chosen day the same with 3 px",
    css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}')
