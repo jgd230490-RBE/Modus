@@ -64,9 +64,23 @@ const moreAt = dash.lastIndexOf('<details className="dash-more"', at("More chart
 const moreFold = dash.slice(moreAt, dash.indexOf("</details>", moreAt));
 ok("⭐ GONE from 'More charts': Vehicles needed over time (it is a key chart now); the fold's name loses 'vehicles'",
    !moreFold.includes("fleetCfg") && !moreFold.includes("Vehicles needed") && moreFold.includes("More charts: trips, carbon over time, material split")
-   && !/More charts:[^<]*vehicles/.test(dash) && (dash.match(/<ChartCanvas config=\{fleetCfg\} size="lg"/g) || []).length === 1);
-ok("...the moved chart is a full-size chart in its row (lg), its tools in its title row",
-   /c-fleet">[\s\S]{0,400}<ChartCanvas config=\{fleetCfg\} size="lg" title=\{"Vehicles needed"\} scope=\{dashScope\} \/>/.test(row1));
+   // NARROWED 25 Nov 2026 (level plots): the moved chart is size "key" now, not "lg"
+   && !/More charts:[^<]*vehicles/.test(dash) && (dash.match(/<ChartCanvas config=\{fleetCfg\} size="key" htmlKey/g) || []).length === 1);
+ok("...the moved chart is a key chart in its row (size key, its key out of the canvas), its tools in its title row",
+   // NARROWED 25 Nov 2026 (the mother session's "level the three plots"): size "lg" became size "key" + htmlKey
+   /c-fleet">[\s\S]{0,400}<ChartCanvas config=\{fleetCfg\} size="key" htmlKey title=\{"Vehicles needed"\} scope=\{dashScope\} \/>/.test(row1));
+ok("⭐ LEVEL PLOTS: the three key charts are size 'key' with their key as an HTML line; nothing else on the page is",
+   /c-demand">[\s\S]{0,400}<ChartCanvas config=\{demandCfg\} size="key" htmlKey /.test(row1)
+   && /c-progress">[\s\S]{0,400}<ChartCanvas config=\{progressCfg\} size="key" htmlKey /.test(row1)
+   && (code.match(/size="key" htmlKey /g) || []).length === 3 && (code.match(/size="key"/g) || []).length === 3 && !/<ChartCanvas [^>]*htmlKey/.test(code.replace(/<ChartCanvas config=\{(demandCfg|progressCfg|fleetCfg)\} size="key" htmlKey /g, "")));
+ok("⭐ ...CSS: one fixed height (the old default's), never stretched by the row; the key line 12 px under the box",
+   /\.chart-box\.is-key\{height:clamp\(200px,28vh,420px\);\}/.test(html) && /\.chart-card>\.chart-box\.is-key\{flex:none;\}/.test(html)
+   && /\.ch-key\{display:flex;flex-wrap:wrap;gap:3px 12px;margin-top:4px;font-size:12px;line-height:16px;color:var\(--muted\);\}/.test(html));
+const _cc = (code.match(/function ChartCanvas\([\s\S]*?\n\}\n/) || [""])[0];
+ok("⭐ ...ChartCanvas: the canvas is drawn with no key when htmlKey; the copied picture is the config AS GIVEN (key and all) at the box's height plus the key line's",
+   _cc.includes("const drawn = htmlKey ? chartNoLegend(config) : config;") && _cc.includes("fitChartConfig(drawn, vwNow())")
+   && _cc.includes("drawChartLight(cfgRef.current, el ? el.clientWidth : 0, h)") && _cc.includes("keyRef.current.offsetHeight + 4")
+   && _cc.includes("cfgRef.current = config;"));
 ok("⭐ CSS (Q9): the rows follow their OWN width: three across from 1,000 px, two from 640 (Vehicles a whole row), one under another below; Cost and Top routes 3 : 2 from 640",
    /\.dash-charts-box\{container-type:inline-size;\}/.test(html)
    && /\.dash-charts,\.dash-charts2\{display:grid;gap:16px 22px;grid-template-columns:minmax\(0,1fr\);\}/.test(html)
@@ -109,7 +123,9 @@ const act = w.React.act || require(G + "react-dom/test-utils").act;
 w.IS_REACT_ACT_ENVIRONMENT = true; global.IS_REACT_ACT_ENVIRONMENT = true;
 w.eval(CLOCK.shiftSource());
 // (guarded, so the harness reports failures on the code before task B instead of throwing)
-w.eval(js + "\nwindow.__O = { NOW_MARK: typeof NOW_MARK === 'undefined' ? {} : NOW_MARK, fitChartConfig, CHART_INK, CHART_MUTED };");
+w.eval(js + "\nwindow.__O = { NOW_MARK: typeof NOW_MARK === 'undefined' ? {} : NOW_MARK, fitChartConfig, CHART_INK, CHART_MUTED, chartKeyItems: typeof chartKeyItems === 'undefined' ? null : chartKeyItems, ChartCanvas };");
+// every config the page hands Chart.js, for the key checks
+const BUILT = []; { const C0 = w.Chart; w.Chart = function(_cv, cfg){ BUILT.push(cfg); return C0(); }; w.Chart.defaults = {}; }
 const X = w.__O;
 const click = (el) => act(() => { el.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
 const tick = () => act(async () => { await new Promise(r => setTimeout(r, 30)); });
@@ -205,6 +221,36 @@ const S = (over) => ({ ...CTX, status: { ...CTX.status, ...over } });
     ok("...a team with no share while the decisions do not fit: '—' and 'no share while the agreed decisions do not fit'; the decisions figure a ring 'No longer fit the plan'",
        /^Target, your [a-z ]+'s share—no share while the agreed decisions do not fit$/.test(T(fig(noShare.el, "target")))
        && st(noShare.el, "decisions") === "none:No longer fit the plan" && /^With the agreed decisions—/.test(T(fig(noShare.el, "decisions")))); noShare.done();
+
+    // ---- the key out of the canvas (level plots) ------------------------------------------------------------------
+    const mountC = (props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+      act(() => { r.render(w.React.createElement(X.ChartCanvas, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+    const two = { type: "bar", data: { labels: ["Jan", "Feb"], datasets: [
+      { label: "Planned t", data: [1, 2], backgroundColor: "rgba(232,89,12,.18)", borderColor: "#E8590C", borderWidth: 1, order: 2 },
+      { label: "Delivered t (reported)", data: [1, 1], backgroundColor: "#0B4EA2", borderWidth: 0, order: 1 }] },
+      options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 10 } } } } };
+    const one = { type: "bar", data: { labels: ["Jan", "Feb"], datasets: [{ label: "Vehicles", data: [1, 2], backgroundColor: "#E8590C" }] }, options: { plugins: { legend: { display: false } } } };
+    BUILT.length = 0;
+    const kc = mountC({ config: two, size: "key", htmlKey: true, title: "Delivered against plan (tonnes)" });
+    const keyEl = kc.el.querySelector('[data-chart-key="1"]');
+    const sw = keyEl ? [...keyEl.querySelectorAll("i")] : [];
+    ok("⭐ KEY LINE: under the box, one entry a series in Chart.js's own key order (by `order`) and colour; a bordered series keeps its edge; the swatch is hidden from a reader",
+       !!keyEl && [...keyEl.children].map(T).join("|") === "Delivered t (reported)|Planned t"
+       && kc.el.querySelector(".chart-box.is-key") && kc.el.querySelector(".chart-box.is-key").nextElementSibling && kc.el.querySelector(".chart-box.is-key").nextElementSibling.contains(keyEl)
+       && sw.length === 2 && /inset 0(px)? 0(px)? 0(px)? 1px/.test(sw[1].style.boxShadow) && !sw[0].style.boxShadow && sw.every(i => i.getAttribute("aria-hidden") === "true"));
+    ok("⭐ ...the canvas is drawn WITHOUT its key (legend display false), the config it was given left as it was (the picture draws the key)",
+       BUILT.length >= 1 && BUILT[BUILT.length - 1].options.plugins.legend.display === false && two.options.plugins.legend.display === undefined);
+    kc.done();
+    const nk = mountC({ config: one, size: "key", htmlKey: true, title: "Vehicles needed" });
+    ok("⭐ ...a chart with no key (Vehicles needed) gets no line and no room for one",
+       !nk.el.querySelector('[data-chart-key="1"]') && !!nk.el.querySelector(".chart-box.is-key") && !nk.el.querySelector(".chart-box.is-key").nextElementSibling); nk.done();
+    BUILT.length = 0;
+    const plain = mountC({ config: two, title: "Cost over time" });
+    ok("🔴 ...a chart without htmlKey (Cost over time, the big screen, More charts) keeps its key inside the canvas, as before",
+       !plain.el.querySelector('[data-chart-key="1"]') && BUILT.length >= 1 && BUILT[BUILT.length - 1].options.plugins.legend.display !== false); plain.done();
+    ok("...chartKeyItems: no entries when the key is switched off; unnamed series skipped",
+       !!X.chartKeyItems && X.chartKeyItems(one).length === 0
+       && X.chartKeyItems({ ...two, data: { labels: [], datasets: [...two.data.datasets, { data: [] }] } }).length === 2);
 
     const bad = mount({ ct: S({ invalid: "The agreed decisions no longer fit the plan (route 'R4' does not exist).", with_decisions_t: null }), transport: TR });
     ok("⭐ ...decisions that no longer fit: the figure is '—' with a ring 'No longer fit the plan'; the server's sentence under the figures",

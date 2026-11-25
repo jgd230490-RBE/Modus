@@ -3369,7 +3369,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
      // NARROWED 10 Nov 2026 (wave 3, finding 5): the buttons are drawn in the box unless the chart has its own title row (`head`)
-     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>')
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B): a fourth size, "key", for the working view's three key charts (one
+     // fixed height, never stretched by their row, so the three plots sit level); the box is the same box
+     && /\.chart-box\.is-key\{height:clamp\(200px,28vh,420px\);\}/.test(html) && /\.chart-card>\.chart-box\.is-key\{flex:none;\}/.test(html)
+     && _cc.includes('const box0 = <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : size === "key" ? " is-key" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>;')
      && _cc.includes('const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;'));   // NARROWED 2 Nov 2026: + the Copy / Download buttons, drawn after the canvas
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
   // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too

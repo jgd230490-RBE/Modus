@@ -546,6 +546,14 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      "Rotate" / "One section" the Charts section fills the screen's height (.dash-fill). */
   .chart-box{position:relative;width:100%;min-width:0;height:clamp(200px,28vh,420px);}
   .chart-box.is-lg{height:clamp(220px,32vh,480px);}
+  /* 25 Nov 2026 (the Dashboard rethink, B): the working view's three key charts - one fixed height, never stretched by
+     the row (each card's key line under it differs), so the three plots and their month axes sit level; at 1150 x 700
+     the plots and their month labels are on the first screen. The key is an HTML line under the box (.ch-key). */
+  .chart-box.is-key{height:clamp(200px,28vh,420px);}
+  .chart-card>.chart-box.is-key{flex:none;}
+  .ch-key{display:flex;flex-wrap:wrap;gap:3px 12px;margin-top:4px;font-size:12px;line-height:16px;color:var(--muted);}
+  .ch-key>span{display:inline-flex;align-items:center;min-width:0;}
+  .ch-key i{display:inline-block;flex:none;width:10px;height:10px;border-radius:3px;margin-right:5px;}
   .chart-box>canvas{display:block;}
   /* 2 Nov 2026: Copy and Download on every chart - 30 px, always visible, sitting on the title row above the chart; not on the big screen or a phone */
   .chart-tools{position:absolute;top:-36px;right:0;display:flex;gap:4px;z-index:3;}
@@ -2383,8 +2391,38 @@ function ChartTools({ title, scope, getPlot, inline }){
 // nudge Chart.js are gone. `height` is kept for the stockpile chart, whose height follows its row count.
 // 10 Nov 2026 (UI critique finding 5, card 5): `head` = the chart's own title row (a node); the Copy / Download buttons then
 // sit at its right in the flow (.gw-head), never absolutely over the sentence above the chart
-function ChartCanvas({ config, height, size, title, scope, notools, head }){
+// 25 Nov 2026 (the Dashboard rethink, B; the mother session's "level the three plots"): `htmlKey` draws the chart's key as
+// an HTML line UNDER the box (.ch-key) instead of inside the canvas, so charts side by side keep plots of one height and
+// their month axes on one line. Only where the config shows a key (a chart with legend display false gets no line and no
+// room). The copied / downloaded picture still carries the key: it is drawn from the config as given, legend and all, at
+// the box's height plus the key line's.
+const chartNoLegend = (config) => {
+  const o = config.options || {}, p = o.plugins || {};
+  return { ...config, options: { ...o, plugins: { ...p, legend: { ...(p.legend || {}), display: false } } } };
+};
+const chartKeyItems = (config) => {
+  const p = (config.options || {}).plugins || {};
+  if(!p.legend || p.legend.display === false) return [];
+  // in the order Chart.js's own key uses: by each series' `order`, then as listed
+  return ((config.data || {}).datasets || []).map((d, i) => ({ d, i })).filter(x => x.d && x.d.label)
+    .sort((a, b) => ((a.d.order || 0) - (b.d.order || 0)) || (a.i - b.i)).map(({ d }) => {
+    const bg = Array.isArray(d.backgroundColor) ? d.backgroundColor[0] : d.backgroundColor;
+    const edge = d.borderWidth && typeof d.borderWidth === "number" && d.borderColor && typeof d.borderColor === "string" ? d.borderColor : null;
+    return { label: d.label, bg: bg || edge || "var(--muted)", edge };
+  });
+};
+function ChartKey({ items }){
+  return (
+    <div className="ch-key" data-chart-key="1">
+      {items.map((k, i) => <span key={i}><i aria-hidden="true" style={{ background: k.bg, boxShadow: k.edge ? `inset 0 0 0 1px ${k.edge}` : undefined }}></i>{k.label}</span>)}
+    </div>
+  );
+}
+function ChartCanvas({ config, height, size, title, scope, notools, head, htmlKey }){
   const box = useRef(null);
+  const keyRef = useRef(null);
+  const keyItems = htmlKey ? chartKeyItems(config) : [];
+  const drawn = htmlKey ? chartNoLegend(config) : config;
   const [autoTitle, setAutoTitle] = useState("");
   const ref = useRef(null);
   const inst = useRef(null);
@@ -2393,7 +2431,7 @@ function ChartCanvas({ config, height, size, title, scope, notools, head }){
   const cfgRef = useRef(config); cfgRef.current = config;
   const vwNow = () => (typeof window !== "undefined" && window.innerWidth) || 1280;
   useEffect(() => { if(!title && box.current) setAutoTitle(chartTitleOf(box.current)); }, [title]);
-  const getPlot = () => { const el = box.current; return drawChartLight(cfgRef.current, el ? el.clientWidth : 0, el ? el.clientHeight : 0).then(canvas => ({ canvas, w: el.clientWidth, h: el.clientHeight })); };
+  const getPlot = () => { const el = box.current, kh = keyRef.current ? keyRef.current.offsetHeight + 4 : 0, h = el ? el.clientHeight + kh : 0; return drawChartLight(cfgRef.current, el ? el.clientWidth : 0, h).then(canvas => ({ canvas, w: el.clientWidth, h })); };
   useEffect(() => {
     const el = box.current;
     if(!el) return;
@@ -2419,11 +2457,12 @@ function ChartCanvas({ config, height, size, title, scope, notools, head }){
     window.Chart.defaults.color = tok("--muted", "#62656B");
     if(window.Chart.defaults.font) window.Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
-    inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
+    inst.current = new window.Chart(ref.current, fitChartConfig(drawn, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
   }, [JSON.stringify(config), theme, sized]);
   const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;
-  const chart = <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>;
+  const box0 = <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : size === "key" ? " is-key" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>;
+  const chart = keyItems.length ? <>{box0}<div ref={keyRef}><ChartKey items={keyItems} /></div></> : box0;
   return head ? <><div className="gw-head" data-chart-head="1"><div className="min-w-0">{head}</div>{tools}</div>{chart}</> : chart;
 }
 
@@ -3631,16 +3670,16 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {!D.empty && <div className="dash-charts-box"><div className="dash-charts" data-dash-charts="1">
             <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} size="lg" title={`Material demand (${unitLabel})`} scope={dashScope} />
+          <ChartCanvas config={demandCfg} size="key" htmlKey title={`Material demand (${unitLabel})`} scope={dashScope} />
           {otherNames && <p className="text-[12px] text-slate-500 mt-1" data-other-mats="1">{otherNames}</p>}
         </div>
             <div className="card p-4 chart-card c-progress">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(tonnes)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} size="lg" title={"Delivered against plan (tonnes)"} scope={dashScope} />
+          <ChartCanvas config={progressCfg} size="key" htmlKey title={"Delivered against plan (tonnes)"} scope={dashScope} />
         </div>
             <div className="card p-4 chart-card c-fleet">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} size="lg" title={"Vehicles needed"} scope={dashScope} />
+          <ChartCanvas config={fleetCfg} size="key" htmlKey title={"Vehicles needed"} scope={dashScope} />
         </div>
           </div></div>}
           <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />
