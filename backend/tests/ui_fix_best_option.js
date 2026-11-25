@@ -62,10 +62,12 @@ ok("⭐ SRC: the options table folds under 'All figures', closed each time a row
 ok("⭐ SRC: the busy-hours offer and its 'in use' lines stay outside the fold (Q5)",
    (() => { const a = html.indexOf("{(showAll || (best && best.route"); const z = html.indexOf("</>}", a); const b = html.indexOf("data-busy-hours={o.alt}", a); return a > 0 && z > a && b > z; })());
 ok("⭐ SRC: the 'i' box: at most 30 words and a user-guide link (R1)",
-   TRY(() => { const m = html.match(/"routes\.best": \{ title: "Best option", text: "([^"]+)", guide: "ug-best-option" \}/); return m && m[1].split(/\s+/).length <= 30; }));
+   // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the title reads "Route options" (it read "Best option")
+   TRY(() => { const m = html.match(/"routes\.best": \{ title: "Route options", text: "([^"]+)", guide: "ug-best-option" \}/); return m && m[1].split(/\s+/).length <= 30; }));
 {
   // every fixed sentence the card writes itself, 25 words or fewer (R1)
-  const own = ["Working out the best option…", "Not suggested yet: the collision history is out of date.", "Every other option is ruled out.",
+  // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Working out the route options…" (it read "Working out the best option…")
+  const own = ["Working out the route options…", "Not suggested yet: the collision history is out of date.", "Every other option is ruled out.",
                "Collision history out of date. Fetch it again on Config → Map and bulletin.",
                "Collisions are not compared: the collision history has not been fetched.",
                "Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.",
@@ -86,8 +88,41 @@ ok("⭐ SRC: the 'i' box: at most 30 words and a user-guide link (R1)",
 }
 ok("⭐ GUIDE: the user guide's Routes section has the Best option entry, names the three answers, no supplier and no endpoint",
    TRY(() => { const a = guide.indexOf('<li id="ug-best-option">'); const li = guide.slice(a, guide.indexOf("</li>", a));
-               return a > 0 && li.includes("<strong>Suggested</strong>") && li.includes("<strong>A trade-off</strong>")
+               // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the second answer is "Planner to decide" (it read "A trade-off")
+               return a > 0 && li.includes("<strong>Suggested</strong>") && li.includes("<strong>Planner to decide</strong>")
+                 && !li.includes("A trade-off") && !/\b(ahead|behind)\b/.test(li)
                  && li.includes("<strong>Keep the route in use</strong>") && !/HERE|\/api\/|safer|Better/.test(li); }));
+
+// ---- 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the old words are GONE from what the
+// page shows on Data -> Routes and from the guide's entry. The script is read with its comments taken out (comments
+// may quote the old words); the Dashboard's record of route choices is another page and keeps its words for now.
+{
+  const live = ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020,
+                                                            module: ts.ModuleKind.None, removeComments: true } }).outputText;
+  const card = (() => { const a = live.indexOf("function BestOption("); return a < 0 ? "" : live.slice(a, live.indexOf("\nfunction ", a + 10)); })();
+  const GONE = ["Best option", "A trade-off", "Your call", "trades too", "trade too", "Make primary", "Goods vehicle",
+                "Way round", "Primary route"];   // "People" and "goods vehicle" are other pages' words: the card is checked below
+  ok("⭐ GONE: the app's script (comments out) shows none of 'Best option', 'A trade-off', 'Your call', 'trades too', "
+     + "'Make primary', 'Goods vehicle', 'Way round' or 'Primary route'",
+     live.length > 100000 && GONE.every(g => !live.includes(g)), GONE.filter(g => live.includes(g)).join(", "));
+  ok("⭐ GONE: the card says no 'ahead', 'behind', 'Left turns', 'People' or 'goods vehicle'; it names 'Route options', 'Mixed', 'Community', "
+     + "'Involving an HGV', 'Left-hand turns' and 'as the main route'",
+     card.length > 1000 && !/\b(ahead|behind)\b|Left turns|"Places"|"People"|goods vehicle/.test(card)
+     && ["Route options", "\"Community\"", "\"Involving an HGV\"", "Left-hand turns", "as the main route"].every(k => card.includes(k))
+     && html.includes('const BO_MARK = { "Suggested": ["Suggested", "ok"], [BO_PLANNER]: ["Mixed", "warn"] };')
+     && html.includes('const BO_PLANNER = "Planner to decide";'),
+     card.length);
+  ok("GONE: the 'All figures' table names the main route 'Main' and its button the option it moves",
+     html.includes('style={{ color: "var(--navy)" }}>Main</span>') && html.includes("`Use Alt ${r.alt_index} as the main route`")
+     && html.includes("<option value={0}>Main route</option>"));
+  const ug = (() => { const a = guide.indexOf('<li id="ug-best-option">'); return a < 0 ? "" : guide.slice(a, guide.indexOf("</li>", a)); })();
+  ok("⭐ GONE: the user guide's entry is 'Route options' with 'Planner to decide' and 'Mixed', and says no 'trade', "
+     + "'ahead', 'behind', 'People' or 'Make … primary'",
+     ug.includes("<strong>Route options</strong>") && ug.includes("<strong>Planner to decide</strong>") && ug.includes("<em>Mixed</em>")
+     && ug.includes("<strong>Use Alt 1 as the main route</strong>") && !/trade|\bahead\b|\bbehind\b|People|primary/i.test(ug), ug.slice(0, 300));
+  ok("GONE: the user guide says 'Make primary' nowhere and the glossary row is 'Main route / alternative'",
+     !guide.includes("Make primary") && guide.includes('<td class="k">Main route / alternative</td>'));
+}
 
 // ---------------- the card in a DOM ----------------
 const dom = new JSDOM(`<!doctype html><html><head></head><body><div id="root"></div></body></html>`,
@@ -134,7 +169,8 @@ function opt(alt, o){
     head_words: { people: "fewer", time: "quicker", busy: "not counted", carbon: "same" },
     part_words: { collisions: "same", goods: "same", cycle: "fewer", community: "fewer" },
     sentences: ["Alt " + alt + " had 39 collisions on it against 39 on the route in use, 2021–2025.",
-                "Alt " + alt + " had 1 collision involving a goods vehicle over 3.5 t on it against 4 on the route in use, 2021–2025.",
+                // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the rule's words "involving an HGV" (it read "a goods vehicle over 3.5 t")
+                "Alt " + alt + " had 1 collision involving an HGV on it against 4 on the route in use, 2021–2025.",
                 "A round trip makes 9 left turns against 10 (10 % fewer), meets a cycle route 4 times against 6 (33 % fewer) and runs 0.17 km beside one against 0.24 km.",
                 "Carbon is 56 kg CO2e a trip against 57.7 kg."] }, o || {});
 }
@@ -157,21 +193,28 @@ if (hasCard) {
     ok("⭐ SUGGESTED: the answer, its chip and the rule's why as returned", m.host.querySelector('[data-best-option="Suggested"]')
        && /Alt 1.?Suggested/.test(t) && t.includes(r.why), t);
     ok("⭐ SUGGESTED: the lorry at the top and at the foot, in the app's short names; the others named (no 'Truck')",
-       t.includes("Best option · Tipper (44t)") && t.includes("For the Tipper (44t), the lorry most approved loads use.")
+       // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Route options" (it read "Best option")
+       t.includes("Route options · Tipper (44t)") && !t.includes("Best option") && t.includes("For the Tipper (44t), the lorry most approved loads use.")
        && t.includes("Not for: Flatbed (44t), Concrete mixer 6 m³ (26t), Concrete mixer 8 m³ (32t).") && !/Truck/.test(t), t);
     ok("⭐ PEOPLE (Q1 A): a row for each part; the collision rows are the rule's sentences with a dash and no tint",
        row(m.host, "collisions").textContent.includes("Alt 1 had 39 collisions on it against 39 on the route in use, 2021–2025.")
-       && row(m.host, "goods").textContent.includes("Alt 1 had 1 collision involving a goods vehicle over 3.5 t on it against 4")
+       // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the row reads "Involving an HGV" (it read "Goods vehicle"), no "People" heading
+       && row(m.host, "goods").textContent.includes("Alt 1 had 1 collision involving an HGV on it against 4")
+       && row(m.host, "goods").textContent.startsWith("Involving an HGV") && ![...m.host.querySelectorAll(".bo-grp")].some(g => g.textContent === "People")
+       && !/Goods vehicle|goods vehicle/.test(t)
        && row(m.host, "collisions").querySelector(".bo-dash") && noTint(m.host));
     ok("⭐ PEOPLE: cycle routes and places each a chip with their counts and percentages; no blended figure",
-       row(m.host, "cycle").textContent.includes("Left turns 9 against 10 (10 % fewer) · met 4 against 6 (33 % fewer) · beside 0.17 km against 0.24")
+       // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Left-hand turns" (it read "Left turns"); the places row reads "Community" (it read "Places")
+       row(m.host, "cycle").textContent.includes("Left-hand turns 9 against 10 (10 % fewer) · met 4 against 6 (33 % fewer) · beside 0.17 km against 0.24")
        && row(m.host, "cycle").querySelector(".rs-ok") && row(m.host, "places").textContent.includes("2 against 7 (71 % fewer)")
+       && row(m.host, "places").textContent.startsWith("Community")
        && !/exposure/i.test(t), row(m.host, "cycle").textContent);
     ok("HEADS: Time quicker with trips; Busy hours not counted said plainly; Carbon same; Limits none added",
        row(m.host, "Time").textContent.includes("100.5 min a round trip · 104 now · 5 trips a day either way")
        && row(m.host, "Busy hours").textContent.includes("No busy-hour times held for Alt 1.")
        && row(m.host, "Carbon").textContent.includes("56 kg CO₂e a trip · 57.7 now") && row(m.host, "Limits").textContent.includes("None added"));
-    const mp = btnText(m.host, "Make Alt 1 primary");
+    // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the button reads "Use Alt 1 as the main route" (it read "Make Alt 1 primary")
+    const mp = btnText(m.host, "Use Alt 1 as the main route");
     ok("⭐ MAKE PRIMARY: an outline button on a Suggested card (btn-sec, never a filled action)", mp && mp.className === "btn-sec" && !mp.getAttribute("style"));
     click(mp);
     const call = m.calls.find(c => c[0] === "promote");
@@ -185,12 +228,12 @@ if (hasCard) {
        && m.host.querySelector("button[data-bo-all]").getAttribute("aria-expanded") === "false");
     m.done();
     const r2 = route(); r2.options = [opt(1, { chosen: true, return_alt: 1 })];
-    const m2 = mount(B(r2)); click(btnText(m2.host, "Make Alt 1 primary"));
+    const m2 = mount(B(r2)); click(btnText(m2.host, "Use Alt 1 as the main route"));
     const c2 = m2.calls.find(c => c[0] === "promote");
     ok("⭐ MAKE PRIMARY: both legs where the option has its own way back (Q3)", c2 && JSON.stringify(c2[4].legs) === '["loaded","return"]');
     m2.done();
     const m3 = mount(B(route({ options: [opt(1, { chosen: true })] })), { onPromote: null });
-    ok("MAKE PRIMARY: none when the caller may not change routes (not an admin login, or the route not picked)", !btnText(m3.host, "Make Alt 1 primary"));
+    ok("MAKE PRIMARY: none when the caller may not change routes (not an admin login, or the route not picked)", !btnText(m3.host, "Use Alt 1 as the main route") && !btnText(m3.host, "Make Alt 1 primary"));
     m3.done();
   }
   // 2. A trade-off (R003): no pick, no Make primary; the long trade line is never shown (Q7), the short one when the rule gives it
@@ -202,19 +245,23 @@ if (hasCard) {
                         head_words: { people: "mixed", time: "same", busy: "not counted", carbon: "less" },
                         part_words: { collisions: "same", goods: "same", cycle: "fewer", community: "more" },
                         sentences: ["Alt 2 had 26 collisions on it against 23 on the route in use, 2021–2025.", "Alt 2 had 0 collisions involving a goods vehicle over 3.5 t on it against 0 on the route in use, 2021–2025."] });
-    const r = route({ route: "R003", answer: "A trade-off", option: null, alt: null, why: LONG, trade: LONG, lorry: "Artic Flatbed (44t)",
+    // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the rule's answer is "Planner to decide" (it read "A trade-off")
+    const r = route({ route: "R003", answer: "Planner to decide", option: null, alt: null, why: LONG, trade: LONG, lorry: "Artic Flatbed (44t)",
                       other_lorries: ["Artic Tipper (44t)"], counts_in_use: CU({ cycle_min: 81.4, trips: 6, co2_kg: 9.6, collisions: 23, goods: 0, left_turns: 9, cycle_meets: 7, cycle_beside_km: 4.7, places: 6 }),
                       options: [opt(1), t2] });
     const m = mount(B(r)); const t = m.text();
-    ok("⭐ TRADE-OFF: 'A trade-off · Your call', the traded option's heads, and NO Make primary (Q2)",
-       /A trade-off.?Your call/.test(t) && m.host.querySelector('[data-bo-option="Alt 2"]') && ![...m.host.querySelectorAll("button")].some(b => /primary/.test(b.textContent)), t);
+    // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): 'Planner to decide · Mixed' (it read 'A trade-off · Your call'); NARROWED: no button
+    // names a main route either (the button's new words)
+    ok("⭐ TRADE-OFF: 'Planner to decide · Mixed', the traded option's heads, and NO Make primary (Q2)",
+       /Planner to decide.?Mixed/.test(t) && !/A trade-off|Your call/.test(t) && m.host.querySelector('[data-bo-option="Alt 2"]') && ![...m.host.querySelectorAll("button")].some(b => /primary|main route/.test(b.textContent)), t);
     ok("⭐ TRADE-OFF: the rule's long trade line (over 25 words) is not on the card (Q7)", !t.includes(LONG) && !m.host.querySelector("[data-bo-why]"));
     ok("TRADE-OFF: places more is a warn chip with its percentage; Time says 'a shorter road that takes longer'; collisions still untinted",
        row(m.host, "places").querySelector(".rs-warn") && row(m.host, "places").textContent.includes("9 against 6 (50 % more)")
        && row(m.host, "Time").textContent.includes("a shorter road that takes longer") && noTint(m.host)
        && row(m.host, "cycle").textContent.includes("met 7 against 7 ·"), row(m.host, "cycle").textContent);
     m.done();
-    const SHORT = "Alt 2 is ahead on cycle routes and carbon, behind on places and time.";
+    // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the short line is said as facts (it read "Alt 2 is ahead on cycle routes and carbon, behind on places and time.")
+    const SHORT = "Alt 2: fewer cycle routes, less carbon; more places; a shorter road that takes longer.";
     const m2 = mount(B(Object.assign({}, r, { trade_short: SHORT })));
     const m0 = mount(B(Object.assign({}, r, { trade_short: null })));
     ok("TRADE-OFF: trade_short null (the field's agreed shape) gives no why line, never the long trade", !m0.host.querySelector("[data-bo-why]") && !m0.text().includes(LONG));
@@ -237,7 +284,7 @@ if (hasCard) {
        /Keep the route in use.?No change/.test(t) && m.host.querySelector("[data-bo-why]").textContent === "Every other option is ruled out."
        && /^Alt 1.?Ruled out/.test(row(m.host, "out-1").textContent) && row(m.host, "out-1").textContent.endsWith(SAID) && row(m.host, "out-2").textContent.includes(SAID)
        && !t.includes("road limit below this lorry that the route in use does not")
-       && !m.host.querySelector("[data-bo-option]") && ![...m.host.querySelectorAll("button")].some(b => /primary/.test(b.textContent)), t);
+       && !m.host.querySelector("[data-bo-option]") && ![...m.host.querySelectorAll("button")].some(b => /primary|main route/.test(b.textContent)), t);
     m.done();
     const z = "it crosses A47 at the new Tilton junction: HGV diversion while the junction is built, closed until 17 Dec 2027 (loaded leg)";
     const m1 = mount(B(route({ answer: "Keep the route in use", options: [opt(1, { ruled_out: [z, z] })] })));
@@ -292,7 +339,7 @@ if (hasCard) {
     const m = mount(B(r));
     ok("⭐ DIVERSION: 'In use: Alt 2, the diversion, until 17 Dec 2027. Compared with it.' and no Make primary even on a suggestion (Q4)",
        m.host.querySelector('[data-bo-in-use="diversion"]').textContent === "In use: Alt 2, the diversion, until 17 Dec 2027. Compared with it."
-       && !btnText(m.host, "Make Alt 1 primary"));
+       && !btnText(m.host, "Use Alt 1 as the main route") && !btnText(m.host, "Make Alt 1 primary"));
     m.done();
     const m2 = mount(B(route({ options: [Object.assign(opt(1), { chosen: true })] })), { busyUses: [{ alt: 2, from: "16:00", to: "19:00", status: "in_use" }, { alt: 1, from: "07:00", to: "09:00", status: "stopped" }] });
     ok("⭐ BUSY HOURS: 'Busy hours: Alt 2 is in use on weekdays 16:00–19:00.' (a stopped use is not said)",
@@ -331,7 +378,8 @@ if (hasCard) {
   // 6. Loading, and a failed read
   {
     const m = mount(null);
-    ok("⭐ LOADING: 'Working out the best option…' with the fold's button usable (Q8)", m.text().includes("Working out the best option…") && m.host.querySelector("button[data-bo-all]"));
+    // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Working out the route options…" (it read "Working out the best option…")
+    ok("⭐ LOADING: 'Working out the route options…' with the fold's button usable (Q8)", m.text().includes("Working out the route options…") && !m.text().includes("best option") && m.host.querySelector("button[data-bo-all]"));
     m.done();
     const m2 = mount(false);
     ok("FAILED READ: no card, only the fold's button (the table stays reachable)", !m2.host.querySelector(".bo-card") && m2.host.querySelector("button[data-bo-all]"));
