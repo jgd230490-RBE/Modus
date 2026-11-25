@@ -538,7 +538,9 @@ ok("🔴 the Pours page names no standard, no supplier and no back end (sources 
    not re.search(r"BS 8500|EN 206|Concrete Society|Holcim|Series 1700|\bAPI\b|endpoint|server|\bHERE\b", pp_words),
    str(re.findall(r"BS 8500|EN 206|Concrete Society|Holcim|Series 1700|\bAPI\b|endpoint|server|\bHERE\b", pp_words)))
 ok("⭐ the Look-ahead grid's POUR mark on the pour's day; the phone card's on the day shown",
-   "const poursAt = useMemo(" in fe and 'className="pour-mark" data-pour-mark={d.day_date}' in fe
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A; card 1): the mark reads "pour" in plain amber words, on the grid and the phone
+   "const poursAt = useMemo(" in fe and 'className="pour-mark la-pour" data-pour-mark={d.day_date}' in fe
+   and '<span className="pour-mark la-pour">pour</span>' in fe and ">POUR</span>" not in fe
    and "const pourLines = new Set(((page && page.pours) || []).filter(p => p.pour_date === shown)" in fe)
 ok("Config → Planning: the two limits, blank = 120 and 30, the hint says the specification wins",
    'data-cfg={"pours-" + k}' in fe and '"transit_limit_min", "Concrete: loading to the end of discharge, at most (minutes)", "120"' in fe

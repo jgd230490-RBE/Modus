@@ -28,7 +28,10 @@ const code = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[
 const css = html.slice(0, html.indexOf("</style>"));
 const between = (a, b) => { const i = code.indexOf(a), j = code.indexOf(b, i + 1); return i >= 0 && j > i ? code.slice(i, j) : ""; };
 const la = between("function LookAhead({ meta, who, access, initialPage, initialView", "\nfunction CommitMap(");   // NARROWED 11 Nov 2026 (CLOCS C-F10 added a prop)
-const laGrid = la.slice(la.indexOf('data-rd-table="lookahead"'), la.indexOf("{/* 14 Oct 2026 (bundle G, W17): the committed week at each gate"));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): a forecast line's row is laLineRow, a function before the page's
+// return (one row under its site), so the grid read here is that function plus the table
+const laGrid = la.slice(la.indexOf("const laLineRow = "), la.indexOf("\n  };\n", la.indexOf("const laLineRow = ")))
+  + la.slice(la.indexOf('data-rd-table="lookahead"'), la.indexOf("{/* 14 Oct 2026 (bundle G, W17): the committed week at each gate"));
 const acct = la.slice(la.indexOf('view === "account" ?'), la.indexOf("{/* 10 Sep: what came OUT of each stockpile"));
 const gw = between("function GatesWeek({ gw, initialOpen }){", "\n// the status pill column");
 
@@ -115,7 +118,8 @@ ok("⭐ 6: under Tonnes a non-tonne row reads tonnes (the server's derived.tonne
 ok("...an editable cell shows the same, and while typing the box is in the line's own unit (its label says m³)",
    laGrid.includes("? <>{grp(f.tonnes, 1)} t<span className=\"la-sub\">{grp(d.planned_qty, 1)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty, 1)}{own}</>}")
    && laGrid.includes("aria-label={`${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}"));
-ok("...the total row says what the tonnes include (Tonnes only)", laGrid.includes('{unitSel === "tonnes" && laMixNote(lines) && <span className="la-sub" data-la-mix="1">{laMixNote(lines)}</span>}'));
+// NARROWED 25 Nov 2026 (task A): the same note joined with what of the week goes out ("400 t of the week goes out")
+ok("...the total row says what the tonnes include (Tonnes only)", laGrid.includes('<span className="la-sub" data-la-mix="1">{[unitSel === "tonnes" ? laMixNote(lines) : "", outWeekT > 0 ? `${grp(outWeekT)} t of the week goes out` : ""].filter(Boolean).join(" · ")}</span>}'));
 if (F.laMixNote) {
   const day = (q, t) => ({ planned_qty: q, derived: { tonnes: t } });
   const conc = { unit: "m3", material_type: "Ready-mixed concrete", days: [day(17, 40.8), day(0, 0)] };

@@ -564,8 +564,12 @@ ok("H1 (HU5): a per-distance RATE is typed and shown in the tenant's unit and st
   && code.includes('else body[k] = (k === "rate_eur_per_km" ? +(+distInRate(n)).toFixed(6) : n);')
   && code.includes('rate_eur_per_km: route.rate_eur_per_km == null ? "" : +(+distRate(route.rate_eur_per_km)).toFixed(4),'));
 ok("🔴 the word PPC is printed nowhere (L5)", !/\bPPC\b/.test(code));
-ok("⭐ the clash rail is ONE row with '+N more', not a stack",
-  _laBody.includes("rail.flags.slice(0, 3)") && _laBody.includes("more`") && !_laBody.includes("dismiss"));
+// REVERSED 25 Nov 2026 (the Look-ahead rethink, task A; card 1): the rail's row of three flags with "+N more" / "show fewer"
+// is gone; the flags line (LaFlagLine) names every kind of flag once, with its site(s), still one line and no dismiss
+ok("⭐ the clash rail is ONE line (the flags line), with no '+N more' or 'show fewer' and no dismiss",
+  !_laBody.includes("rail.flags.slice(0, 3)") && !_laBody.includes("more`") && !_laBody.includes("show fewer")
+  && !_laBody.includes("railOpen") && !_laBody.includes("dismiss")
+  && _laBody.includes("<LaFlagLine rail={rail} siteOfLine={siteOfLine} onSite={showSite} />"));
 // 🔴 09 Sep night: the LIVE Tark Tee check froze the page on the critical path, and off
 // it still took 30 s+. 10 Sep: the page reads the STORED per-route check (the rail carries
 // it), and the live check runs on demand in the background — a "check now / re-check"
@@ -622,7 +626,8 @@ ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ah
   !/#eff6ff|#64748b|#B45309/i.test(_laBody)
   // NARROWED 24 Nov 2026 (own look, stage 3): of the eight, the seven column washes are the 6 % column tint, --navy-soft-col
   // (and the Horizon's stockpile cell's `bg` the same), and the eighth, the chosen week pill, keeps the 10 % --navy-soft
-  && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 7 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
+  // NARROWED 25 Nov 2026 (task A): + the site heading's today cell (eight column washes)
+  && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 8 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
   && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
@@ -2035,7 +2040,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const _dbWall = _dbBody.slice(_dbBody.indexOf("      ) : (\n        <>\n"));
   // 13 Oct 2026 (W6, narrowed): the grid now holds a small by-day table in each details row, so the slice ends at the
   // </table> after the totals row, not the first one
-  const _laGrid = _laBody.slice(_laBody.indexOf('<table className="tbl compact'), _laBody.indexOf("</table>", _laBody.indexOf('<tr className="la-total')));
+  // NARROWED 25 Nov 2026 (task A): the table's class is an expression (cards on a tablet), and a forecast line's row is
+  // laLineRow, a function before the page's return, so the slice is that function plus the table up to its totals row
+  const _laGrid = _laBody.slice(_laBody.indexOf("const laLineRow = "), _laBody.indexOf("\n  };\n", _laBody.indexOf("const laLineRow = ")))
+    + _laBody.slice(_laBody.indexOf('<table className={"tbl compact rd-table"'), _laBody.indexOf("</table>", _laBody.indexOf('<tr className="la-total')));
   // 8b. the data palette: six tokens, light and dark, read in fixed order, never a raw hex on a dataset
   // 11 Oct 2026 NARROWED: the user chose the orange-led palette (plan = brand orange, delivered = blue, model = violet)
   ok("the data palette is six tokens in the light look (plan orange, delivered blue, teal, model violet, gold, not-yet grey)",
@@ -2390,7 +2398,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("Look-ahead: the commit grid is a compact .tbl with a caption, the row named in words, a Week column, a Status column and a totals row",
     // 13 Oct 2026 (W6, narrowed): the caption follows the unit switch; the row is named by its two ends (team, section
     // and the rest in the details); ONE status column, after the route (the flags win over the week's state: decision 1)
-    _laGrid.includes('"Planned quantity by day"}</b>') && _laGrid.includes('<th className="la-stick" style={{ minWidth: 280 }}>Route</th>')
+    // NARROWED 25 Nov 2026 (task A): the first column is the Site (a line is named under its site)
+    _laGrid.includes('"Planned quantity by day"}</b>') && _laGrid.includes('<th className="la-stick" style={{ minWidth: 280 }}>Site</th>')
     && _laGrid.includes('<th className="num">Week</th>') && _laGrid.includes("<th>Status</th>") && _laGrid.includes('<tr className="la-total rd-card">')
     // NARROWED 10 Nov 2026 (wave 3, finding 5): the status cell goes on with last week's shortfall as a second line
     && _laGrid.includes('<td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />')
@@ -2405,9 +2414,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     !/text-\[(9|10|11)px\]/.test(_laGrid) && /function laStatus\(flags, w\)\{[\s\S]*?word: flagWord\(f, LINE_FLAG_LABEL\)/.test(code)
     && _laGrid.includes("{laFlagGroups(lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === \"bad\"}>")
     && /function laFlagGroups\(flags\)\{[\s\S]*?word: flagWord\(f, LINE_FLAG_LABEL\)[\s\S]*?const t = teamText\(f\.text \|\| ""\)/.test(code));
-  ok("...the clash rail is a card that says how many flags, each a word with a dot; +N more kept",
-    _laBody.includes('<span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>')
-    && _laBody.includes("rail.flags.slice(0, 3)") && _laBody.includes("more`"));
+  // NARROWED 25 Nov 2026 (task A): the rail card became the flags line: how many flags, then each kind as a shape and its
+  // word; "+N more" is gone (REVERSED, see the rail's ONE-line check)
+  ok("...the flags line says how many flags, each kind a word with its shape; no '+N more'",
+    /function LaFlagLine\(\{ rail, siteOfLine, onSite \}\)\{[\s\S]*?<b>\{rail\.count\} flag\{rail\.count === 1 \? "" : "s"\}<\/b>/.test(code)
+    && !_laBody.includes("flags this week</span>") && !_laBody.includes("rail.flags.slice(0, 3)") && !_laBody.includes("more`"));
 }
 
 // ---- 11 Oct 2026: the carbon target on the Dashboard, Forecasts and Submit forecast -------------
@@ -3127,7 +3138,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // scrolls sideways half of it sat off screen; the gate table had no scroll box and spilled out of its card; at 360 px
   // the Look-ahead's first cell kept its inline 280 px and a long status word did not wrap
   ok("W6: every row-details table sits in a scroll box that is a size container, and a details grid is never wider than that box",
-     (src.match(/className="[^"]*overflow-auto[^"]*rd-scroll[^"]*"/g) || []).length === 5 && /\.rd-scroll\{container-type:inline-size;\}/.test(html)
+     // NARROWED 25 Nov 2026 (task A): four plain boxes and the Look-ahead's, which scrolls sideways at a desk only (cards on a tablet)
+     (src.match(/className="[^"]*overflow-auto[^"]*rd-scroll[^"]*"/g) || []).length === 4
+     && src.includes('<div className={laTab ? "rd-scroll" : "overflow-auto rd-scroll"} data-la-cards={laTab ? "1" : undefined}>')
+     && /\.rd-scroll\{container-type:inline-size;\}/.test(html)
      && /\.rd-dl\{position:sticky;left:0;max-width:min\(100cqw, 1100px\);/.test(html)
      && src.includes('<div className="overflow-auto rd-scroll"><table className="ga-table rd-table" data-rd-table="gates">'));
   ok("W6: the big screen hides the row chevrons as it hides the info boxes (a wall display is not clicked)",
@@ -3682,7 +3696,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
      && src.includes('GATE_OVER: "Gate over", GATE_NEAR: "Gate near", STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",')
      && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR"\n                          // 10 Nov 2026 (UI critique finding 5): a line short last week is a warning, not an alarm\n                          || code === "SHORTAGE") ? "warn" : "bad";')
-     && src.includes('<RowStatus word={flagWord(f)} tone={laTone(f.code)} />')
+     // NARROWED 25 Nov 2026 (task A): the flags line takes the rail's word and tone a KIND of flag at a time
+     && src.includes("k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] };")
+     && src.includes("<RowStatus word={k.word + ")
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
   ok("⭐ W8: the location form carries the CLP cap (lorry visits a day), sends null for blank, never 0",
@@ -3843,7 +3859,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
        && !/lineKeyOf\(f\)/.test(_pl));
     ok("PHONE LOOK-AHEAD (17 Oct): the status, the details and the 'N lines flagged' count all read that day's flags",
        _pl.includes("const lf = flagsByLine[lk] || [];") && _pl.includes("st: laStatus(lf, line.week || {})")
-       && _pl.includes("laFlagGroups(r.lf).map(g =>") && _pl.includes("const flagged = rows.filter(r => r.lf.length).length;"));
+       // NARROWED 25 Nov 2026 (task A): "N lines flagged" became "N sites flagged · N lines short last week", from the same day's flags
+       && _pl.includes("laFlagGroups(r.lf).map(g =>") && !_pl.includes("const flagged = rows.filter(r => r.lf.length).length;")
+       && _pl.includes('const siteFlagged = daySites.filter(x => x.rows.some(r => r.lf.some(f => f.code !== "SHORTAGE"))).length;')
+       && _pl.includes('const shortLines = rows.filter(r => r.lf.some(f => f.code === "SHORTAGE")).length;'));
     ok("DESK GRID (17 Oct, unchanged): the desk Look-ahead's row is the whole week, so it keeps joining by line alone, every flag of the week",
        _la.length > 3000 && _la.includes("(rail.flags || []).forEach(f => { const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f); });")
        && !_la.includes("phFlagsByLine") && !/day_date !== day/.test(_la));

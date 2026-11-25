@@ -732,7 +732,11 @@ ok("frontend: signed-in role text shows the team's name",
 ok("frontend: the clash rail shows the code's name (the provider's for a restriction) and the teams' names",
    # NARROWED 10 Nov 2026 (wave 2, card 12): the word is the one status chip (RowStatus), in sentence case; a provider's own
    # word in capitals ("ROADWORKS") reads in sentence case through capsWord
-   "<RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}" in fe_src and 'IPT_SHARE: "Share"' in fe_src
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): the rail became the flags line, a kind of flag with its site(s);
+   # a flag's own sentence, with the teams' names (teamText), is in the line's details (laFlagGroups)
+   "k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] };" in fe_src
+   and "<RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}" not in fe_src
+   and 'const t = teamText(f.text || "")' in fe_src and 'IPT_SHARE: "Share"' in fe_src
    and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? capsWord(f.label) : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
    and "{f.code}</span> {f.text}" not in fe_src and 'TARK_TEE: "TARK TEE"' not in fe_src)
 ok("frontend: the map entry is not called public — the map is behind the gate",

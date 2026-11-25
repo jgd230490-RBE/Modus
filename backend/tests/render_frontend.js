@@ -1071,7 +1071,10 @@ if (loaded) {
     }
     ok("...with the KPI strip, the clash rail and one row per line",
       // 13 Oct 2026 (W6, narrowed): one RowDetails chevron a line, not a ▶
-      commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): the rail is the flags line with the rail's own count, no "+N more";
+      // the sites open at a desk, so every line keeps its one chevron
+      commitOut.includes("planned this week") && commitOut.includes('data-la-flagline="' + fixture.clashes.count + '"')
+      && !commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
       && (commitOut.match(/class="rd-chev"/g) || []).length === fixture.commit.lines.length);
     // 10 Oct 2026 NARROWED: the 9 px "qty · tr · veh" sub-label went with the one-off styles; the five
     // day columns are counted by their headers (a day name and number), and the caption says the rest

@@ -1280,7 +1280,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 36   # NARROWED 23 Nov 2026 (claude/working-list): +2, the Light look's Working chip; both together, merged 24 Nov: 34 + 2 = 36; NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+   _fe_wo.count("var(--warn-text)") == 37   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): 36 -> 37, the grid's "pour" in plain amber words (.pour-mark.la-pour); NARROWED 23 Nov 2026 (claude/working-list): +2, the Light look's Working chip; both together, merged 24 Nov: 34 + 2 = 36; NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
      # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe

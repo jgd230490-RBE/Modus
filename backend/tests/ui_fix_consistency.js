@@ -66,7 +66,10 @@ ok("...StatusWord (Forecasts' and Users' status, Config's changed / unsaved) dra
 ok("...an abnormal load's flags, the Abnormal loads summary and the Look-ahead's flag strip use the chip too",
    code.includes('<span className="al-flag" title={f.text}><RowStatus word={AL_FLAG_WORD[f.code] || f.code} tone={AL_FLAG_TONE[f.code] || "warn"} /></span>')
    && code.includes('<RowStatus word="Notice late" tone="bad" />') && code.includes('<RowStatus word="AIL road limit" tone="bad" />')
-   && code.includes('<span key={i} className="la-flag-line"><RowStatus word={flagWord(f)} tone={laTone(f.code)} />')
+   // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): the rail's strip became the flags line, one chip a kind of flag
+   && code.includes("k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] };")
+   && code.includes('<RowStatus word={k.word + (!k.undated && k.days.size ? ", " + Array.from(k.days).sort().map(dayName).join(", ") : "")} tone={k.tone} />')
+   && !code.includes('className="la-flag-line"')
    && !code.includes("NOTICE LATE</AlChip>"));
 const caps = [];
 for (const name of ["RAIL_LABEL", "LINE_FLAG_LABEL", "POUR_WORD", "AL_FLAG_WORD"]) {

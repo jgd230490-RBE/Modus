@@ -1013,6 +1013,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .pb-load{background:#44464B;} .pb-there{background:#2563EB;} .pb-chk{background:#62656B;} .pb-dis{background:#C2410C;}
   .pb-wash{background:#0F766E;} .pb-back{background:#1E40AF;}
   .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:0 5px;margin-left:4px;background:#34363A;color:#fff;vertical-align:1px;}
+  .pour-mark.la-pour{background:none;color:var(--warn-text);font-weight:500;letter-spacing:0;padding:0;}   /* 25 Nov 2026 (task A): "pour" in plain amber words in the week's list */
   @media (max-width:900px){.pour-form,.pour-figs{grid-template-columns:repeat(2,minmax(0,1fr));}.pour-wide{grid-column:span 2;}}
   .ed-head:focus{outline:none;}
   .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:3px;}
@@ -1061,6 +1062,39 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .la-carry{display:block;font-size:12px;line-height:1.3;margin-top:2px;color:var(--muted);white-space:nowrap;}
   .la-carry.is-short{color:var(--warn-text);font-weight:600;}
   .la-sub{display:block;font-size:12px;line-height:1.25;font-weight:400;color:var(--muted);}
+  /* 25 Nov 2026 (the Look-ahead rethink, task A, card 1): the week by SITE. A site is a heading row under a 1 px ink line
+     (its name in Sora 600 15 px, its type, lines and team under it), its lines under it named "From …", indented; one
+     arrow (the look's one, turned) folds a site; a site with one line is one row. The flags as one line. Tokens only. */
+  .tbl tr.la-site>td{border-top:1px solid var(--ink);padding-top:9px;padding-bottom:8px;vertical-align:top;}
+  .tbl tr.la-site>td.num{font-weight:600;color:var(--ink);}
+  .tbl tr.la-site.la-one>td.num .la-cell,.tbl tr.la-site.la-one>td.num>span{font-weight:600;}
+  .la-site-p{display:flex;align-items:flex-start;gap:4px;}
+  .la-site-h{display:block;min-width:0;}
+  .la-sn{display:block;font:600 15px/1.25 var(--f-head);color:var(--ink);}
+  .la-sm{display:block;font-size:12px;font-weight:400;line-height:1.35;color:var(--muted);margin-top:1px;}
+  .la-fold{position:relative;flex:none;width:24px;height:24px;margin:-2px 0 0 -4px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;cursor:pointer;color:var(--ink-2,var(--ink));}
+  .la-fold i{display:block;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;}
+  .la-fold[aria-expanded="true"] i{transform:rotate(45deg);margin-top:-3px;}
+  .la-fold:hover{background:var(--surface-2);}
+  .la-fold:focus-visible{outline:2px solid var(--navy);outline-offset:1px;}
+  @media (pointer:coarse){.la-fold::after{content:"";position:absolute;inset:-10px;}}
+  .tbl tr.la-ln>td.rd-primary{padding-left:26px;}
+  .la-lf{display:block;font-weight:500;color:var(--ink);}
+  .la-dir{font-weight:400;color:var(--muted);}
+  .la-lm{display:block;font-size:12px;font-weight:400;color:var(--muted);line-height:1.35;}
+  .la-site.la-one .la-site-h{padding-left:0;}
+  .la-folds{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:13px;color:var(--muted);}
+  .la-flagline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;border-top:1px solid var(--ink);border-bottom:1px solid var(--line);padding:9px 0;margin:4px 0 12px;font-size:13px;}
+  .la-flagline>b{font-weight:600;color:var(--ink);}
+  .la-fl{display:inline-flex;align-items:center;flex-wrap:wrap;gap:0 5px;min-width:0;}
+  .la-fl .row-st.row-st{color:var(--ink);font-weight:500;white-space:nowrap;}
+  .la-fl-sep{color:var(--muted);}
+  .la-fl-comma{margin-left:-5px;}   /* a comma between two sites sits against the name before it */
+  .la-fl-site{font:inherit;font-size:13px;color:var(--navy);text-decoration:underline;text-underline-offset:2px;background:none;border:0;padding:0;cursor:pointer;}
+  .la-fl-site:hover{text-decoration-thickness:2px;}
+  .la-fl-site:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:3px;}
+  .la-fl-n{font-style:normal;color:var(--muted);}
+  .la-fl-none{color:var(--muted);}
   .gw-days{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;}
   .ga-key-none{width:16px;height:10px;border-radius:3px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
@@ -1258,16 +1292,33 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .tab-cards>tbody>tr>td>span:not(.block){display:inline-block;max-width:100%;white-space:normal;}   /* a chip in a card cell wraps inside its column (Zones' "Routed through @ 12 mph" ran into From) */
     .tab-cards>tbody>tr>td>span.block{display:block;max-width:100%;white-space:normal;}   /* 12 Nov 2026 (batch 5): a second line keeps its own line in a card, as at a desk ("2 Nov 2026Approver Name" ran together under Last issue) */
     .tab-cards .tc-only{display:inline-block !important;margin-left:10px;}
+    /* 25 Nov 2026 (found by task A): the rule above made a status chip (td>span.row-st) inline-block, so its shape's <i>
+       lost its size and a grey ring drew as a thin bar on every tablet card with a "none" status: the chip keeps its flex */
+    .tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}
   }
   .tc-only{display:none !important;}
   .al-det-btn{background:none;border:0;padding:0 2px;min-height:24px;font:inherit;font-size:14px;color:var(--ink);text-decoration:underline;cursor:pointer;}
   /* the Data page's map | panel: side by side above 1024 px, no gap at a zoomed width such as 1024.2 (was Tailwind's lg, 1024); at 768–1024 the panel sits under the map */
   @media not all and (max-width:1024px){ .dm-grid{grid-template-columns:repeat(3,minmax(0,1fr));} .dm-grid>.dm-map{grid-column:span 2 / span 2;} }
-  /* the Look-ahead day table at 768–1024 (wave 4, card 6): the status under the route's name, the day columns narrower */
-  .la-st-under{display:block;margin-top:4px;font-weight:400;}
-  .la-st-under .la-carry{display:block;margin-top:2px;}
-  [data-la-tab="1"] .tbl th.num,[data-la-tab="1"] .tbl td.num{padding-left:6px;padding-right:6px;}
-  [data-la-tab="1"] .tbl .la-stick{min-width:200px !important;}
+  /* 25 Nov 2026 (the Look-ahead rethink, task A; John: "Cards as drawn"): at 768–1024 the Look-ahead is CARDS (.tab-cards),
+     which reverses 10 Nov's wave 4 card 6 here (a table with the status under the route's name; .la-st-under is gone). A site
+     is a ruled heading with its days, not a box; each line under it a card with its days in a row and its details under it.
+     !important: the card row rule's :not() chain outweighs a class (rule learnt, PR #258). */
+  .la-cards>tbody>tr.la-site{border:0 !important;border-top:1px solid var(--ink) !important;border-radius:0 !important;background:transparent !important;margin:16px 12px 0 !important;padding:10px 2px 4px !important;}
+  .la-cards>tbody>tr.la-site>td,.la-cards>tbody>tr.la-total>td{border:0 !important;}
+  .la-cards>tbody>tr>td.la-site-c,.la-cards>tbody>tr>td.rd-primary{order:0;grid-column:1 / -3;}
+  .la-cards>tbody>tr>td.rd-status{grid-column:-3 / -1;}
+  .la-cards>tbody>tr>td .la-sub{display:block !important;}
+  .la-cards>tbody>tr>td.rd-status .la-carry{display:block !important;margin-top:2px;}
+  .la-cards>tbody>tr>td.la-stick{border-right:0 !important;box-shadow:none !important;}
+  .la-cards>tbody>tr>td.la-today,.la-cards>tbody>tr>td.la-today::before,.la-cards>tbody>tr>td.la-today .la-cell{color:var(--navy) !important;}
+  .la-cards>tbody>tr.la-ln>td.rd-primary{padding-left:0;}
+  .la-cards>tbody>tr.la-ln{margin-left:24px !important;}
+  .la-cards>tbody>tr.la-ln+tr.rd-details{margin-left:24px !important;}
+  .la-cards>tbody>tr>td.num{text-align:left;font-variant-numeric:tabular-nums;}
+  .la-cards>tbody>tr>td.num .la-cell{text-align:left;}
+  .la-cards>tbody>tr.la-total{border:0 !important;border-top:2px solid var(--ink) !important;border-radius:0 !important;background:transparent !important;margin:18px 12px 0 !important;padding:10px 2px 4px !important;font-weight:600;}
+  .la-cards>tbody>tr.la-total>td:first-child{order:0;grid-column:1 / -1;}
   /* Configuration → Vehicles (wave 4, card 7): on a desk the name column is held and a fade says there is more; at 768–1024
      each vehicle is a card, two a row, each field with its label over the box */
   .fade-scroll{position:relative;}
@@ -1348,6 +1399,21 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ph-line .ph-r small{display:block;font-size:13px;font-weight:500;color:var(--muted);}
   .ph-line .rd-chips{margin-top:4px;}
   .ph-line .row-st{white-space:normal;margin-top:4px;}
+  /* 25 Nov 2026 (task A): the phone's day as its sites (card 1): a ruled site row that folds its lines */
+  .ph-site{border-top:1px solid var(--ink);}
+  .ph-site-b{display:block;width:100%;min-height:48px;padding:9px 0 8px;border:0;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer;}
+  .ph-site-b:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .ph-s1{display:flex;gap:8px;align-items:baseline;}
+  .ph-tw{flex:none;display:inline-block;width:7px;height:7px;margin:0 4px 0 2px;border-right:2px solid var(--ink-2,var(--ink));border-bottom:2px solid var(--ink-2,var(--ink));transform:rotate(-45deg);transition:transform .15s;}
+  .ph-site-b[aria-expanded="true"] .ph-tw{transform:rotate(45deg);margin-top:-3px;}
+  .ph-sn{flex:1;min-width:0;font:600 15px/1.3 var(--f-head);}
+  .ph-sf{flex:none;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .ph-s2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:3px;padding-left:19px;font-size:13px;color:var(--muted);}
+  .ph-s2 .row-st{margin-top:0;}
+  .ph-sm{margin-left:auto;font-variant-numeric:tabular-nums;}
+  .ph-site .ph-line>button{padding-left:19px;}
+  .ph-line .ph-lm{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px;}
+  .ph-line.la-out .ph-l>span:first-child{font-weight:600;}
   .ph-line .rd-dl{padding:2px 0 12px;grid-template-columns:1fr 1fr;gap:6px 14px;position:static;max-width:none;}
   .ph-more{width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--action);font:600 15px var(--f-text);cursor:pointer;}
   .ph-actions{display:flex;gap:10px;margin-top:12px;}
@@ -2061,7 +2127,14 @@ function useRowOpen(table){
     try { window.sessionStorage.setItem(rdKey(table), JSON.stringify(n)); } catch(e){}
     return n;
   });
-  return [(k) => !!open[k], toggle];
+  // 25 Nov 2026 (the Look-ahead's sites, "Open all · Fold all"): set many keys at once, on or off
+  const setMany = (keys, on) => setOpen(o => {
+    const n = { ...o };
+    (keys || []).forEach(k => { if(on) n[k] = 1; else delete n[k]; });
+    try { window.sessionStorage.setItem(rdKey(table), JSON.stringify(n)); } catch(e){}
+    return n;
+  });
+  return [(k) => !!open[k], toggle, setMany];
 }
 // Loads | Tonnes | Lorries — the one number a cell stacks no more. Loads = loaded trips; Lorries = the
 // vehicles needed (on a day, or a line's busiest month where a figure spans months).
@@ -8971,6 +9044,100 @@ function RouteChoicesRecord({ phone }){
   );
 }
 
+// ---- 25 Nov 2026 (the Look-ahead rethink, task A; card 1, John's "Yes, as recommended" to Q1 to Q7): the week by SITE --
+// The site of every line comes from the server (backend/la_sites.py: `line.site`, `commit.sites` in the order of Data →
+// Locations, each site's totals); nothing here works a site or a total out a second way. A site's ONE status is the
+// page's own laStatus over its lines' flags (SHORTAGE never takes it) and, with no flag, the least advanced week of its
+// lines: "Confirmed" only when every line is. The flag words and their order stay LINE_FLAG_LABEL and LA_FLAG_RANK.
+const LA_WEEK_STEP = { derived: 0, edited: 1, confirmed: 2 };
+function laSiteStatus(siteLines, flagsByLine){
+  const fl = [];
+  let wk = null;
+  (siteLines || []).forEach(l => {
+    (flagsByLine[lineKeyOf(l)] || []).forEach(f => fl.push(f));
+    const w = l.week || {};
+    if(!wk || w.parent_changed || (!wk.parent_changed && (LA_WEEK_STEP[w.status] ?? -1) < (LA_WEEK_STEP[wk.status] ?? -1))) wk = w;
+  });
+  return laStatus(fl, wk || {});
+}
+// the site's carry line: "Short 305 t last week" when any of its lines is flagged short (the lines' own tonnes to carry,
+// added); the quiet grey "n t to carry" is a line's, never rolled up to the site
+function laSiteCarry(siteLines, carryBy, flagsByLine){
+  let t = 0, any = false;
+  (siteLines || []).forEach(l => {
+    if(!(flagsByLine[lineKeyOf(l)] || []).some(f => f.code === "SHORTAGE")) return;
+    const r = carryBy[laCarryKey(l)];
+    if(!r || !(+r.remaining_short > 1e-6)) return;
+    any = true; t += +(r.remaining_short_t != null ? r.remaining_short_t : r.remaining_short) || 0;
+  });
+  return any ? <span className="la-carry is-short" data-la-carry="site">Short {laQty(Math.round(t))} t last week</span> : null;
+}
+// The sites of the week as the page shows them: the server's `commit.sites` (Data → Locations order) with each site's own
+// lines, the lines INTO it first and its out lines last; an older reply with no `sites` gives one site a line. A line
+// whose two ends are no longer places sits last under "Other lines". The desk and the phone both read this one list.
+function laSiteList(commit, lines){
+  const byKey = {}; (lines || []).forEach(l => { byKey[lineKeyOf(l)] = l; });
+  const list = (commit && commit.sites) || (lines || []).map(l => ({ id: lineKeyOf(l), name: (l.context || {}).dest_name || l.route_id, type: "", lines: [lineKeyOf(l)], out_lines: 0, days: {}, week: null, out_week: null, ipt: (l.context || {}).ipt || null }));
+  const isOut = (l) => !!(l.site && l.site.dir === "out");
+  return list.map(x => {
+    const sl = (x.lines || []).map(k => byKey[k]).filter(Boolean);
+    return { ...x, name: x.name || "Other lines", sl: [...sl.filter(l => !isOut(l)), ...sl.filter(isOut)] };
+  }).filter(x => x.sl.length);
+}
+// a work section as Submit prints it: its code, and its name when it has one
+const laSecWords = (meta, id) => { if(!id) return ""; const s = ((meta && meta.work_sections) || []).find(x => x.section_id === id); return s && s.name ? `${id} · ${s.name}` : id; };
+// a site's figure in the unit the switch picks, and its out part as a second line
+const laSiteFig = (o, unit) => !o ? "—" : unit === "loads" ? grp(o.loads) : unit === "lorries" ? grp(o.lorries) : `${grp(o.t)} t`;
+const laSiteOut = (o, unit) => !o ? "" : unit === "loads" ? `${grp(o.loads)} out` : unit === "lorries" ? `${grp(o.lorries)} out` : `${grp(o.t)} t out`;
+// The flags line (in place of the rail's three sentences and its "+N more"): the rail's own count, then each kind of flag
+// as a shape and its word, most serious first, and the site(s) it is at as links (a count when a site has it more than
+// once; a dated flag says its day); last and apart, the lines short last week. `onSite(id)` opens and shows a site.
+function LaFlagLine({ rail, siteOfLine, onSite }){
+  const flags = (rail && rail.flags) || [];
+  if(!(rail && rail.count > 0)) return null;
+  const kinds = [];
+  laSorted(flags).filter(f => f.code !== "SHORTAGE").forEach(f => {
+    let k = kinds.find(x => x.code === f.code);
+    if(!k){ k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] }; kinds.push(k); }
+    if(f.day_date) k.days.add(f.day_date); else k.undated = true;
+    const s = siteOfLine(lineKeyOf(f));
+    const id = s ? (s.id || "") : null;
+    let e = k.sites.find(x => x.id === id);
+    if(!e){ e = { id, name: s ? s.name : null, n: 0 }; k.sites.push(e); }
+    e.n += 1;
+  });
+  const short = flags.filter(f => f.code === "SHORTAGE");
+  const shortKeys = Array.from(new Set(short.map(lineKeyOf)));
+  const firstShort = shortKeys.map(siteOfLine).find(Boolean);
+  return (
+    <div className="la-flagline" data-guide="lookahead-flags" data-la-flagline={rail.count}>
+      <b>{rail.count} flag{rail.count === 1 ? "" : "s"}</b>
+      {kinds.map(k => (
+        <span key={k.code} className="la-fl" data-la-flag={k.code}>
+          <RowStatus word={k.word + (!k.undated && k.days.size ? ", " + Array.from(k.days).sort().map(dayName).join(", ") : "")} tone={k.tone} />
+          {k.sites.map((e, i) => (
+            <React.Fragment key={String(e.id)}>
+              <span className={"la-fl-sep" + (i ? " la-fl-comma" : "")} aria-hidden="true">{i ? "," : "·"}</span>
+              {e.name != null
+                ? <button type="button" className="la-fl-site" onClick={() => onSite(e.id)}>{e.name}</button>
+                : <span className="la-fl-none">{e.n} line{e.n === 1 ? "" : "s"}</span>}
+              {e.name != null && e.n > 1 && <em className="la-fl-n">{e.n}</em>}
+            </React.Fragment>
+          ))}
+        </span>
+      ))}
+      {shortKeys.length > 0 && (
+        <span className="la-fl" data-la-flag="SHORTAGE">
+          <RowStatus word="Short last week" tone={laTone("SHORTAGE")} />
+          <span className="la-fl-sep" aria-hidden="true">·</span>
+          {firstShort ? <button type="button" className="la-fl-site" onClick={() => onSite(firstShort.id, shortKeys)}>{shortKeys.length} line{shortKeys.length === 1 ? "" : "s"}</button>
+                      : <span className="la-fl-none">{shortKeys.length} line{shortKeys.length === 1 ? "" : "s"}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // One empty state for every page, in three kinds (10 Oct 2026, ui-review-1009 mockup 5):
 // "none" (nothing yet), "nomatch" (the filters hide everything) and "error" (a read
 // failed). Same card, same type sizes; the action names the way out.
@@ -12950,7 +13117,14 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   const [acctShow, setAcctShowRaw] = useState(() => { if(initialAcctShow) return initialAcctShow; try { return localStorage.getItem("modus_la_acct_show") === "cost" ? "cost" : "tonnes"; } catch(e){ return "tonnes"; } });
   const setAcctShow = (v) => { setAcctShowRaw(v); try { localStorage.setItem("modus_la_acct_show", v); } catch(e){} };
   const acctCost = acctShow === "cost";
-  const [railOpen, setRailOpen] = useState(false);
+  // 25 Nov 2026 (task A, Q4): each site open or folded, remembered for the session; open to start with at a desk, folded on
+  // a tablet. The stored key is a site turned AWAY from that start, in a table of its own for each, so the two never mix.
+  const [siteDeskTurned, siteDeskTurn, siteDeskMany] = useRowOpen("lookahead-sites");
+  const [siteTabTurned, siteTabTurn, siteTabMany] = useRowOpen("lookahead-sites-tablet");
+  const siteKey = (s) => "s:" + ((s && s.id) || "");
+  const siteOpen = (s) => laTab ? siteTabTurned(siteKey(s)) : !siteDeskTurned(siteKey(s));
+  const siteToggle = (s) => (laTab ? siteTabTurn : siteDeskTurn)(siteKey(s));
+  const sitesAll = (list, open) => laTab ? siteTabMany(list.map(siteKey), open) : siteDeskMany(list.map(siteKey), !open);
   const [confirming, setConfirming] = useState(false);   // the whole-week flag dialog
   const [flags, setFlags] = useState({ weather: "", wetness: "", traffic: "", other: "" });
   const pick = (v) => { setView(v); try { localStorage.setItem("modus_la_view", v); } catch(e){} };
@@ -13039,6 +13213,16 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   }, [page]);
   const allConfirmed = lines.length > 0 && lines.every(l => l.week && l.week.status === "confirmed");
   const anyConfirmed = lines.some(l => l.week && l.week.status === "confirmed");
+  // 25 Nov 2026 (task A): the server's sites (commit.sites), each with its lines in the page's order, the out lines last.
+  // An older page with no `sites` reads every line as one site of its own destination's name, so the list still draws.
+  const sites = useMemo(() => laSiteList(commit, lines), [commit, lines]);
+  const siteOfLine = useMemo(() => { const g = {}; sites.forEach(s => s.sl.forEach(l => { g[lineKeyOf(l)] = s; })); return (k) => g[k] || null; }, [sites]);
+  const showSite = (id, keys) => {
+    const pickd = sites.filter(s => (s.id || "") === (id || "") || (keys && s.sl.some(l => keys.includes(lineKeyOf(l)))));
+    sitesAll(pickd.filter(s => !siteOpen(s)), true);
+    setTimeout(() => { const el = document.querySelector(`[data-la-site="${CSS.escape(String(id || ""))}"]`); if(el && el.scrollIntoView) el.scrollIntoView({ block: "start", behavior: "smooth" }); }, 0);
+  };
+  const outWeekT = sites.reduce((x, s) => x + (s.out_lines && s.out_week ? +s.out_week.t || 0 : 0), 0);
 
   // ---- writes ------------------------------------------------------------------
   const [lorryPlan, setLorryPlan] = useState(null);     // 8 Nov 2026 (2.1-9): the Lorry plan's figures, for the KPI caption
@@ -13118,6 +13302,126 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
     ? `Commit week is ${spanLabel(cw.from, cw.to)}${bucket === "next" ? " · next week, by the switch" : ""} · Mon–Fri only`
     : `Horizon is weeks, not days · ${monthLabelAbs(horizon.from_month || cw.month_index || 1, months.start_year)} + ${monthLabelAbs((horizon.to_month || (cw.month_index || 1) + 1), months.start_year)} · make-ready only`;
 
+  // 25 Nov 2026 (task A): ONE forecast line's row and its details (W6's RowDetails, unchanged in what it holds). Under a
+  // site it is named by where it comes from ("From Northfield Quarry"), an out line by where it goes ("Out, to …"), then
+  // its material and work section, the team only where the site's lines are not all one team's. `one` (a site with ONE
+  // line) puts the site's heading in the row's first cell, so the site is one row: no fold arrow, the line's own cells.
+  const laLineRow = (line, site, one) => {
+    const out = !!(line.site && line.site.dir === "out");
+                      const c = line.context || {};
+    const lk = lineKeyOf(line);
+    const lf = flagsByLine[lk] || [];
+    const w = line.week || {};
+    const locked = w.status === "confirmed";
+    const wd = line.week_derived || {};
+    const st = laStatus(lf, w);
+    const teamWord = iptKey(c.ipt) ? teamName(iptKey(c.ipt)) : `No ${TEAM().toLowerCase()}`;
+    const veh = c.vehicle_short || vehLabel(c.vehicle_type) || "—";
+    const own = line.unit && line.unit !== "t" ? ` ${unitLbl(line.unit)}` : "";
+    return (
+      <RowDetails key={lk} rowKey={"la-" + lk} isOpen={laOpen(lk)} onToggle={() => laToggle(lk)} colSpan={3 + dates.length}
+        label={`Details for ${line.route_id}${line.discipline ? ", " + line.discipline : ""}`}
+        firstClass="la-stick" firstStyle={{ minWidth: 280 }}
+        rowProps={one ? { "data-la-line": lk, "data-la-site": (site && site.id) || "", className: "la-site la-one" } : { "data-la-line": lk, className: "la-ln" + (out ? " la-out" : "") }}
+        summary={one ? one
+          : <><span className="la-lf">{out ? <span className="la-dir">Out, to </span> : <span className="la-dir">From </span>}{(out ? c.dest_name : c.origin_name) || line.route_id}</span>
+          <span className="la-lm">{[c.material_type, laSecWords(meta, line.section_id || c.section_id), site && site.ipt ? null : teamWord].filter(Boolean).join(" · ")}</span></>}
+        chips={[
+                /* 28 Oct 2026 (task 0c): a dated zone diverts the route on some of this week's days */
+                (c.diversion && c.diversion.share > 0) ? "Diverted" : null,
+                /* 5 Nov 2026 (task 0d-2): the route's lorries take another road in the busy hours */
+                (c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null]}
+        cells={<>
+          <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />
+            {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</td>
+          {weekdaysOf(line).map(d => {
+            const k = `${lk}|${d.day_date}|p`;
+            const t = d.day_date === today;
+            const f = d.derived || {};
+            const typed = d.status === "edited" && <span className="ml-1 text-amber-700" role="img" aria-label="typed by hand">✎</span>;
+            return (
+              <td key={d.day_date} className={"num" + (t ? " la-today" : "")} data-label={`${dayName(d.day_date)} ${dayNum(d.day_date)}`} style={t ? { background: "var(--navy-soft-col)" } : {}}>
+                {/* ⭐ Editable while the week is not confirmed — this week or next,
+                    whichever bucket is open. A confirmed week's plan is read-only
+                    (L6); re-open it to change it. 10 Oct: the cell reads as a figure
+                    and becomes an input when clicked (mockup 3), so the grid reads
+                    as a table until someone types. 13 Oct (W6): in Tonnes only. */}
+                {unitSel === "loads" ? <span className="tabular-nums">{grp(f.trips)}</span>
+                 : unitSel === "lorries" ? (c.baked ? <span className="tabular-nums">{grp(f.vehicles)}</span> : <span className="text-amber-700">—</span>)
+                 : !locked && editing === k ? (
+                  <input autoFocus className={fld + " font-semibold"} inputMode="decimal"
+                    aria-label={`${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}
+                    value={draft[k] ?? (d.planned_qty ?? "")}
+                    onChange={e => setDraft(x => ({ ...x, [k]: e.target.value }))}
+                    onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}
+                    onBlur={() => { saveDay(line, d); setEditing(null); }} />
+                ) : !locked ? (
+                  <button type="button" className="la-cell" onClick={() => setEditing(k)}
+                    aria-label={`${dayName(d.day_date)}'s plan, ${grp(draft[k] ?? d.planned_qty, 1)} ${unitLbl(line.unit)}: click to type`}>{own && f.tonnes != null && draft[k] == null
+                      ? <>{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty, 1)}{own}</>}</button>
+                ) : own && f.tonnes != null ? (
+                  // 10 Nov 2026 (UI critique finding 6, card 6): under Tonnes a concrete row reads tonnes too (its m³ at
+                  // the material's density, the server's figure), its own m³ under it, so the total never mixes units unseen
+                  <span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></span>
+                ) : (
+                  <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
+                )}
+                {typed}
+                {poursAt[`${lk}|${d.day_date}`] && <span className="pour-mark la-pour" data-pour-mark={d.day_date}
+                  title={poursAt[`${lk}|${d.day_date}`].map(p => `${p.place || "Pour"}: ${grp(p.m3)} m³ from ${p.start}`).join("; ")}>pour</span>}
+              </td>
+            );
+          })}
+          <td className="num font-semibold" data-label="Week">
+            {unitSel === "loads" ? grp(wd.trips)
+             : unitSel === "lorries" ? (c.baked && wd.vehicles_peak != null ? grp(wd.vehicles_peak) : "—")
+             : own && wd.tonnes != null ? <>{grp(wd.tonnes, 1)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty, 1)}{own}</span></>
+             : <>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></>}
+          </td>
+        </>}>
+        <RdItem t="Route">{line.route_id}</RdItem>
+        <RdItem t={TEAM()}>{teamWord}</RdItem>
+        <RdItem t="Discipline">{line.discipline || null}</RdItem>
+        <RdItem t="Section">{c.section_id || "None set"}</RdItem>
+        <RdItem t="Material">{c.material_type || "—"}</RdItem>
+        <RdItem t="Vehicle">{veh}</RdItem>
+        <RdItem t="Vehicle, full name">{c.vehicle_type && vehLabel(c.vehicle_type) !== veh ? vehLabel(c.vehicle_type) : null}</RdItem>
+        <RdItem t="This week">{laWeekWords(w.status)}</RdItem>
+        <RdItem t="Diversion">{c.diversion && c.diversion.share > 0
+          ? (c.diversion.share >= 0.999 ? "A way round a closed road, all week." : "A way round a closed road, some days.") : null}</RdItem>
+        <RdItem t="Parent month changed" wide bad>{w.parent_changed ? "The parent month's quantity changed after this week was set. This week was deliberately not refreshed." : null}</RdItem>
+        <RdItem t="Days and week disagree" wide bad>{line.days_ne_week ? `The days add up to ${grp(line.days_sum, 1)} ${unitLbl(line.unit)}, not the week's ${grp(w.planned_qty, 1)}.` : null}</RdItem>
+        {laFlagGroups(lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === "bad"}>{g.texts.map((x, i) => <div key={i}>{x}</div>)}</RdItem>)}
+        <RdItem t="By day" wide>
+          <table className="rd-days">
+            <thead><tr><th scope="col">Day</th><th scope="col">Plan ({unitLbl(line.unit)})</th><th scope="col">Tonnes</th><th scope="col">Loads</th><th scope="col">Lorries</th><th scope="col"><span className="sr-only">Typed</span></th></tr></thead>
+            <tbody>{weekdaysOf(line).map(d => { const f = d.derived || {}; return (
+              <tr key={d.day_date}><td>{dayName(d.day_date)} {dayNum(d.day_date)}</td><td>{grp(d.planned_qty, 1)}</td>
+                <td>{f.tonnes != null ? grp(f.tonnes, 1) : "—"}</td><td>{grp(f.trips)}</td><td>{c.baked ? grp(f.vehicles) : "—"}</td>
+                <td>{d.status === "edited" ? "typed by hand" : ""}</td></tr>); })}</tbody>
+          </table>
+        </RdItem>
+        <RdItem t="Week">{`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)}`}</RdItem>
+        <RdItem t="Week, tonnes">{wd.tonnes != null ? grp(wd.tonnes, 1) : null}</RdItem>
+        <RdItem t="Week, loads">{wd.trips != null ? grp(wd.trips) : null}</RdItem>
+        <RdItem t="Week, peak lorries">{c.baked ? grp(wd.vehicles_peak) : "Needs this line's route worked out for its vehicle"}</RdItem>
+        {c.baked ? <>
+          <RdItem t={`${DU()} a trip`}>{`${grp(dist(c.km_trip))}${c.return_baked ? "" : ", outbound only: the return is not routed yet"}`}</RdItem>
+          <RdItem t={`${DU()} this week`}>{grp(dist(wd.km))}</RdItem>
+          <RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}, ${c.km_basis === "loaded" ? "loaded leg" : "round trip"}`}</RdItem>
+          <RdItem t="Cycle">{`${grp(c.cycle_min)} min${c.cycle_source === "here" ? "" : ", return estimated"}`}</RdItem>
+          <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break" : c.lorry_day.limited_by === "driver_day" ? "one driver's 13 h day" : "one round trip does not fit a driver's day: one lorry a trip"})` : "") : null}</RdItem>
+        </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${vehLabel(c.payload_fallback)} fallback)` : ""}.`}</RdItem>}
+        <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()}${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
+        <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
+        <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>
+        <RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}${fairWords(c.fair.flags) ? ", " + fairWords(c.fair.flags) : ""}` : null}</RdItem>
+        <RdItem t="Fair, per unit">{wd.fair_eur != null && wd.fair_units && wd.fair_units.per_t != null ? unitList(wd.fair_units) : null}</RdItem>
+        <RdItem t="Fuel" wide>{wd.fair_eur != null && c.fair ? `${grp(c.fair.litres_trip, 1)} L a trip at ${CUR()}${c.fair.index_eur_per_l} a litre, fuel ${grp(c.fair.fuel_share_pct)} % of the cost` : null}</RdItem>
+      </RowDetails>
+    );
+  };
+
   return (
     <div className="max-w-[1500px] mx-auto p-5">
       <PageHeader title="Look-ahead" kicker={view === "commit" ? "Track · commit week" : view === "account" ? "Track · last week" : "Track · horizon"} subtitle={page ? subtitle : "Loading the commit week…"} />
@@ -13179,22 +13483,9 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week" />
           </div>
 
-          {/* the clash rail — ONE row, flags run together, +N more */}
-          {rail.count > 0 && (
-            <div className="card px-4 py-3 mb-3 text-sm flex items-start gap-4 flex-wrap" data-guide="lookahead-flags">
-              <span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>
-              <span className="min-w-0 flex-1 leading-6 flex flex-wrap gap-x-4 gap-y-1">
-                {(railOpen ? rail.flags : rail.flags.slice(0, 3)).map((f, i) => (
-                  <span key={i} className="la-flag-line"><RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}</span>
-                ))}
-              </span>
-              {rail.count > 3 && (
-                <button onClick={() => setRailOpen(o => !o)} className="shrink-0 font-semibold hover:underline">
-                  {railOpen ? "show fewer" : `+${rail.count - 3} more`}
-                </button>
-              )}
-            </div>
-          )}
+          {/* 25 Nov 2026 (task A, Q7): the flags as ONE line, each a shape, its word and its site as a link; shortages apart.
+              Each flag's sentence stays in its line's details. */}
+          <LaFlagLine rail={rail} siteOfLine={siteOfLine} onSite={showSite} />
           {/* H1: the line reads the provider's words from the page; a tenant with no
               provider (status "off"/"skipped" with no provider) sees nothing here. */}
           {lines.length > 0 && ttSrc.restrictions !== "skipped" && ttSrc.restrictions !== "off" && ttSrc.restrictions_provider && (
@@ -13229,14 +13520,19 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             <div className="card overflow-hidden" data-rd-card="lookahead">
               <div className="rd-bar">
                 <UnitSwitch value={unitSel} onChange={setUnitSel} note={unitSel !== "tonnes" ? "Switch to Tonnes to type a day's plan." : null} />
+                {sites.some(x => x.sl.length > 1) && <span className="la-folds" data-la-folds="1">
+                  <button type="button" className="la-fl-site" onClick={() => sitesAll(sites, true)}>Open all</button>
+                  <span aria-hidden="true">·</span>
+                  <button type="button" className="la-fl-site" onClick={() => sitesAll(sites, false)}>Fold all</button>
+                </span>}
               </div>
-              <div className="overflow-auto rd-scroll" data-la-tab={laTab ? "1" : undefined}>
-                <table className="tbl compact rd-table" data-rd-table="lookahead" style={{ minWidth: laTab ? `${200 + (dates.length + 1) * 70}px` : `${440 + dates.length * 96}px` }}>
+              <div className={laTab ? "rd-scroll" : "overflow-auto rd-scroll"} data-la-cards={laTab ? "1" : undefined}>
+                <table className={"tbl compact rd-table" + (laTab ? " tab-cards la-cards" : "")} data-rd-table="lookahead" style={laTab ? { "--tc-n": dates.length + 1 } : { minWidth: `${440 + dates.length * 96}px` }}>
                   <caption><b>{unitSel === "loads" ? "Loads by day" : unitSel === "lorries" ? "Lorries needed by day" : "Planned quantity by day"}</b><InfoTip id="la.commit" /></caption>
                   <thead>
                     <tr>
-                      <th className="la-stick" style={{ minWidth: 280 }}>Route</th>
-                      {!laTab && <th>Status</th>}
+                      <th className="la-stick" style={{ minWidth: 280 }}>Site</th>
+                      <th>Status</th>
                       {dates.map(iso => {
                         const t = iso === today;
                         return (
@@ -13249,131 +13545,58 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map(line => {
-                      const c = line.context || {};
-                      const lk = lineKeyOf(line);
-                      const lf = flagsByLine[lk] || [];
-                      const w = line.week || {};
-                      const locked = w.status === "confirmed";
-                      const wd = line.week_derived || {};
-                      const st = laStatus(lf, w);
-                      const teamWord = iptKey(c.ipt) ? teamName(iptKey(c.ipt)) : `No ${TEAM().toLowerCase()}`;
-                      const veh = c.vehicle_short || vehLabel(c.vehicle_type) || "—";
-                      const own = line.unit && line.unit !== "t" ? ` ${unitLbl(line.unit)}` : "";
+                    {sites.map(s => {
+                      const sid = s.id || "";
+                      const one = s.sl.length === 1;
+                      const sst = laSiteStatus(s.sl, flagsByLine);
+                      const carry = laSiteCarry(s.sl, carryBy, flagsByLine);
+                      const teamOf = s.ipt && iptKey(s.ipt) ? teamName(iptKey(s.ipt)) : null;
+                      const l0 = s.sl[0], c0 = (l0 && l0.context) || {};
+                      const o0 = !!(l0 && l0.site && l0.site.dir === "out");
+                      const meta1 = [s.type, one ? null : `${s.sl.length} lines`, teamOf].filter(Boolean).join(" · ");
+                      const name = <span className="la-sn">{s.name}</span>;
+                      if(one) return laLineRow(l0, s, <span className="la-site-h" data-la-site-name={sid}>{name}
+                        <span className="la-sm">{meta1}</span>
+                        <span className="la-sm">{[`${o0 ? "Out, to" : "From"} ${(o0 ? c0.dest_name : c0.origin_name) || l0.route_id}`, c0.material_type, laSecWords(meta, l0.section_id || c0.section_id)].filter(Boolean).join(" · ")}</span></span>);
+                      const open = siteOpen(s);
+                      const outs = s.out_lines > 0;
                       return (
-                        <RowDetails key={lk} rowKey={"la-" + lk} isOpen={laOpen(lk)} onToggle={() => laToggle(lk)} colSpan={(laTab ? 2 : 3) + dates.length}
-                          label={`Details for ${line.route_id}${line.discipline ? ", " + line.discipline : ""}`}
-                          firstClass="la-stick" firstStyle={{ minWidth: 280 }}
-                          rowProps={{ "data-la-line": lk }}
-                          summary={<>{c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}
-                            {laTab && <span className="la-st-under" data-la-st-under="1"><RowStatus word={st.word} tone={st.tone} more={st.more} />
-                              {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</span>}</>}
-                          chips={[teamWord, c.material_type || null,
-                                  /* 28 Oct 2026 (task 0c): a dated zone diverts the route on some of this week's days */
-                                  (c.diversion && c.diversion.share > 0) ? "Diverted" : null,
-                                  /* 5 Nov 2026 (task 0d-2): the route's lorries take another road in the busy hours */
-                                  (c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null]}
-                          cells={<>
-                            {!laTab && <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />
-                              {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</td>}
-                            {weekdaysOf(line).map(d => {
-                              const k = `${lk}|${d.day_date}|p`;
-                              const t = d.day_date === today;
-                              const f = d.derived || {};
-                              const typed = d.status === "edited" && <span className="ml-1 text-amber-700" role="img" aria-label="typed by hand">✎</span>;
-                              return (
-                                <td key={d.day_date} className="num" data-label={`${dayName(d.day_date)} ${dayNum(d.day_date)}`} style={t ? { background: "var(--navy-soft-col)" } : {}}>
-                                  {/* ⭐ Editable while the week is not confirmed — this week or next,
-                                      whichever bucket is open. A confirmed week's plan is read-only
-                                      (L6); re-open it to change it. 10 Oct: the cell reads as a figure
-                                      and becomes an input when clicked (mockup 3), so the grid reads
-                                      as a table until someone types. 13 Oct (W6): in Tonnes only. */}
-                                  {unitSel === "loads" ? <span className="tabular-nums">{grp(f.trips)}</span>
-                                   : unitSel === "lorries" ? (c.baked ? <span className="tabular-nums">{grp(f.vehicles)}</span> : <span className="text-amber-700">—</span>)
-                                   : !locked && editing === k ? (
-                                    <input autoFocus className={fld + " font-semibold"} inputMode="decimal"
-                                      aria-label={`${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}
-                                      value={draft[k] ?? (d.planned_qty ?? "")}
-                                      onChange={e => setDraft(x => ({ ...x, [k]: e.target.value }))}
-                                      onKeyDown={e => { if(e.key === "Enter" || e.key === "Escape") e.currentTarget.blur(); }}
-                                      onBlur={() => { saveDay(line, d); setEditing(null); }} />
-                                  ) : !locked ? (
-                                    <button type="button" className="la-cell" onClick={() => setEditing(k)}
-                                      aria-label={`${dayName(d.day_date)}'s plan, ${grp(draft[k] ?? d.planned_qty, 1)} ${unitLbl(line.unit)}: click to type`}>{own && f.tonnes != null && draft[k] == null
-                                        ? <>{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty, 1)}{own}</>}</button>
-                                  ) : own && f.tonnes != null ? (
-                                    // 10 Nov 2026 (UI critique finding 6, card 6): under Tonnes a concrete row reads tonnes too (its m³ at
-                                    // the material's density, the server's figure), its own m³ under it, so the total never mixes units unseen
-                                    <span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></span>
-                                  ) : (
-                                    <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
-                                  )}
-                                  {typed}
-                                  {poursAt[`${lk}|${d.day_date}`] && <span className="pour-mark" data-pour-mark={d.day_date}
-                                    title={poursAt[`${lk}|${d.day_date}`].map(p => `${p.place || "Pour"}: ${grp(p.m3)} m³ from ${p.start}`).join("; ")}>POUR</span>}
-                                </td>
-                              );
-                            })}
-                            <td className="num font-semibold" data-label="Week">
-                              {unitSel === "loads" ? grp(wd.trips)
-                               : unitSel === "lorries" ? (c.baked && wd.vehicles_peak != null ? grp(wd.vehicles_peak) : "—")
-                               : own && wd.tonnes != null ? <>{grp(wd.tonnes, 1)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty, 1)}{own}</span></>
-                               : <>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></>}
+                        <React.Fragment key={"site-" + sid}>
+                          <tr className={"la-site" + (open ? " is-open" : "")} data-la-site={sid}>
+                            <td className="la-stick la-site-c" style={{ minWidth: 280 }}>
+                              <div className="la-site-p">
+                                <button type="button" className="la-fold" aria-expanded={open ? "true" : "false"} onClick={() => siteToggle(s)}
+                                  aria-label={`${open ? "Fold" : "Open"} ${s.name}`}><i aria-hidden="true"></i></button>
+                                <span className="la-site-h">{name}<span className="la-sm">{meta1}</span>
+                                </span>
+                              </div>
                             </td>
-                          </>}>
-                          <RdItem t="Route">{line.route_id}</RdItem>
-                          <RdItem t={TEAM()}>{teamWord}</RdItem>
-                          <RdItem t="Discipline">{line.discipline || null}</RdItem>
-                          <RdItem t="Section">{c.section_id || "None set"}</RdItem>
-                          <RdItem t="Material">{c.material_type || "—"}</RdItem>
-                          <RdItem t="Vehicle">{veh}</RdItem>
-                          <RdItem t="Vehicle, full name">{c.vehicle_type && vehLabel(c.vehicle_type) !== veh ? vehLabel(c.vehicle_type) : null}</RdItem>
-                          <RdItem t="This week">{laWeekWords(w.status)}</RdItem>
-                          <RdItem t="Diversion">{c.diversion && c.diversion.share > 0
-                            ? (c.diversion.share >= 0.999 ? "A way round a closed road, all week." : "A way round a closed road, some days.") : null}</RdItem>
-                          <RdItem t="Parent month changed" wide bad>{w.parent_changed ? "The parent month's quantity changed after this week was set. This week was deliberately not refreshed." : null}</RdItem>
-                          <RdItem t="Days and week disagree" wide bad>{line.days_ne_week ? `The days add up to ${grp(line.days_sum, 1)} ${unitLbl(line.unit)}, not the week's ${grp(w.planned_qty, 1)}.` : null}</RdItem>
-                          {laFlagGroups(lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === "bad"}>{g.texts.map((x, i) => <div key={i}>{x}</div>)}</RdItem>)}
-                          <RdItem t="By day" wide>
-                            <table className="rd-days">
-                              <thead><tr><th scope="col">Day</th><th scope="col">Plan ({unitLbl(line.unit)})</th><th scope="col">Tonnes</th><th scope="col">Loads</th><th scope="col">Lorries</th><th scope="col"><span className="sr-only">Typed</span></th></tr></thead>
-                              <tbody>{weekdaysOf(line).map(d => { const f = d.derived || {}; return (
-                                <tr key={d.day_date}><td>{dayName(d.day_date)} {dayNum(d.day_date)}</td><td>{grp(d.planned_qty, 1)}</td>
-                                  <td>{f.tonnes != null ? grp(f.tonnes, 1) : "—"}</td><td>{grp(f.trips)}</td><td>{c.baked ? grp(f.vehicles) : "—"}</td>
-                                  <td>{d.status === "edited" ? "typed by hand" : ""}</td></tr>); })}</tbody>
-                            </table>
-                          </RdItem>
-                          <RdItem t="Week">{`${grp(w.planned_qty, 1)} ${unitLbl(line.unit)}`}</RdItem>
-                          <RdItem t="Week, tonnes">{wd.tonnes != null ? grp(wd.tonnes, 1) : null}</RdItem>
-                          <RdItem t="Week, loads">{wd.trips != null ? grp(wd.trips) : null}</RdItem>
-                          <RdItem t="Week, peak lorries">{c.baked ? grp(wd.vehicles_peak) : "Needs this line's route worked out for its vehicle"}</RdItem>
-                          {c.baked ? <>
-                            <RdItem t={`${DU()} a trip`}>{`${grp(dist(c.km_trip))}${c.return_baked ? "" : ", outbound only: the return is not routed yet"}`}</RdItem>
-                            <RdItem t={`${DU()} this week`}>{grp(dist(wd.km))}</RdItem>
-                            <RdItem t={TKM()}>{`${grp(dist(wd.tonne_km))}, ${c.km_basis === "loaded" ? "loaded leg" : "round trip"}`}</RdItem>
-                            <RdItem t="Cycle">{`${grp(c.cycle_min)} min${c.cycle_source === "here" ? "" : ", return estimated"}`}</RdItem>
-                            <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break" : c.lorry_day.limited_by === "driver_day" ? "one driver's 13 h day" : "one round trip does not fit a driver's day: one lorry a trip"})` : "") : null}</RdItem>
-                          </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${vehLabel(c.payload_fallback)} fallback)` : ""}.`}</RdItem>}
-                          <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()}${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
-                          <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
-                          <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>
-                          <RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}${fairWords(c.fair.flags) ? ", " + fairWords(c.fair.flags) : ""}` : null}</RdItem>
-                          <RdItem t="Fair, per unit">{wd.fair_eur != null && wd.fair_units && wd.fair_units.per_t != null ? unitList(wd.fair_units) : null}</RdItem>
-                          <RdItem t="Fuel" wide>{wd.fair_eur != null && c.fair ? `${grp(c.fair.litres_trip, 1)} L a trip at ${CUR()}${c.fair.index_eur_per_l} a litre, fuel ${grp(c.fair.fuel_share_pct)} % of the cost` : null}</RdItem>
-                        </RowDetails>
+                            <td className="rd-status" data-label="Status"><RowStatus word={sst.word} tone={sst.tone} more={sst.more} />{carry}</td>
+                            {dates.map(iso => (
+                              <td key={iso} className={"num la-site-n" + (iso === today ? " la-today" : "")} data-label={`${dayName(iso)} ${dayNum(iso)}`} style={iso === today ? { background: "var(--navy-soft-col)" } : {}}>
+                                {laSiteFig((s.days || {})[iso], unitSel)}{outs && <span className="la-sub">{laSiteOut({ t: ((s.days || {})[iso] || {}).out_t || 0, loads: ((s.days || {})[iso] || {}).out_loads || 0, lorries: ((s.days || {})[iso] || {}).out_lorries || 0 }, unitSel)}</span>}
+                              </td>
+                            ))}
+                            <td className="num la-site-n" data-label="Week">{laSiteFig(s.week, unitSel)}{outs && <span className="la-sub">{laSiteOut(s.out_week, unitSel)}</span>}</td>
+                          </tr>
+                          {open && s.sl.map(l => laLineRow(l, s, null))}
+                        </React.Fragment>
                       );
                     })}
                     <tr className="la-total rd-card">
-                      <td className="la-stick" data-label="Total">{lines.length} line{lines.length === 1 ? "" : "s"}
-                        {unitSel === "tonnes" && laMixNote(lines) && <span className="la-sub" data-la-mix="1">{laMixNote(lines)}</span>}</td>
-                      {!laTab && <td></td>}
+                      <td className="la-stick" data-label="Total">{sites.length} site{sites.length === 1 ? "" : "s"} · {lines.length} line{lines.length === 1 ? "" : "s"}
+                        {commit.team_only && <span className="la-sub" data-la-team-only="1">{commit.team_only}'s lines only</span>}
+                        {((unitSel === "tonnes" && laMixNote(lines)) || outWeekT > 0) && <span className="la-sub" data-la-mix="1">{[unitSel === "tonnes" ? laMixNote(lines) : "", outWeekT > 0 ? `${grp(outWeekT)} t of the week goes out` : ""].filter(Boolean).join(" · ")}</span>}</td>
+                      <td></td>
                       {dates.map(iso => {
                         let tt = 0, tr = 0, vv = 0;
-                        lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ const f = d.derived || {}; tt += f.tonnes || 0; tr += f.trips || 0; vv += f.vehicles || 0; } }));
-                        return <td key={iso} className="num" data-label={`${dayName(iso)} ${dayNum(iso)}`} style={iso === today ? { background: "var(--navy-soft-col)" } : {}}>{unitSel === "loads" ? grp(tr) : unitSel === "lorries" ? grp(vv) : `${grp(tt)} t`}</td>;
+                        // 25 Nov 2026 (task A): lorries count ROUTED lines only, as the site headings and the peak figure do (an
+                        // unrouted line's lorries read "—"), so the headings add up to this row in every unit
+                        lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ const f = d.derived || {}; tt += f.tonnes || 0; tr += f.trips || 0; vv += (l.context || {}).baked ? (f.vehicles || 0) : 0; } }));
+                        return <td key={iso} className={"num" + (iso === today ? " la-today" : "")} data-label={`${dayName(iso)} ${dayNum(iso)}`} style={iso === today ? { background: "var(--navy-soft-col)" } : {}}>{unitSel === "loads" ? grp(tr) : unitSel === "lorries" ? grp(vv) : `${grp(tt)} t`}</td>;
                       })}
                       <td className="num" data-label="Week">{unitSel === "loads" ? grp(lines.reduce((x, l) => x + ((l.week_derived || {}).trips || 0), 0))
-                        : unitSel === "lorries" ? grp(Math.max(0, ...dates.map(iso => lines.reduce((x, l) => x + (((l.days || []).find(d => d.day_date === iso) || {}).derived || {}).vehicles || 0, 0))))
+                        : unitSel === "lorries" ? grp(Math.max(0, ...dates.map(iso => lines.reduce((x, l) => x + ((l.context || {}).baked ? ((((l.days || []).find(d => d.day_date === iso) || {}).derived || {}).vehicles || 0) : 0), 0))))
                         : `${grp(totals.planned_t)} t`}</td>
                     </tr>
                   </tbody>
@@ -13792,7 +14015,7 @@ const phWeekdays = (lines, cw) => {
   }
   return out;
 };
-const PH_FIRST = 6;    // lines shown before "Show N more"
+// 25 Nov 2026 (task A): PH_FIRST and "Show N more lines" are gone: the day is its sites, every one listed, folded.
 // 17 Oct 2026: the clash rail's flags of ONE day, by line. A flag dated to a day (`day_date`: a gate over or near
 // capacity, a route cap, a share) belongs on that day's card only; it was joined by line key alone, so Wednesday's gate
 // showed on Monday's card. A flag with no date (a road limit, a restriction, not routed…) is the line's all week and
@@ -13812,7 +14035,7 @@ function PhoneLookAhead({ meta, initialPage }){
   const [err, setErr] = useState("");
   const [day, setDay] = useState(null);
   const [opened, setOpened] = useState({});   // line key -> its facts shown
-  const [all, setAll] = useState(false);
+  const [siteIsOpen, siteFlip] = useRowOpen("lookahead-sites-phone");   // 25 Nov 2026: a site's lines, folded to start
   const [busy, setBusy] = useState(false);
   const [lp, setLp] = useState(null);           // 8 Nov 2026 (2.1-9): the Lorry plan, read-only on a phone
   const [lpAll, setLpAll] = useState(false);
@@ -13832,7 +14055,7 @@ function PhoneLookAhead({ meta, initialPage }){
       .catch(e => { if(live) setErr(errSay("Couldn't load the look-ahead.", e)); });
     return () => { live = false; };
   }, [bucket]);
-  useEffect(() => { setAll(false); setOpened({}); }, [day, bucket]);
+  useEffect(() => { setOpened({}); }, [day, bucket]);
 
   const cw = (page && page.commit_week) || {};
   const lines = (page && page.commit && page.commit.lines) || [];
@@ -13856,10 +14079,18 @@ function PhoneLookAhead({ meta, initialPage }){
   const loads = rows.reduce((x, r) => x + (r.f.trips || 0), 0);
   const routed = rows.filter(r => r.c.baked);
   const lorries = routed.reduce((x, r) => x + (r.f.vehicles || 0), 0);
-  const flagged = rows.filter(r => r.lf.length).length;
   const conf = rows.filter(r => (r.line.week || {}).status === "confirmed").length;
   const weekWords = !rows.length ? "" : conf === rows.length ? "The week is confirmed" : conf ? `${conf} of ${rows.length} lines confirmed` : "Derived from the month · not confirmed yet";
-  const list = all ? rows : rows.slice(0, PH_FIRST);
+  // 25 Nov 2026 (the Look-ahead rethink, task A; card 1): the day is its SITES, as the desk's week is. A site shows on a
+  // day when one of its lines has something that day; its figures are the server's own for that day (commit.sites[].days).
+  // Its status is the desk's rule over the lines' flags OF THAT DAY (phFlagsByLine: a dated flag on its own day only).
+  const byLk = {}; rows.forEach(r => { byLk[r.lk] = r; });
+  const daySites = laSiteList(page && page.commit, lines).map(x => ({ ...x, rows: x.sl.map(l => byLk[lineKeyOf(l)]).filter(Boolean) })).filter(x => x.rows.length);
+  const siteFlagged = daySites.filter(x => x.rows.some(r => r.lf.some(f => f.code !== "SHORTAGE"))).length;
+  const shortLines = rows.filter(r => r.lf.some(f => f.code === "SHORTAGE")).length;
+  const noteBits = [page && page.commit && page.commit.team_only ? `${page.commit.team_only}'s lines only` : "", siteFlagged ? `${siteFlagged} site${siteFlagged === 1 ? "" : "s"} flagged` : "",
+    shortLines ? `${shortLines} line${shortLines === 1 ? "" : "s"} short last week` : "",
+    rows.length > routed.length ? `${rows.length - routed.length} not routed yet` : ""].filter(Boolean);
 
   const daySheet = async () => {
     setBusy(true);
@@ -13909,46 +14140,63 @@ function PhoneLookAhead({ meta, initialPage }){
                 <span><b>{grp(tonnes)}</b>t</span>
                 <span><b>{grp(loads)}</b>loads</span>
                 <span><b>{routed.length ? grp(lorries) : "—"}</b>{routed.length < rows.length && routed.length ? "lorries, routed lines" : "lorries"}</span>
-                <span><b>{rows.length}</b>line{rows.length === 1 ? "" : "s"}</span>
+                <span data-ph-fig="sites"><b>{daySites.length}</b>site{daySites.length === 1 ? "" : "s"}</span>
               </div>
-              <div className="ph-note">{weekWords}{flagged ? ` · ${flagged} line${flagged === 1 ? "" : "s"} flagged` : ""}{rows.length > routed.length ? ` · ${rows.length - routed.length} not routed yet` : ""}</div>
+              {rows.length > 0 && <div className="ph-note" data-ph-note="1">{noteBits.length ? noteBits.join(" · ") : weekWords}</div>}
               {!rows.length && <div className="ph-note">Nothing planned on this day.</div>}
               {lp && lp.chained && lp.chained.by_day && lp.chained.by_day[shown] != null && lp.chained.saved_week > 0 && (
                 <div className="ph-note" data-ph-lorry-plan={shown}>{grp(lp.chained.by_day[shown])} lorries with each yard's trips chained · {grp((lp.booked.by_day[shown] || 0) - lp.chained.by_day[shown])} lorry-day{(lp.booked.by_day[shown] || 0) - lp.chained.by_day[shown] === 1 ? "" : "s"} saved</div>
               )}
-              {list.map(r => {
-                const isOpen = !!opened[r.lk];
-                const own = r.line.unit && r.line.unit !== "t" ? unitLbl(r.line.unit) : "t";
-                const teamWord = iptKey(r.c.ipt) ? teamName(iptKey(r.c.ipt)) : `No ${TEAM().toLowerCase()}`;
-                const did = "ph-d-" + r.lk.replace(/[^A-Za-z0-9]/g, "-");
+              {daySites.map(x => {
+                const sid = x.id || "";
+                const skey = "s:" + sid;
+                const open = siteIsOpen(skey);
+                const sd = (x.days || {})[shown] || {};
+                const t = x.days && x.days[shown] ? sd.t : x.rows.reduce((n, r) => n + (r.f.tonnes || 0), 0);
+                const n = x.days && x.days[shown] ? sd.loads : x.rows.reduce((m, r) => m + (r.f.trips || 0), 0);
+                const sst = laSiteStatus(x.rows.map(r => r.line), flagsByLine);
+                const sbid = "ph-s-" + String(sid).replace(/[^A-Za-z0-9]/g, "-");
                 return (
-                  <div key={r.lk} className="ph-line" data-ph-line={r.lk}>
-                    <button type="button" aria-expanded={isOpen ? "true" : "false"} aria-controls={did}
-                      onClick={() => setOpened(o => ({ ...o, [r.lk]: !o[r.lk] }))}>
-                      <span className="ph-l">
-                        <span>{r.c.origin_name || r.line.route_id} → {r.c.dest_name || "—"}{pourLines.has(r.lk) && <span className="pour-mark">POUR</span>}</span>
-                        <span className="rd-chips"><span className="rd-chip">{teamWord}</span>{r.c.material_type && <span className="rd-chip">{r.c.material_type}</span>}</span>
-                        <RowStatus word={r.st.word} tone={r.st.tone} more={r.st.more} />
-                      </span>
-                      <span className="ph-r">{r.f.tonnes != null ? `${grp(r.f.tonnes)} t` : `${grp(r.d.planned_qty, 1)} ${own}`}<small>{grp(r.f.trips)} load{r.f.trips === 1 ? "" : "s"}</small></span>
+                  <div key={skey} className="ph-site" data-ph-site={sid}>
+                    <button type="button" className="ph-site-b" aria-expanded={open ? "true" : "false"} aria-controls={sbid} onClick={() => siteFlip(skey)}>
+                      <span className="ph-s1"><i className="ph-tw" aria-hidden="true"></i><span className="ph-sn">{x.name}</span><span className="ph-sf">{grp(t)} t</span></span>
+                      <span className="ph-s2"><RowStatus word={sst.word} tone={sst.tone} more={sst.more} /><span className="ph-sm">{`${grp(n)} load${n === 1 ? "" : "s"} · ${x.rows.length} line${x.rows.length === 1 ? "" : "s"}`}{(+sd.out_t || 0) > 0 ? ` · ${grp(sd.out_t)} t out` : ""}</span></span>
                     </button>
-                    <dl className="rd-dl" id={did} hidden={!isOpen}>
-                      <RdItem t="Route">{r.line.route_id}</RdItem>
-                      <RdItem t="Vehicle">{r.c.vehicle_short || vehLabel(r.c.vehicle_type) || "—"}</RdItem>
-                      <RdItem t="Plan">{`${grp(r.d.planned_qty, 1)} ${unitLbl(r.line.unit)}${r.d.status === "edited" ? ", typed by hand" : ""}`}</RdItem>
-                      <RdItem t="Lorries">{r.c.baked ? grp(r.f.vehicles) : "Needs this line's route worked out"}</RdItem>
-                      <RdItem t="Section">{r.c.section_id || null}</RdItem>
-                      <RdItem t="This week">{laWeekWords((r.line.week || {}).status)}</RdItem>
-                      {laFlagGroups(r.lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === "bad"}>{g.texts.map((x, i) => <div key={i}>{x}</div>)}</RdItem>)}
-                    </dl>
+                    <div id={sbid} hidden={!open}>
+                      {open && x.rows.map(r => {
+                        const isOpen = !!opened[r.lk];
+                        const own = r.line.unit && r.line.unit !== "t" ? unitLbl(r.line.unit) : "t";
+                        const teamWord = iptKey(r.c.ipt) ? teamName(iptKey(r.c.ipt)) : `No ${TEAM().toLowerCase()}`;
+                        const out = !!(r.line.site && r.line.site.dir === "out");
+                        const did = "ph-d-" + r.lk.replace(/[^A-Za-z0-9]/g, "-");
+                        return (
+                          <div key={r.lk} className={"ph-line" + (out ? " la-out" : "")} data-ph-line={r.lk}>
+                            <button type="button" aria-expanded={isOpen ? "true" : "false"} aria-controls={did}
+                              onClick={() => setOpened(o => ({ ...o, [r.lk]: !o[r.lk] }))}>
+                              <span className="ph-l">
+                                <span>{out ? "Out, to " : "From "}{(out ? r.c.dest_name : r.c.origin_name) || r.line.route_id}{pourLines.has(r.lk) && <span className="pour-mark la-pour">pour</span>}</span>
+                                <small className="ph-lm">{[r.c.material_type, laSecWords(meta, r.line.section_id || r.c.section_id), x.ipt ? null : teamWord].filter(Boolean).join(" · ")}</small>
+                              </span>
+                              <span className="ph-r">{r.f.tonnes != null ? `${grp(r.f.tonnes)} t` : `${grp(r.d.planned_qty, 1)} ${own}`}<small>{grp(r.f.trips)} load{r.f.trips === 1 ? "" : "s"}</small></span>
+                            </button>
+                            <dl className="rd-dl" id={did} hidden={!isOpen}>
+                              <RdItem t="Route">{r.line.route_id}</RdItem>
+                              <RdItem t="Status"><RowStatus word={r.st.word} tone={r.st.tone} more={r.st.more} /></RdItem>
+                              <RdItem t="Team">{teamWord}</RdItem>
+                              <RdItem t="Vehicle">{r.c.vehicle_short || vehLabel(r.c.vehicle_type) || "—"}</RdItem>
+                              <RdItem t="Plan">{`${grp(r.d.planned_qty, 1)} ${unitLbl(r.line.unit)}${r.d.status === "edited" ? ", typed by hand" : ""}`}</RdItem>
+                              <RdItem t="Lorries">{r.c.baked ? grp(r.f.vehicles) : "Needs this line's route worked out"}</RdItem>
+                              <RdItem t="Section">{r.c.section_id || null}</RdItem>
+                              <RdItem t="This week">{laWeekWords((r.line.week || {}).status)}</RdItem>
+                              {laFlagGroups(r.lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === "bad"}>{g.texts.map((x, i) => <div key={i}>{x}</div>)}</RdItem>)}
+                            </dl>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
-              {rows.length > PH_FIRST && (
-                <button type="button" className="ph-more" onClick={() => setAll(a => !a)}>
-                  {all ? "Show fewer lines" : `Show ${rows.length - PH_FIRST} more line${rows.length - PH_FIRST === 1 ? "" : "s"}`}
-                </button>
-              )}
               {lp && lp.chained && lp.chained.days && (lp.chained.days[shown] || []).length > 0 && (() => {
                 const flat = []; (lp.chained.days[shown] || []).forEach(y => y.lorries.forEach(L => flat.push({ y, L })));
                 const some = lpAll ? flat : flat.slice(0, 4);

@@ -1345,9 +1345,13 @@ async function rowDetailsDom(){
     });
     return out;
   };
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A; card 1, John's "Yes, as recommended"): a Look-ahead site's line
+  // under its name ("Compound · 2 lines · North Team") and a line's ("Ready-mixed concrete · WS4 · Tilton viaduct") are
+  // drawn with several " · " on card 1; those two lines (.la-sm, .la-lm) are read apart, the rest of a cell still holds one
+  const cellText = (c) => { const k = c.cloneNode(true); k.querySelectorAll(".la-sm, .la-lm").forEach(x => x.remove()); return norm(k.textContent); };
   const dotCheck = (label, table) => {
     const cells = table ? cellsOf(table) : [];
-    const bad = cells.filter(c => dots(norm(c.textContent)) > 1).map(c => norm(c.textContent).slice(0, 90));
+    const bad = cells.filter(c => dots(cellText(c)) > 1).map(c => norm(c.textContent).slice(0, 90));
     ok(`ROW DETAILS · ≤ one ' · ' per rendered cell: ${label} (${cells.length} cells)`, !!table && cells.length > 0 && bad.length === 0, bad.slice(0, 3).join(" | "));
   };
   const pressUnit = (el, which) => {
@@ -1777,14 +1781,29 @@ async function phoneShellDom(){
   const figs = () => [...ph().querySelectorAll(".ph-figs > span")].map(s => s.textContent.replace(/\s+/g, " ").trim());
   const sumOf = (rows, k) => rows.reduce((a, x) => a + ((x.d.derived || {})[k] || 0), 0);
   const rT = dayRows(LA.today);
-  ok("⭐ PHONE: the day card's figures are the server's for that day: tonnes, loads, lorries (routed lines), lines",
+  // 25 Nov 2026 (the Look-ahead rethink, task A): the day is its SITES (the server's commit.sites, in its order; an older
+  // page with none gives one site a line, in the lines' order), every site listed and folded to start
+  const lkOf = (l) => `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}|${l.month_index}`;
+  const siteIds = (rows) => { const keys = new Set(rows.map(x => lkOf(x.l)));
+    return LA.commit.sites ? LA.commit.sites.filter(s => s.lines.some(k => keys.has(k))).map(s => String(s.id || ""))
+                           : LA.commit.lines.filter(l => keys.has(lkOf(l))).map(lkOf); };
+  const openSites = (el) => [...el.querySelectorAll(".ph-site-b")].filter(b => b.getAttribute("aria-expanded") === "false").forEach(b => click(b));
+  // NARROWED 25 Nov 2026 (task A; card 1): the fourth figure is the day's sites, not its lines
+  ok("⭐ PHONE: the day card's figures are the server's for that day: tonnes, loads, lorries (routed lines), sites",
      figs().join("|") === [`${w.__F.grp(sumOf(rT, "tonnes"))}t`, `${w.__F.grp(sumOf(rT, "trips"))}loads`,
                            `${rT.some(x => x.l.context.baked) ? w.__F.grp(rT.filter(x => x.l.context.baked).reduce((a, x) => a + (x.d.derived.vehicles || 0), 0)) : "—"}${rT.some(x => !x.l.context.baked) && rT.some(x => x.l.context.baked) ? "lorries, routed lines" : "lorries"}`,
-                           `${rT.length}line${rT.length === 1 ? "" : "s"}`].join("|"), figs().join("|"));
+                           `${siteIds(rT).length}site${siteIds(rT).length === 1 ? "" : "s"}`].join("|"), figs().join("|"));
   const lineEls = () => [...ph().querySelectorAll(".ph-line")];
   const tonnesOf = (el) => { const k = el.getAttribute("data-ph-line"); const x = rT.find(y => `${y.l.route_id}|${y.l.discipline || ""}|${y.l.section_id || ""}|${y.l.month_index}` === k); return x ? (x.d.derived.tonnes || 0) : -1; };
-  ok("PHONE: one row per line planned that day, heaviest first",
-     lineEls().length === Math.min(rT.length, 6) && lineEls().every((e, i, a) => i === 0 || tonnesOf(a[i - 1]) >= tonnesOf(e)));
+  // REVERSED 25 Nov 2026 (task A; card 1): no longer the six heaviest lines and "Show N more": one row a SITE in the server's
+  // order, folded to start (no line drawn); opened, every line planned that day is there once
+  ok("PHONE: one row a site with something planned that day, in the server's order, folded to start",
+     [...ph().querySelectorAll("[data-ph-site]")].map(e => e.getAttribute("data-ph-site")).join("|") === siteIds(rT).join("|")
+     && lineEls().length === 0 && [...ph().querySelectorAll(".ph-site-b")].every(b => b.getAttribute("aria-expanded") === "false")
+     && !/Show \d+ more line|Show fewer lines/.test(ph().textContent));
+  openSites(ph());
+  ok("PHONE: ...opened, every line planned that day is listed once (no 'Show N more')",
+     lineEls().length === rT.length && new Set(lineEls().map(e => e.getAttribute("data-ph-line"))).size === rT.length && tonnesOf(lineEls()[0]) >= 0);
   ok("🔴 PHONE: team NAMES on the phone Look-ahead, never an id", !/\bIPT ?\d\b/i.test(ph().textContent) && /Team \d|North Team|No team/i.test(ph().textContent));
   const first = lineEls()[0], fb = first.querySelector("button"), fdl = first.querySelector("dl");
   ok("PHONE: a line's facts are shut until it is tapped (a native button, aria-expanded / aria-controls)",
@@ -2156,29 +2175,41 @@ async function phoneDayFlagsDom(){
   const word = (l) => { const s = line(l).querySelector(".row-st"); return [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim(); };
   const more = (l) => (line(l).querySelector(".row-st .rs-more") || {}).textContent || "";
   const facts = (l) => line(l).querySelector("dl").textContent;
-  const note = () => card().querySelector(".ph-note").textContent;
+  const note = () => card().querySelector("[data-ph-note]").textContent;
+  // 25 Nov 2026 (task A): the day is its sites, folded to start: open every site before reading a line; the note counts
+  // the SITES flagged that day (a line's site from the server's commit.sites, else the line itself)
+  const openSites = async () => { for (const b of [...el.querySelectorAll(".ph-site-b")].filter(x => x.getAttribute("aria-expanded") === "false"))
+    await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
+  const siteOfL = (l) => { const s = (LA.commit.sites || []).find(x => x.lines.includes(lk(l))); return s ? String(s.id || "") : lk(l); };
+  const sitesFlagged = (ls) => { const n = new Set(ls.map(siteOfL)).size; return `${n} site${n === 1 ? "" : "s"} flagged`; };
   const pick = async (iso) => { await act(async () => { [...el.querySelectorAll(".ph-days > button")].find(b => b.textContent === w.__F.dayName(iso) + " " + w.__F.dayNum(iso)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
 
+  await openSites();
   ok("PHONE DAY FLAGS: the card opens on today with all three lines", card().getAttribute("data-ph-day") === today && !!line(A) && !!line(B) && !!line(C));
   ok("⭐ PHONE DAY FLAGS (today): a gate over capacity dated another day is NOT on the card — not in the line's status, not in its details",
      word(A) !== "Gate over" && !/Gate over/.test(facts(A)) /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && !facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (today): a flag dated today IS on the card; the same line's route cap dated another day is not",
      word(B) === "Gate near" && more(B) === "" && facts(B).includes(`Gate B on ${today}`) && !/\bCap\b/.test(facts(B)), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (today): a flag with no date (a road restriction) is on the card", word(C) === "Restriction" && facts(C).includes("Road closed all week"), word(C));
-  ok("PHONE DAY FLAGS (today): the count names the two lines flagged today, not three", /· 2 lines flagged/.test(note()), note());
+  // NARROWED 25 Nov 2026 (task A): the count is the sites flagged that day (B's and C's), not A's
+  ok("PHONE DAY FLAGS (today): the count names the sites of the two lines flagged today, not three", note().startsWith(sitesFlagged([B, C])), note());
 
   await pick(next);
+  await openSites();
   ok("⭐ PHONE DAY FLAGS (next weekday): its own gate over capacity shows on that day's card, status and details",
      card().getAttribute("data-ph-day") === next && word(A) === "Gate over" && facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
   ok("PHONE DAY FLAGS (next weekday): line B carries its route cap, and today's gate near capacity has left the card",
      word(B) === "Cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "Restriction");
-  ok("PHONE DAY FLAGS (next weekday): three lines flagged", /· 3 lines flagged/.test(note()), note());
+  // NARROWED 25 Nov 2026 (task A): the sites of the three lines flagged
+  ok("PHONE DAY FLAGS (next weekday): three lines flagged, counted by their sites", note().startsWith(sitesFlagged([A, B, C])), note());
 
   await pick(third);
+  await openSites();
   ok("⭐ PHONE DAY FLAGS (a day no dated flag names): only the undated restriction — one line flagged, A and B in the week's own state",
      card().getAttribute("data-ph-day") === third && word(C) === "Restriction" && !/Gate|Cap/.test(word(A) + word(B))
-     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && /· 1 line flagged/.test(note()), `${word(A)} | ${word(B)} | ${note()}`);
+     // NARROWED 25 Nov 2026 (task A): one SITE flagged (C's)
+     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && note().startsWith(sitesFlagged([C])), `${word(A)} | ${word(B)} | ${note()}`);
   await act(async () => { r.unmount(); }); el.remove();
 
   // the desk grid: its row is the whole week, so every flag of the week stays on it (unchanged by the phone's rule)
