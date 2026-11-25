@@ -8400,13 +8400,18 @@
     const FLOW_MARK_GAP = 90;
     //: px a second on screen while Play runs, every road (the card's sketch: 90 px in 7 s)
     const FLOW_MARK_SPEED = 13;
-    //: px from the line's middle to a mark's centre, left of its travel (the card: 2.7 px): a road's two rows sit 5.4 px
-    //: apart, so two marks 5.2 px across never touch however they fall
-    const FLOW_MARK_SIDE = 2.7;
-    //: the mark: a SOLID white arrowhead 5.2 px long and 5.2 px across with a 0.8 px outline in the darkest band blue
-    //: (#00215B, CARBON_RAMP's last), its tip the way of travel; one picture (FLOW_MARK_IMG), turned per mark
-    const FLOW_MARK_LEN = 5.2;
-    const FLOW_MARK_W = 5.2;
+    //: 25 Nov 2026 (the mother session: the line's one width is on trial, 5 or 4 px): the mark's size and side step are
+    //: set FROM the forecast line's width, never typed, so either answer needs no rework. On the 5 px line: 2.7 px off the
+    //: middle (the card's sketch), 5.2 px long and across; on a 4 px line a fifth smaller. Its two rows sit 2 x SIDE
+    //: apart, more than a mark's width, so the two directions never cross; each mark overhangs the casing by
+    //: SIDE + W / 2 - casing / 2 (1.5 px on 5 / 7.6, 0.94 px on 4 / 6.6)
+    const FLOW_MARK_SCALE = FORECAST_LINE_WIDTH / 5;
+    //: px from the line's middle to a mark's centre, left of its travel
+    const FLOW_MARK_SIDE = Math.round(2.7 * FLOW_MARK_SCALE * 100) / 100;
+    //: the mark: a SOLID white arrowhead (5.2 px long and across on the 5 px line) with a 0.8 px outline in the darkest
+    //: band blue (#00215B, CARBON_RAMP's last), its tip the way of travel; one picture (FLOW_MARK_IMG), turned per mark
+    const FLOW_MARK_LEN = Math.round(5.2 * FLOW_MARK_SCALE * 100) / 100;
+    const FLOW_MARK_W = FLOW_MARK_LEN;
     const FLOW_MARK_RING = '#00215B';
     const FLOW_MARK_RING_W = 0.8;
     const FLOW_MARK_IMG = 'flow-arrowhead';

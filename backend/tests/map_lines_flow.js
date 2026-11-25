@@ -48,10 +48,26 @@ ok("A4 the marks' one layer: a symbol of one picture on its own point source, tu
    /id: 'forecast-flow-light', type: 'symbol', source: FLOW_LIGHT_SOURCE,/.test(fblk)
    && /'icon-image': FLOW_MARK_IMG, 'icon-rotate': \['get', 'rot'\],\s*'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',\s*'icon-allow-overlap': true, 'icon-ignore-placement': true/.test(fblk)
    && (fblk.match(/map\.addLayer\(/g) || []).length === 1 && (fblk.match(/map\.addImage\(/g) || []).length === 1);
-ok("A5 the brief's values: 5.2 px long and across, a 0.8 px #00215B outline (the darkest band blue), 2.7 px left, 90 px apart, 13 px a second",
-   html.includes("const FLOW_MARK_LEN = 5.2;") && html.includes("const FLOW_MARK_W = 5.2;") && html.includes("const FLOW_MARK_RING = '#00215B';")
-   && html.includes("const FLOW_MARK_RING_W = 0.8;") && html.includes("const FLOW_MARK_SIDE = 2.7;") && html.includes("const FLOW_MARK_GAP = 90;")
+// NARROWED 25 Nov 2026 (the line's one width on trial, 5 or 4 px): the size and side step follow FORECAST_LINE_WIDTH
+ok("A5 the brief's values: 5.2 px long and across and 2.7 px left ON THE 5 px LINE (set from FORECAST_LINE_WIDTH), a 0.8 px #00215B outline (the darkest band blue), 90 px apart, 13 px a second",
+   html.includes("const FLOW_MARK_SCALE = FORECAST_LINE_WIDTH / 5;")
+   && html.includes("const FLOW_MARK_SIDE = Math.round(2.7 * FLOW_MARK_SCALE * 100) / 100;")
+   && html.includes("const FLOW_MARK_LEN = Math.round(5.2 * FLOW_MARK_SCALE * 100) / 100;") && html.includes("const FLOW_MARK_W = FLOW_MARK_LEN;")
+   && !/const FLOW_MARK_(SIDE|LEN|W) = [0-9]/.test(html) && html.includes("const FLOW_MARK_RING = '#00215B';")
+   && html.includes("const FLOW_MARK_RING_W = 0.8;") && html.includes("const FLOW_MARK_GAP = 90;")
    && html.includes("const FLOW_MARK_SPEED = 13;") && /CARBON_RAMP\s*=\s*\[[^\]]*'#00215B'\]/.test(html));
+// the mark's sums at both widths on trial: the constants' own lines, run with each line and casing width
+const markAt = (lw) => new Function("FORECAST_LINE_WIDTH",
+  (html.match(/const FLOW_MARK_SCALE = [^\n]*\n/) || [""])[0] + (html.match(/const FLOW_MARK_SIDE = [^\n]*\n/) || [""])[0]
+  + (html.match(/const FLOW_MARK_LEN = [^\n]*\n/) || [""])[0] + (html.match(/const FLOW_MARK_W = [^\n]*\n/) || [""])[0]
+  + "return { side: FLOW_MARK_SIDE, len: FLOW_MARK_LEN, w: FLOW_MARK_W };")(lw);
+const m5 = markAt(5), m4 = markAt(4), over = (m, casing) => m.side + m.w / 2 - casing / 2;
+ok("A5b on the 5 px line (7.6 casing): 5.2 px marks 2.7 px off the middle, overhanging the casing by 1.5 px",
+   m5.side === 2.7 && m5.len === 5.2 && m5.w === 5.2 && Math.abs(over(m5, 7.6) - 1.5) < 1e-9, m5);
+ok("A5c on a 4 px line (6.6 casing): a fifth smaller (4.16 px, 2.16 px off), overhanging by no more than on the 5 px line",
+   m4.side === 2.16 && m4.len === 4.16 && over(m4, 6.6) <= over(m5, 7.6) + 1e-9, [m4, over(m4, 6.6)]);
+ok("A5d at both widths the two directions' rows never cross (2 x the side step > a mark's width)",
+   2 * m5.side > m5.w && 2 * m4.side > m4.w);
 ok("A6 kept: the 'called forward' chevrons are untouched (their own layer, not the flow's)",
    /chevron/i.test(html.slice(0, fA)) || /chevron/i.test(html.slice(fB)));
 
@@ -136,7 +152,7 @@ if (F) {
   const seRot = Math.atan2(px([-0.8, 52.55], z)[0] - px([-0.9, 52.65], z)[0], -(px([-0.8, 52.55], z)[1] - px([-0.9, 52.65], z)[1])) * 180 / Math.PI;
   ok("C3 going south-east they point the way the line runs on screen (rot = its bearing, to a tenth of a degree)",
      seM.length > 0 && seM.every(f => Math.abs(f.properties.rot - seRot) <= 0.05), [seRot, seM[0] && seM[0].properties.rot]);
-  ok("C4 a road's two rows (5.4 px apart) never touch: an arrowhead is 5.2 px across", 2 * F.FLOW_MARK_SIDE > 5.2);
+  ok("C4 a road's two rows (5.4 px apart) never touch: an arrowhead is 5.2 px across (on the 5 px line)", F.FLOW_MARK_SIDE === 2.7 && 2 * F.FLOW_MARK_SIDE > 5.2);
 
   console.log("D. Standing still, or drifting at one slow speed");
   let speedOk = true; const sp = [];

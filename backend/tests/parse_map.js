@@ -5909,12 +5909,12 @@ function qrRead(mod) {
      && !/id:\s?'forecast-flow',\s?type:\s?'line',\s?source:\s?'routes-source'/.test(code));
   ok("🔴 REVERSED 24 Nov 2026 (card 3): no line-offset for the flow (FLOW_OFFSET gone); the arrowheads sit FLOW_MARK_SIDE px left of their travel (was: one NEGATIVE line-offset; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting))",
      !/const FLOW_OFFSET\b/.test(code) && (code.match(/'line-offset': FLOW_OFFSET/g) || []).length === 0
-     && /const FLOW_MARK_SIDE = 2\.7;/.test(fcode) && /const dx = cx - ax, dy = cy - ay, nx = dy \/ len, ny = -dx \/ len;/.test(fcode));
+     && /const FLOW_MARK_SIDE = Math\.round\(2\.7 \* FLOW_MARK_SCALE \* 100\) \/ 100;/.test(fcode) && /const dx = cx - ax, dy = cy - ay, nx = dy \/ len, ny = -dx \/ len;/.test(fcode));
   ok("⭐ REVERSED 24 Nov 2026 (card 3; NARROWED 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting)): the arrowheads as added — one symbol layer on their own source, one picture turned to each mark's travel on the map, never in the way of a name, no filter, NO gradient anywhere (was: the lanes as added)",
      /id: 'forecast-flow-light', type: 'symbol', source: FLOW_LIGHT_SOURCE,/.test(addLight) && !/filter:/.test(addLight)
      && /'icon-image': FLOW_MARK_IMG, 'icon-rotate': \['get', 'rot'\],/.test(addLight)
      && /'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',\s*'icon-allow-overlap': true, 'icon-ignore-placement': true/.test(addLight)
-     && fcode.includes("const FLOW_MARK_LEN = 5.2;") && fcode.includes("const FLOW_MARK_W = 5.2;") && fcode.includes("const FLOW_MARK_RING = '#00215B';") && fcode.includes("const FLOW_MARK_RING_W = 0.8;")
+     && fcode.includes("const FLOW_MARK_LEN = Math.round(5.2 * FLOW_MARK_SCALE * 100) / 100;") && fcode.includes("const FLOW_MARK_W = FLOW_MARK_LEN;") && fcode.includes("const FLOW_MARK_SCALE = FORECAST_LINE_WIDTH / 5;") && fcode.includes("const FLOW_MARK_RING = '#00215B';") && fcode.includes("const FLOW_MARK_RING_W = 0.8;")
      && !/line-gradient/.test(fcode) && !/lineMetrics: true/.test(fcode));
 ok("🔴 D115 / 23 Oct: no butt cap anywhere on the page; the frame's dots go through setFlowDots (REVERSED 28 Oct 2026 (task 0a); NARROWED 24 Nov 2026: setFlowPulse is gone with the lanes)",
      !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 0
