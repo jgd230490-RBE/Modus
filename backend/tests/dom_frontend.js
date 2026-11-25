@@ -973,7 +973,12 @@ async function gateArrivalsDom(){
   // answered a month-9 fixture to whatever month was asked, so the two differ on purpose
   ok("GATE DOM: ...the month select holds the month that was asked for, and the header line carries the server's label",
      d2.el.querySelector("select.ga-sel") && d2.el.querySelector("select.ga-sel").value === String(thisMonth)
-     && d2.el.textContent.includes("Sep 2026: lorries a day at each gate"));
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the sentence under the header left; the server's label is the
+     // "i"'s value now, read when the "i" opens (and the saved picture's scope)
+     && !d2.el.textContent.includes("Sep 2026: lorries a day at each gate")
+     && (() => { const ib = d2.el.querySelector('[data-guide="dash-gates"] button.ibtn'); if(!ib) return false;
+       act(() => { ib.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+       const t = w.document.body.textContent.includes("Sep 2026"); act(() => { ib.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); return t; })());
 
   // (3) picking another month re-reads with that month and nothing else
   const other = thisMonth === 3 ? 4 : 3;

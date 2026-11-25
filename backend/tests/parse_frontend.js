@@ -2601,16 +2601,22 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && gac.includes('g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds")')
     // 13 Oct 2026 (W6, narrowed): the cell reads "2.6 min"; the full sentence is in the details
     && gac.includes('{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}') && gac.includes('{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}')
-    && gac.includes("all {TEAMS().toLowerCase()} together") && !/every \{TEAMS\(\)/.test(code)
+    // REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials): the sentence "{ga.label}: lorries a day at each gate, all … together, …" left the screen; its sense is in the "i"
+    && !gac.includes("all {TEAMS().toLowerCase()} together") && !gac.includes("{ga.label}: lorries a day at each gate") && !/every \{TEAMS\(\)/.test(code)
+    && code.includes('text: "Each gate\'s lorries a day, every team together, spread evenly over its open hours, against what it can check in. Queue likely from 85 %; over capacity past 100 %."')
     // REVERSED 10 Nov 2026 (UI critique 17): the empty panel says "Pick another month, or approve a line." with an Open Forecasts button
     && gac.includes("Pick another month, or approve a line.") && !gac.includes("Pending lines appear as a note until they are approved")
-    && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
+    && gac.includes("a day{r.cap == null ? \"\" : ` of ${grp(r.cap)}`}") && gac.includes("The gate arrivals did not load.")   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the dial's line "164.0 a day of 150"
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
     && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
   // REVERSED 14 Oct 2026 (bundle G, W17, the user's D42 follow-up): two steps, each always with a word — red "Over gate
   // capacity" (the 11 Oct red rule, renamed) and amber "Queue likely" at 85 % (the gold token, RowStatus "warn"); no green tick
   ok("🔴 always with a word: red 'Over gate capacity' ('bad'), amber 'Queue likely' ('warn', the gold token) and grey otherwise; no tick",
-    gac.includes('<RowStatus word={gaFlagWord(g)} tone={gaTone(g)} />') && !/"ok"/.test(gac)
+    gac.includes('<RowStatus word={gaFlagWord(g)} tone={gaTone(g)} />')
+    // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): "ok" is the verdict's dot and a fine dial's arc colour (CSS); a dial's WORD is never "ok" (gaDialWord: null when fine)
+    && (gac.match(/"ok"/g) || []).length === 2 && gac.includes('const vTone = nOverG ? "bad" : nNearG ? "warn" : "ok";')
+    && gac.includes('const gaDialTone = (r) => r.cap == null ? "none" : r.over ? "bad" : r.near ? "warn" : "ok";')
+    && gac.includes(': r.over ? "Over capacity" : r.near ? "Queue likely" : null;')
     && code.includes('const gaTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";')
     && gac.includes('<RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>') && !gac.includes("title={g.reason}")
     && code.includes('g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
@@ -2621,7 +2627,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && !gac.includes("unbaked"));
   ok("teams reach the screen through teamText only; no id is rendered",
     gac.includes("teamText(t)") && gac.includes("teamText(t.team)") && !/g\.gate_id\}|location_id\}|scope\}|fallthrough_routes/.test(gaIdsStripped)
-    && !/IPT ?[1-6]/.test(gac) && gac.includes("{TEAMS().toLowerCase()}"));
+    && !/IPT ?[1-6]/.test(gac) && gac.includes("each {TEAM().toLowerCase()}'s lorries"));   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the TEAMS() sentence left; the fold names the tenant's team word
   ok("the month select uses the Dashboard's month words (monthLabelAbs) and defaults to today's month clamped to the horizon",
     gac.includes("monthLabelAbs(i, startYear)") && gac.includes("Math.max(1, Math.min(n,") && gac.includes('aria-label="Month"')
     && gac.includes("onChange={e => onMonth(+e.target.value)}"));
@@ -2654,7 +2660,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && src.includes("Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter; the full rule is in t1-gates
     && !src.includes("peak bands, else the shift)")
     && _tg.includes("<code>backend/gate_hours.py</code>") && _tg.includes("<strong>Queue likely</strong> (amber)")
-    && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
+    && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" value={anyDefault ? `${ga.label}. Where no hours are typed, a gate is open ${ga.default_hours}.` : ga.label} /></h3>') && !_dbBody.includes("every {TEAMS()"));   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the "i" carries the month and the default hours
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
     // 17 Oct 2026 (narrowed): six sections (the Simulation); the Gate arrivals panel is still not on it
@@ -3265,9 +3271,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // (or removed) must leave the list, and INFO_PINNED_MAX comes down with it; never raise either. A box not on the list fails
   // at 31 words. The guide link (a new or changed box links to its user-guide section) is not checked yet: FR7.
   const INFO_PINNED_30 = { "dash.carbon": 40, "dash.today_veh": 40, "fc.cost": 39, "dash.delivered": 38, "dash.sim": 38, "clp.holding_areas": 38,
-    "la.lorryplan": 37, "la.commit": 37, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
+    "la.lorryplan": 37, "la.commit": 37, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34,
     "map.commit.today": 33, "map.commit.week": 33, "dash.stock": 33, "dash.vehicles": 32, "la.cost_quote": 32, "clp.euro_class": 31, "clp.carbon_rate": 31 };
-  const INFO_PINNED_MAX = 20;   // 24 Nov 2026 (the Dashboard rethink, A1): dash.deliveries brought within 30 words, left the list
+  const INFO_PINNED_MAX = 19;   // 24 Nov 2026 (the Dashboard rethink): 21 -> 19, dash.deliveries (A1) and dash.gates (A2) each brought within 30 words and left the list
   const over30 = (dict) => Object.keys(dict).filter(k => words(dict[k].text) > 30);
   const unpinnedOver = (dict) => over30(dict).filter(k => !(k in INFO_PINNED_30));
   ok(`⭐ FR1 A2: every "i" box shows at most 30 words, but the pinned (${over30(INFOS).length} over 30 today, ${Object.keys(INFO_PINNED_30).length} pinned)`,
@@ -3354,9 +3360,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile chart is a line chart now and takes the box's own height
   // (as the Stockpiles page's does), so four row charts are left: the gate chart and the CLP section's three
   ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the gate and CLP row charts, whose height follows their rows)",
-     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 4
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the gate chart became dials (no canvas), so three row charts are left
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 3 && !src.includes('<ChartCanvas config={gaCfg}')
      && src.includes('height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />') && src.includes('height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />')
-     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes('<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate"') && !/<ChartCanvas config=\{cfg\} height=/.test(src)
+     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && !/<ChartCanvas config=\{cfg\} height=/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -3574,32 +3581,36 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
 // (capacity_per_day, capacity_pct; test_gate_arrivals pins the arithmetic and that it agrees with the red flag).
 {
   const _ga = (src.match(/function GateArrivalsPanel\([\s\S]*?\n\}\n/) || [""])[0];
-  ok("GATE CHART: the panel opens with a chart, one row a gate (fullest first), above the table, which folds under 'Gate by gate'",
-     _ga.includes('<div className="ga-chart" data-ga-chart="1">') && _ga.includes('<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate"')
-     && _ga.indexOf('data-ga-chart="1"') < _ga.indexOf('data-rd-table="gates"') && _ga.includes('<details className="ga-more" data-ga-table="1"><summary>Gate by gate:')
+  // REVERSED 24 Nov 2026 (the Dashboard rethink, A2; John: "a gauge for each gate", version c): the bullet chart became a dial
+  // a gate. Each of the five checks below is the old one turned round: what it held, and what holds now.
+  ok("GATE CHART: REVERSED 24 Nov 2026 — dials, not a chart: one a gate (fullest first, the same order), above the table, which folds under 'All N gates' / 'Gate by gate'",
+     !_ga.includes('data-ga-chart="1"') && !_ga.includes("<ChartCanvas config={gaCfg}") && !src.includes("const gaCfg =")
+     && _ga.includes('<div className="ga-chart" data-ga-dials="1">') && _ga.includes("{shown.map(r => <GaDial key={r.g.gate_id} r={r} name={dialName(r)} />)}")
+     && _ga.indexOf('data-ga-dials="1"') < _ga.indexOf('data-rd-table="gates"')
+     && _ga.includes("<details className=\"ga-more\" data-ga-table=\"1\"><summary>{shown.length < gates.length ? `All ${gates.length} gates` : \"Gate by gate\"}: the gap, the check-in time, each {TEAM().toLowerCase()}'s lorries</summary>")
      && _ga.includes("((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day)"));
-  ok("GATE CHART: a bullet chart — a pale track to the gate's capacity, the planned arrivals inside it, a marker with an arrow at capacity",
-     _ga.includes('{ label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap)') && _ga.includes('{ label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day)')
-     && _ga.includes('const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {') && _ga.includes("plugins: [capMarks] };")
-     && (_ga.match(/grouped: false/g) || []).length === 2);
-  ok("GATE CHART: 🔴 the browser draws the server's capacity and flag — it divides nothing; red only where the server's flag is red",
-     // NARROWED 14 Oct 2026 (W17): + near (the server's amber flag) in gold; the 85 % tick is the server's near_per_day
+  ok("GATE CHART: REVERSED 24 Nov 2026 — a half ring to 125 % of the gate's OWN capacity, a dashed mark at GA_NEAR and a solid one at capacity; no track to a shared scale",
+     !src.includes('const capMarks = { id: "gaCapMarks"') && !src.includes('{ label: "Capacity a day"')
+     && src.includes("const GA_DIAL_TOP = 125;") && src.includes("const GA_DIALS = 6;")
+     && src.includes('{r.cap != null && <line className="ga-d-near" {...gaDialTick(GA_NEAR)} />}') && src.includes('{r.cap != null && <line className="ga-d-cap" {...gaDialTick(100)} />}')
+     && src.includes('<path className="ga-d-track" d={gaDialArc(GA_DIAL_TOP)} />') && src.includes('{r.pct != null && <path className="ga-d-arc" d={gaDialArc(r.pct)} />}'));
+  ok("GATE CHART: 🔴 the browser draws the server's share and flag — the panel divides nothing; the arc's tone is the server's flag; no gate shows past the server's own",
      _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\", near: g.flag === \"amber\" }))")
-     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60|GA_NEAR *\/|\/ *100/.test(_ga) && _ga.includes("r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)")
-     && _ga.includes("x.getPixelForValue(r.g.near_per_day)"));
-  ok("GATE CHART: every row says its figure in words (no hover on a TV or a print): 'N a day · P % of C', 'over capacity', 'no check-in time typed'",
-     // NARROWED 14 Oct 2026 (W17): + "queue likely" on an amber row, and a headline for gates near capacity
-     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");')
-     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}'));
-  ok("GATE CHART: a key names the bar, the track, the marker, red and grey; the tooltip names the gate and how capacity is worked out",
-     // NARROWED 14 Oct 2026 (W17): capacity is the gate's open hours (the shift where none are typed), and the key names the 85 % step
-     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the open hours ÷ the check-in time a lorry")
-     && _ga.includes('<i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely')
-     && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
-     // REVERSED 17 Oct 2026: no gate rests on the lorry shift; the tooltip names the hours (the default said so) and the shut minutes
+     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60|GA_NEAR *\/|\/ *100/.test(_ga)
+     && src.includes('const gaDialTone = (r) => r.cap == null ? "none" : r.over ? "bad" : r.near ? "warn" : "ok";')
+     && _ga.includes("const shown = rowsC.filter((r, i) => i < GA_DIALS || r.over || r.near);"));
+  ok("GATE CHART: every dial says its figure in words (no hover on a TV or a print): the share, 'N a day of C', and a word only where a gate is not fine",
+     src.includes('{r.pct == null ? "—" : `${r.pct} %`}') && src.includes('{gaN1(r.g.arrivals_per_day)} a day{r.cap == null ? "" : ` of ${grp(r.cap)}`}')
+     && src.includes("{word && <RowStatus word={word} tone={tone} />}")
+     && _ga.includes('const verdict = nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity";')
+     && _ga.includes('<span className="ga-head-v" data-ga-verdict={vTone}><RowStatus word={verdict} tone={vTone} /></span>'));
+  ok("GATE CHART: REVERSED 24 Nov 2026 — the five-part key went; ONE key line names the two marks; how capacity is worked out stays in the \"i\" and the fold",
+     !src.includes('<i className="ga-key-bar"></i>planned arrivals a day') && !src.includes("capacity: the open hours ÷ the check-in time a lorry")
+     && !src.includes('<i className="ga-key-gold"></i>') && !src.includes("more than it can check in <i") && !/\.ga-key-(bar|track|red|gold|none)\{/.test(html)
+     && _ga.includes('<div className="ga-key"><span><i className="ga-key-near" aria-hidden="true"></i>{GA_NEAR} %: queue likely</span><span><i className="ga-key-cap" aria-hidden="true"></i>capacity</span></div>')
+     && src.includes("Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.")
      && !_ga.includes("h shift") && !_ga.includes("ga.shift_hours")
-     && _ga.includes('a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}')
-     && _ga.includes('${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`'));
+     && _ga.includes('<RdItem t="Open">') && _ga.includes('<RdItem t="Check-in" >'));
 }
 
 // ---- 14 Oct 2026 (bundle G, W7 + W8): CLP monitoring and the CLP data fields, source level ---------------
@@ -3758,7 +3769,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('<button type="button" className="row-x" aria-label={`Remove shut time ${i + 1}`} title="Remove"')   // NARROWED 27 Oct 2026: a named 26 px "×"
      && src.includes('<div role="group" aria-labelledby="gate-shut-h">') && src.includes('id="gate-shut-h">Shut during the day (optional)</div>'));
   ok("⭐ the review: a gate left no open time says so on the chart's tooltip and the week's card, never 'no check-in time typed'",
-     src.includes('r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null')
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the chart's tooltip went with the chart; the dial's word says it
+     src.includes('const gaDialWord = (r) => r.cap == null ? (r.g.no_open_time ? "No open time" : "No check-in time typed")')
+     && !src.includes('"No open time: the bands and shut times cover its hours"')
      && src.includes(`g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."`));
   ok("the Config hint is a sentence and says a change that strands a gate is refused, naming it",
      src.includes(_h1 + ". Take them from the noise consent or planning conditions.</div>")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the refusal names the gate on Save; the hint no longer says so
@@ -5275,7 +5288,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && dash.includes("{sites.length ? ` · ${sitesWords(sites, locList)}` : \"\"}"));
   ok("CHART BUTTONS: ONE component (ChartTools) drawn by ChartCanvas; Copy writes a PNG to the clipboard and falls back to a download that says 'Saved instead'; Download saves the same PNG",
      code.includes("function ChartTools({ title, scope, getPlot, inline }){") && code.includes('new ClipboardItem({ "image/png": make() })') && code.includes('await download("Saved instead")')
-     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 3 /* NARROWED 17 Nov 2026 (best option step 3): + the Route choices record, in its own head */
+     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 4 /* NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): + the gate dials' own, in their title row */ /* NARROWED 17 Nov 2026 (best option step 3): + the Route choices record, in its own head */
      // NARROWED 10 Nov 2026 (wave 3, finding 5): drawn once as `tools`, in the box or in the chart's own title row (`head`)
      && code.includes("const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;"));
   ok("CHART BUTTONS: the picture is drawn at 2x on WHITE, redrawn light off screen, the title above and ONE scope line below (scheme, the page's parts, 'Wayscope, <date>', the demo notice)",
@@ -5288,7 +5301,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes('aria-label={`Copy chart: ${t}`}') && src.includes('aria-label={`Download chart: ${t}`}'));
   ok("CHART BUTTONS: the Dashboard's eight working charts, Gate arrivals, the stockpile charts, the CLP carbon pair and the Simulation's timeline each carry a title; the page's own scope rides on the Dashboard's",
      (dash.match(/<ChartCanvas config=\{\w+\}[^\n]*title=\{[^\n]*scope=\{dashScope\} \/>/g) || []).length === 8
-     && code.includes('title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]}') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the dials carry their own ChartTools with the same scope
+     && code.includes('<ChartTools inline title={picTitle} scope={[ga.label, sited || null]} getPlot={async () => gaDialsPicture(shown, dialName)} />')
+     && code.includes('const picTitle = "Gate arrivals: each gate against its capacity";') && !code.includes('title="Gate arrivals: lorries a day at each gate"') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
      && code.includes("const dashScope = [rangeLabel,"));
   // 5 Nov 2026 (task 0d-2, the user: "Yes, as recommended" to notes\busy-hours-apply-mockup-1105 Q1-Q20)
   // REVERSED 17 Nov 2026 (ui-best-option-1117, Q6; the user: "Yes, as recommended"; it bends the 5 Nov line): the offer no
