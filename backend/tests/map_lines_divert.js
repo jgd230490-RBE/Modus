@@ -44,7 +44,7 @@ function stubMap(order) {
 const FILTER = (legs, rids) => ['all', ['==', ['get', 'is_forecast'], true], ['in', ['get', 'type'], ['literal', legs]], ['in', ['get', 'route_id'], ['literal', rids]]];
 function load(env) {
   const names = Object.keys(env);
-  return new Function(...names, block + "\nreturn { DIV_EDGE, DIV_USUAL, DIV_USUAL_LAYERS, divOffPieces, updateDiversionEdge, divEdgeGaps, updateUsualRoad, ensureDiversionEdge, placeDiversionEdge, divOverlayPasses, divBandW };")(...names.map(k => env[k]));
+  return new Function(...names, block + "\nreturn { DIV_EDGE, DIV_USUAL, DIV_USUAL_LAYERS, divOffPieces, updateDiversionEdge, divEdgeGap, updateUsualRoad, ensureDiversionEdge, placeDiversionEdge, divOverlayPasses };")(...names.map(k => env[k]));
 }
 const BASE = (m, over) => Object.assign({
   map: m, DIV: { orig: new Map() }, forecastLayerFilter: () => FILTER(['Inbound Highway', 'Outbound Highway'], ['R1', 'R2']),
@@ -118,42 +118,35 @@ ok("A14 the filter or a pick redraws it (applyForecastFilter), and a look change
    fnSrc("applyForecastFilter").includes("updateUsualRoad()") && fnSrc("raiseMarks").includes("restyleUsualRoad()"));
 
 // ---------------------------------------------------------------------------------------------------------------
-console.log("B. The way round: two amber rails outside the line, at every band");
-ok("B1 amber #F59E0B, 3 px a side (at least 2 px of amber shows each side), round caps",
+console.log("B. The way round: two amber rails outside the one line");
+ok("B1 amber #F59E0B, 3 px a side (at least 2 px of amber shows each side), round caps, the gap the line's own width",
    /const DIV_EDGE = \{ colour: '#F59E0B', near_m: 25, rail: 3,/.test(block)
-   && /'line-cap': 'round'/.test(fnSrc("ensureDiversionEdge")) && /'line-gap-width': \['to-number', \['get', 'dv_gap'\], FORECAST_LINE_WIDTH\]/.test(fnSrc("ensureDiversionEdge")));
+   && /'line-cap': 'round'/.test(fnSrc("ensureDiversionEdge")) && fnSrc("ensureDiversionEdge").includes("'line-gap-width': divEdgeGap(),"));
+// 25 Nov 2026: John reversed Q4 ("all lines should be the same thickess"): every blue line is 5 px on 7.6 in every mode,
+// so the rails' gap is the one width; the band-width gaps built on 24 Nov (pieces cut where the width changed) are GONE
+ok("⭐ B2 gone: no band width in the diversion code (no dv_gap, no cut by width, no LINE_BAND_WIDTHS / bandWidthExpr / rlStops)",
+   !/dv_gap|divEdgeGaps|divGapLines|divBandW|DIV_GAP_NEAR_M|LINE_BAND_WIDTHS|bandWidthExpr|rlStops/.test(block));
 {
+  const gap = (over) => { const m = stubMap(); const E = load(BASE(m, over)); E.ensureDiversionEdge(); return (m.added.find(x => x.l.id === 'diversion-edge') || { l: { paint: {} } }).l.paint['line-gap-width']; };
+  ok("⭐ B3 the gap is the one line width (5 px, so 11 px across) whatever the heat map; a council view its thin line (2 px)",
+     gap({}) === 5 && gap({ heatMode: () => 'volume' }) === 5 && gap({ heatMode: () => 'carbon' }) === 5 && gap({ councilFocus: () => true }) === 2,
+     [gap({}), gap({ heatMode: () => 'volume' }), gap({ councilFocus: () => true })]);
   const orig = new Map([['R1|Inbound Highway', { coords: mainL }]]);
-  const run = (over, routes, rl) => {
-    const m = stubMap(['forecast-casing', 'forecast-layer', 'road-load-line']);
-    m.sources['routes-source'] = { _data: { features: routes || [] }, setData: () => {} };
-    if (rl) m.sources['road-load-source'] = { _data: { features: rl }, setData: () => {} };
-    const E = load(BASE(m, Object.assign({ DIV: { orig } }, over)));
-    E.updateDiversionEdge({ features: [leg('R1', 'Inbound Highway', divL)] });
-    return E.DIV_EDGE.fc.features.map(f => f.properties.dv_gap);
-  };
-  ok("⭐ B2 heat map Off: the gap is the line's one width (5 px)", JSON.stringify(run({})) === '[5]', run({}));
-  ok("B3 a council view: the gap is the thin council line (2 px)", JSON.stringify(run({ councilFocus: () => true })) === '[2]');
-  const route = (avg) => ({ type: 'Feature', properties: { type: 'Inbound Highway', route_id: 'R1', is_forecast: true, f_avg: avg, f_co2: 0 }, geometry: { type: 'LineString', coordinates: divL } });
-  ok("⭐ B4 Volume: the gap is the band's own width under the stretch, widest (200 and over, 10 px) and thinnest (under 20, 3 px)",
-     JSON.stringify(run({ heatMode: () => 'volume' }, [route(250)])) === '[10]' && JSON.stringify(run({ heatMode: () => 'volume' }, [route(5)])) === '[3]',
-     [run({ heatMode: () => 'volume' }, [route(250)]), run({ heatMode: () => 'volume' }, [route(5)])]);
-  const rlf = [{ type: 'Feature', properties: { rl_mv: 120 }, geometry: { type: 'LineString', coordinates: divL.filter(c => c[0] >= -0.96 && c[0] <= -0.95) } }];
-  const g = run({ heatMode: () => 'volume' }, [route(5)], rlf);
-  ok("⭐ B5 a shared section over part of it (100 to 200, 8 px) widens the gap THERE only: the piece is cut where the width changes",
-     g.includes(8) && g.includes(3) && g.length >= 2, g);
-  ok("B6 a filtered-out route's band does not widen the gap", JSON.stringify(run({ heatMode: () => 'volume', forecastLayerFilter: () => FILTER(['Inbound Highway'], ['R1']) },
-     [route(5), Object.assign(route(250), { properties: { type: 'Inbound Highway', route_id: 'R9', is_forecast: true, f_avg: 250 } })])) === '[3]');
+  const m = stubMap(); const E = load(BASE(m, { DIV: { orig } }));
+  E.updateDiversionEdge({ features: [leg('R1', 'Inbound Highway', divL)] });
+  ok("B4 one piece a stretch off the usual road, sent once; the same month again sends nothing",
+     E.DIV_EDGE.fc.features.length === 1 && m.sent['diversion-edge-source'] === 1
+     && (E.updateDiversionEdge({ features: [leg('R1', 'Inbound Highway', divL)] }), m.sent['diversion-edge-source'] === 1));
 }
 {
   const m = stubMap(['forecast-casing', 'forecast-layer', 'diversion-edge', 'road-load-casing', 'road-load-line', 'forecast-flow', 'busy-core']);
   const E = load(BASE(m)); E.placeDiversionEdge();
   const o = m.order;
-  ok("⭐ B7 the rails go just over the highest of the forecast line, the shared sections and the lanes (so no band hides them), under a pick",
+  ok("⭐ B7 the rails go just over the highest of the forecast line, the shared sections and the lanes (so a shared section never hides them), under a pick",
      o.indexOf('diversion-edge') === o.indexOf('forecast-flow') + 1 && o.indexOf('diversion-edge') < o.indexOf('busy-core'), o);
 }
-ok("B8 a band or mode change re-cuts the gaps (applyCarbonMode), and the filter does too (applyForecastFilter)",
-   fnSrc("applyCarbonMode").includes("if (typeof divEdgeGaps === 'function') divEdgeGaps();") && fnSrc("applyForecastFilter").includes("divEdgeGaps()"));
+ok("B8 a mode change (a council view) sets the gap again (applyCarbonMode)",
+   fnSrc("applyCarbonMode").includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());"));
 ok("B9 amber is the way round's alone: the busy-hours road and its hours carry none",
    !/#F59E0B|#f59e0b|amber/i.test(fnSrc("busyInk") + fnSrc("busySample")) && html.includes("const BUSY_ROAD_COLOR = CONFIG.COLORS.brand;"));
 
@@ -207,7 +200,7 @@ ok("D3 the key's samples are hidden from a screen reader (the row's words say it
 console.log("E. The guides");
 ok("E1 the user guide's key row and busy-hours item say what the map now draws",
    help.includes("Where a route goes round a closure") && help.includes("Usual road, not used this month") && /busy hours[\s\S]{0,400}without a click|with no click/i.test(help));
-ok("E2 the technical guide says how the rails keep clear of a wide band", /line-gap-width/.test(tech) && /div-usual/.test(tech));
+ok("E2 the technical guide says how the rails sit outside the line, and no band width", /line-gap-width/.test(tech) && /div-usual/.test(tech) && !/dv_gap|DIV_GAP_NEAR_M/.test(tech));
 
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);

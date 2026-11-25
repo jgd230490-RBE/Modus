@@ -151,9 +151,9 @@ ok("C9 the shared sections are widened by rl_mv on their own stops (rlStops), at
    && acm.includes("map.setPaintProperty('road-load-line', 'line-width', bandWidthExpr('rl_mv', rlStops(), 0));")
    && acm.includes("map.setPaintProperty('road-load-casing', 'line-width', bandWidthExpr('rl_mv', rlStops(), LINE_BAND_PAD));"));
 // NARROWED 24 Nov 2026 (card 5, claude/map-lines-diversions): the edge is two amber rails OUTSIDE the line, their gap the
-// width of the widest band under each stretch (divEdgeGaps), so a band change re-cuts the gaps instead of widening a casing
-ok("C10 the amber diversion edge keeps clear of a wide band: a band change re-cuts its gaps to the line's width",
-   acm.includes("if (typeof divEdgeGaps === 'function') divEdgeGaps();") && !acm.includes("'diversion-edge', 'line-width', caseW"));
+// line's own width (25 Nov: the one width, John's reversal of Q4), set again at a mode change instead of widening a casing
+ok("C10 the amber diversion edge keeps clear of the line: a mode change sets the rails' gap to the line's width",
+   acm.includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());") && !acm.includes("'diversion-edge', 'line-width', caseW"));
 ok("C11 the edge under every forecast line: white on a light ground, the 12 Nov pale edge on a dark one, heat map on or Off",
    fnSrc("heatEdgeColour").includes("return typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing;")
    && html.includes("const HEAT_EDGE_DARK = '#E7E5E4';"));

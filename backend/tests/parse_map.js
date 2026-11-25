@@ -7407,13 +7407,13 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     E2.updateDiversionEdge({ features: [] });
     ok("edge: a month with no diversion clears the edge once", sent === 2 && E2.DIV_EDGE.fc.features.length === 0);
     E2.ensureDiversionEdge();
-    // NARROWED 24 Nov 2026 (card 5): two amber rails OUTSIDE the line (line-gap-width = the line's own width, dv_gap), 3 px a
+    // NARROWED 24 Nov 2026 (card 5): two amber rails OUTSIDE the line (line-gap-width = the one line width, 25 Nov), 3 px a
     // side, added at the line and then lifted over the lines (placeDiversionEdge); the usual road's three layers go UNDER
     // the forecast casing
     const ed = added.find(x => x[0] === 'diversion-edge');
     ok("⭐ edge: two amber rails outside the line (a gap the line's width), 3 px a side, round caps; the usual road under the forecast casing",
        !!ed && ed[1] === 'forecast-layer' && ed[2] === 3 && ed[3] === '#F59E0B'
-       && JSON.stringify(ed[4]) === JSON.stringify(['to-number', ['get', 'dv_gap'], 6]) && ed[5] === 'round'
+       && ed[4] === 6 && ed[5] === 'round'
        && ['div-usual-casing', 'div-usual', 'div-usual-x'].every(id => (added.find(x => x[0] === id) || [])[1] === 'forecast-casing'), added);
     ok("edge: the legend line, only in a month with a diversion, and the edge rides with the overlay (added, filtered, removed)",
        // NARROWED 24 Nov 2026 (card 5): reworded "The way round a closure", in divLegendRows
