@@ -443,7 +443,7 @@ def _closures(route, vehicle, day, ctx):
         for p in pages:
             leg = "" if len(p["legs"]) != 1 else (" going loaded" if "loaded" in p["legs"] else " coming back")
             if p["kind"] == "diversion":
-                lines.append({"kind": "closure", "text": f"Diversion {p['when']}{leg}: page {p['page']}"})
+                lines.append({"kind": "closure", "text": f"Diversion {p['when']}{(',' + leg) if leg else ''}: page {p['page']}"})
             else:
                 lines.append({"kind": "peak", "text": f"Weekdays {p['when']}: the peak-hours road{leg}, page {p['page']}"})
         for r in ctx.all_choice:

@@ -488,4 +488,5 @@ def community_in_frame(v, omit=()):
     keep = [f for f in keep if f["properties"]["kind"] not in omit]
     kinds = [dict(k) for k in community.KINDS if any(f["properties"]["kind"] == k["key"] for f in keep)]
     sources = sorted({f["properties"].get("source_key") for f in keep if f["properties"].get("source_key")})
-    return {"features": keep, "kinds": kinds, "credit": community.credit_line(sources) if keep else "", "left_out": left_out}
+    return {"features": keep, "kinds": kinds, "credit": community.credit_line(sources) if keep else "", "left_out": left_out,
+            "sources": sources if keep else []}       # 25 Nov 2026: the Route sheet joins its block's sources to these

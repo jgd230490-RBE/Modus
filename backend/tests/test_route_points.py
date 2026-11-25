@@ -470,6 +470,7 @@ ok("4: ...printed under several routes: no route named", rp.shared_words(5, ["R0
 ok("4: a block whose every limit was printed above loses the at-limit sentence (nothing 'below' is left)",
    blocks[1]["sentences"] == [] and blocks[0]["sentences"] == A["sentences"], str(blocks[1]["sentences"]))
 
+SAVED_HITS = db.query("SELECT id, limits_hits, limits_checked_at, limits_status FROM routes WHERE tenant_id = ?", (T,))
 # --------------------------------------------------------------------------- 5. every demo route, stand-in lines: no banned word
 import math  # noqa: E402
 locs = {l["id"]: l for l in db.query("SELECT id, lat, lon FROM locations WHERE tenant_id = ?", (T,))}
@@ -510,6 +511,47 @@ ok("6: route_points fetches nothing, draws no map, writes nothing",
    not re.search(r"urlopen|requests\.|basemap|httpx|db\.execute|INSERT |UPDATE |DELETE ", code))
 ok("6: no collision count is read", "collision_records" not in code and "count_on_lines" not in code)
 ok("6: places come from the grid's cells, never every place for every route", "self.grid.get((gx, gy)" in code)
+
+
+# --------------------------------------------------------------------------- 7. the Route sheet (stage 3)
+route_choice._MEMO.clear()
+for _h in SAVED_HITS:          # section 5 gave every route stand-in hits: put sections 2 to 4's back
+    db.execute("UPDATE routes SET limits_hits = ?, limits_checked_at = ?, limits_status = ? WHERE tenant_id = ? AND id = ?",
+               (_h["limits_hits"], _h["limits_checked_at"], _h["limits_status"], T, _h["id"]))
+
+
+def flat(pdf):
+    return re.sub(r"\s+", " ", pdf_text(pdf))
+
+
+def flat_raw(pdf):
+    return re.sub(r"\s+", " ", pdf_text(pdf, raw=True))
+
+
+S12 = route_sheet.sheet("R012", vehicle=FLAT)
+pdf12 = export.build_route_sheet_pdf(S12)
+T12 = flat(pdf12)
+ok("7: the Route sheet carries the block in place of the limit lines: its heading, the sentence, both ways, the foot",
+   "Take care on this route" in T12 and "at the limit at every height limit below" in T12 and "Going loaded" in T12
+   and "Coming back" in T12 and "Road signs come first" in T12 and "Lorry limits: this lorry is over" not in T12, T12[:400])
+ok("7: ...every place, uncut (no '+n more'), and the limits' road names",
+   all(n in T12 for n in ("St Lukes Hospital", "Tugby CofE Primary School", "Uppingham Surgery", "Melton Road, B6047", "Kettering Road"))
+   and "more on the route sheet" not in T12)
+ok("7: ...an unnamed limit says 'no road name stored' and does not send the reader to a map on this same sheet",
+   "no road name stored" in T12 and "see the map on the route sheet" not in T12)
+ok("7: ...page 1 names the diversion page by its dates", "Diversion 1–31 Dec 2027: page 2" in T12, T12[T12.find("Take care"):][:600])
+ok("7: ...the block's foot says when the limits were last checked",
+   "Road signs come first. Limits checked 24 Nov 2026." in T12 or "Road signs come first. Limits checked 24 Nov 2026." in flat_raw(pdf12))
+ok("7: ...the gate stays in Arriving at B (the block prints no gate line of its own on this sheet)",
+   T12.count("No deliveries") == 1 or "Arriving at B" in T12)
+ok("7: the diversion's page carries its own block: its own limit back (Diversion Lane), not the main line's Kettering Road",
+   pdf_text(pdf12).count("\f") >= 2 and "Diversion Lane" in T12.split("Back to page 1's route")[0][T12.find("Diversion: "):]
+   if "Diversion: " in T12 else False, T12[T12.find("Diversion: "):][:500] if "Diversion: " in T12 else T12[-600:])
+ok("7: the block was placed beside the last mile or, when too long, full width under it (the typed words beside the last mile, last)", S12.get("take_care_place") in ("side", "full", "full2"), (S12.get("take_care_place"), S12.get("body_size"), S12.get("take_care_size")))
+T40 = flat(export.build_route_sheet_pdf(route_sheet.sheet("R040", vehicle=FLAT)))
+ok("7: a lorry over a limit: the OVER sentence on the Route sheet, the limit's line says so",
+   "This lorry is over a limit below. Ask the site team before you run." in T40 and "this lorry is over it" in T40, T40[:500])
+ok("7: the blocks the sheet prints say no banned word", not any(BANNED_RE.search(w) for P in [S12["take_care"]] + [d.get("take_care") or {"head": ""} for d in S12["diversions"]] for w in rp.all_words(P) if P.get("legs") is not None))
 
 
 print(f"test_route_points: {PASS} passed, {len(FAIL)} failed")

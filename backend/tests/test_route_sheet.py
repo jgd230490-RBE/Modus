@@ -427,8 +427,10 @@ ok("⭐ the legend and the last mile, the arriving and leaving blocks with the g
    and "Leaving B" in T and "Gate out: South gate" in T and f"Then follow the amber route back to A: {S['return_words']}." in T   # NARROWED 23 Oct 2026: amber, solid
    and "Gate in" in T and "Gate out" in T, T)
 # two columns: the text comes out a row at a time (both headings, then both bodies), so each row is checked in that order
+# NARROWED 25 Nov 2026 (the Look-ahead rethink, card 4): the heading reads "Permitted deviations" on the sheet (the field's
+# own name; "diversion" is a dated closure's way round); the Routes screen's label is not changed
 ok("⭐ the typed words under their headings, two to a row; 'Not typed' nowhere here (nothing is missing); the gate note in metres",
-   "Why this route Permitted diversions Agreed in the CLP: avoids the village centre. If the A-road is closed: the signed diversion only." in T
+   "Why this route Permitted deviations Agreed in the CLP: avoids the village centre. If the A-road is closed: the signed diversion only." in T
    and "Site rules at B, Mill Compound Site rules at A, Kelsey Quarry 15 mph on site. Report to the weighbridge." in T
    and "Not typed" not in T and "starts 334 m from South gate" in T, T)
 network.set_site_rules("L1", None)
@@ -437,14 +439,14 @@ T2 = flat(export.build_route_sheet_pdf(rs.sheet("R1", acc=PLANNER)))
 # REVERSED 11 Nov 2026 (CLOCS card B-F2, John's yes): it read "an empty field reads 'Not typed' under its heading, never
 # vanishes"; an empty part is now left off the sheet and the Routes screen says which words are missing
 ok("🔴 an empty field is left out, heading and all: no 'Not typed' on the sheet; the typed parts close up two to a row",
-   "Not typed" not in T2 and "Permitted diversions" not in T2 and "Site rules at A" not in T2
+   "Not typed" not in T2 and "Permitted deviations" not in T2 and "Permitted diversions" not in T2 and "Site rules at A" not in T2
    and "Why this route Site rules at B, Mill Compound Agreed in the CLP: avoids the village centre. 15 mph on site." in T2,
    T2[-500:])
 network.set_route_sheet_text("R1", {"route_reason"}, route_reason=None)
 _blk = export.route_sheet_blocks(rs.sheet("R1", acc=PLANNER))
 ok("...route_sheet_blocks lists only what is typed, never a 'Not typed' body",
    all(b[1] and b[1] != rs.NOT_TYPED and b[2] is False for b in _blk)
-   and not any(b[0] in ("Why this route", "Permitted diversions") for b in _blk), str(_blk))
+   and not any(b[0] in ("Why this route", "Permitted deviations", "Permitted diversions") for b in _blk), str(_blk))
 network.set_route_sheet_text("R1", {"route_reason"}, route_reason="Agreed in the CLP: avoids the village centre.")
 ok("⭐ the footer: a planning document, the site team and the signs first; no Mapbox credit for a map it did not draw (offline)",
    "A planning document: the site team's instructions and the road signs come first." in T and "Mapbox" not in T
@@ -698,8 +700,9 @@ T5 = flat(export.build_route_sheet_pdf(S5))
 ok("⭐ 3c. the sheet says it: calls at H in the subtitle; the legend A to H, H to B when called, back with no stop; the H badge in the key",
    "calls at Lane holding area" in T5 and "Loaded, A to H" in T5 and "H to B when called" in T5 and "Empty, back to A (no stop at H)" in T5
    and "holding area" in T5 and "Loaded, A to B" not in T5, T5[:600])
-ok("⭐ 3c. Arriving opens with the three steps, in order, then the gate: go to H first (where, hours, spaces); wait to be called forward; then the gate",
-   T5.index("1. Go to Lane holding area first") < T5.index("2. Wait there to be called forward.") < T5.index("3. Then drive to the gate:") < T5.index("Gate in: Hill gate")
+# NARROWED 25 Nov 2026 (card 4): step 2 reads "Wait there until called to site." (the Driver sheet's words)
+ok("⭐ 3c. Arriving opens with the three steps, in order, then the gate: go to H first (where, hours, spaces); wait until called to site; then the gate",
+   T5.index("1. Go to Lane holding area first") < T5.index("2. Wait there until called to site.") < T5.index("3. Then drive to the gate:") < T5.index("Gate in: Hill gate")
    and "before the" in T5 and "open 07:00–20:30, closed on Saturdays and Sundays" in T5 and "spaces" in T5, T5[T5.find("Arriving"):][:500])
 ok("3c. the holding area's rules as typed, under their own heading; the second map's heading",
    "Site rules at H, Lane holding area" in T5 and "Engines off while you wait." in T5
