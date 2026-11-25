@@ -7452,10 +7452,11 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     E2.ensureDiversionEdge();
     // NARROWED 24 Nov 2026 (card 5): two amber rails OUTSIDE the line (line-gap-width = the one line width, 25 Nov), 3 px a
     // side, added at the line and then lifted over the lines (placeDiversionEdge); the usual road's three layers go UNDER
-    // the forecast casing
+    // the forecast casing. NARROWED 25 Nov 2026 (John, "Keep 4 px"): the rail is sized from the line and its casing, 1.7 px
+    // of amber beyond the casing (here the sandbox's 6 on 8.5: 2.95 px), never a written 3
     const ed = added.find(x => x[0] === 'diversion-edge');
-    ok("⭐ edge: two amber rails outside the line (a gap the line's width), 3 px a side, round caps; the usual road under the forecast casing",
-       !!ed && ed[1] === 'forecast-layer' && ed[2] === 3 && ed[3] === '#F59E0B'
+    ok("⭐ edge: two amber rails outside the line (a gap the line's width), 1.7 px beyond the casing a side, round caps; the usual road under the forecast casing",
+       !!ed && ed[1] === 'forecast-layer' && Math.abs(ed[2] - ((8.5 - 6) / 2 + 1.7)) < 1e-9 && ed[3] === '#F59E0B'
        && ed[4] === 6 && ed[5] === 'round'
        && ['div-usual-casing', 'div-usual', 'div-usual-x'].every(id => (added.find(x => x[0] === id) || [])[1] === 'forecast-casing'), added);
     ok("edge: the legend line, only in a month with a diversion, and the edge rides with the overlay (added, filtered, removed)",

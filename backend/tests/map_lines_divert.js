@@ -48,7 +48,7 @@ function load(env) {
 }
 const BASE = (m, over) => Object.assign({
   map: m, DIV: { orig: new Map() }, forecastLayerFilter: () => FILTER(['Inbound Highway', 'Outbound Highway'], ['R1', 'R2']),
-  FORECAST_CASING_WIDTH: 7.6, FORECAST_LINE_WIDTH: 5, COUNCIL_ROUTE_WIDTH: 2, CONFIG: { COLORS: { forecast: '#1F5FD6', brand: '#0B4EA2' } },
+  FORECAST_CASING_WIDTH: 6.6, FORECAST_LINE_WIDTH: 4, COUNCIL_ROUTE_WIDTH: 2, CONFIG: { COLORS: { forecast: '#1F5FD6', brand: '#0B4EA2' } },
   renderFlowLegend: () => {}, heatMode: () => null, councilFocus: () => false, mapModeMonth: () => 16, styleReady: () => true,
   LINE_BAND_WIDTHS: [3, 4.5, 6, 8, 10], ROUTE_VOLUME_STOPS: [20, 50, 100, 200], carbonScale: () => ({ stops: [1, 2, 3, 4] }),
   rlStops: () => [20, 50, 100, 200], RL: { month: 16, cache: { 16: true } }, netDark: () => false, labelAnchor: () => undefined,
@@ -119,17 +119,32 @@ ok("A14 the filter or a pick redraws it (applyForecastFilter), and a look change
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("B. The way round: two amber rails outside the one line");
-ok("B1 amber #F59E0B, 3 px a side (at least 2 px of amber shows each side), round caps, the gap the line's own width",
-   /const DIV_EDGE = \{ colour: '#F59E0B', near_m: 25, rail: 3,/.test(block)
-   && /'line-cap': 'round'/.test(fnSrc("ensureDiversionEdge")) && fnSrc("ensureDiversionEdge").includes("'line-gap-width': divEdgeGap(),"));
-// 25 Nov 2026: John reversed Q4 ("all lines should be the same thickess"): every blue line is 5 px on 7.6 in every mode,
+// NARROWED 25 Nov 2026 (John, "Keep 4 px"): the rail is no longer a written 3: it is sized from the line and its casing,
+// 1.7 px of amber beyond the casing whatever the one width is (4 on 6.6 now; 5 on 7.6 the day before)
+{
+  const railAt = (lw, cw) => load(BASE(stubMap(), { FORECAST_LINE_WIDTH: lw, FORECAST_CASING_WIDTH: cw })).DIV_EDGE.rail;
+  const beyond = (lw, cw) => railAt(lw, cw) - (cw - lw) / 2;
+  ok("B1 amber #F59E0B, round caps, the gap the line's own width; each rail 1.7 px of amber beyond the casing at 4 on 6.6 AND at 5 on 7.6 (at least 2 px of amber each side of the line)",
+     /const DIV_EDGE = \{ colour: '#F59E0B', near_m: 25, beyond: 1\.7,\n\s*get rail\(\)\{ return \(FORECAST_CASING_WIDTH - FORECAST_LINE_WIDTH\) \/ 2 \+ this\.beyond; \},/.test(block)
+     && Math.abs(beyond(4, 6.6) - 1.7) < 1e-9 && Math.abs(beyond(5, 7.6) - 1.7) < 1e-9 && railAt(4, 6.6) >= 2
+     && /'line-cap': 'round'/.test(fnSrc("ensureDiversionEdge")) && fnSrc("ensureDiversionEdge").includes("'line-gap-width': divEdgeGap(),"),
+     [railAt(4, 6.6), railAt(5, 7.6)]);
+  ok("⭐ B1b no line width written as a number in the diversion code (no 5 / 7.6 / 11 / 10 px figure): widths come from the constants",
+     !/(rail|line-gap-width|line-width)['"]?\s*:\s*(5|7\.6|11|10|4|6\.6)\b/.test(block));
+  const lw = html.match(/const FORECAST_LINE_WIDTH = ([\d.]+);/), du = block.match(/coreW:\s*([\d.]+)/),
+        bz = html.match(/id:'busy-core'[^\n]*'line-width':([\d.]+)/);
+  ok("B1c the usual road and the busy-hours road stay thinner than the one forecast line",
+     !!(lw && du && bz) && +du[1] < +lw[1] && +bz[1] < +lw[1], [lw && lw[1], du && du[1], bz && bz[1]]);
+}
+// 25 Nov 2026: John reversed Q4 ("all lines should be the same thickess"): every blue line is ONE width in every mode (4 px on 6.6 since his "Keep 4 px"),
 // so the rails' gap is the one width; the band-width gaps built on 24 Nov (pieces cut where the width changed) are GONE
 ok("⭐ B2 gone: no band width in the diversion code (no dv_gap, no cut by width, no LINE_BAND_WIDTHS / bandWidthExpr / rlStops)",
    !/dv_gap|divEdgeGaps|divGapLines|divBandW|DIV_GAP_NEAR_M|LINE_BAND_WIDTHS|bandWidthExpr|rlStops/.test(block));
 {
   const gap = (over) => { const m = stubMap(); const E = load(BASE(m, over)); E.ensureDiversionEdge(); return (m.added.find(x => x.l.id === 'diversion-edge') || { l: { paint: {} } }).l.paint['line-gap-width']; };
-  ok("⭐ B3 the gap is the one line width (5 px, so 11 px across) whatever the heat map; a council view its thin line (2 px)",
-     gap({}) === 5 && gap({ heatMode: () => 'volume' }) === 5 && gap({ heatMode: () => 'carbon' }) === 5 && gap({ councilFocus: () => true }) === 2,
+  ok("⭐ B3 the gap is the one line width (4 px, so 10 px across) whatever the heat map; a council view its thin line (2 px)",
+     gap({}) === 4 && gap({ heatMode: () => 'volume' }) === 4 && gap({ heatMode: () => 'carbon' }) === 4 && gap({ councilFocus: () => true }) === 2
+     && gap({ FORECAST_LINE_WIDTH: 5, FORECAST_CASING_WIDTH: 7.6 }) === 5,
      [gap({}), gap({ heatMode: () => 'volume' }), gap({ councilFocus: () => true })]);
   const orig = new Map([['R1|Inbound Highway', { coords: mainL }]]);
   const m = stubMap(); const E = load(BASE(m, { DIV: { orig } }));

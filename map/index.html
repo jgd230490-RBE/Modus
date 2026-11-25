@@ -9036,11 +9036,16 @@
     // the ONLY amber on a route now, and it must show where a shared section's line (road-load-line, drawn over the
     // routes) covers the route too: under the line at the casing's width it was gone there. So the edge is TWO AMBER
     // RAILS drawn OVER the lines, 'line-width' = DIV_EDGE.rail a side, 'line-gap-width' = the one line width
-    // (divEdgeGap: 5 px, so 11 px across; a council view's thin line 2 px). Placed just above the forecast line, the
+    // (divEdgeGap; a council view's thin line 2 px). Placed just above the forecast line, the
     // shared sections and the lanes (placeDiversionEdge), under the flow's arrows, a pick and the marks.
     // (25 Nov 2026, John reversed Q4: "all lines should be the same thickess". The rails' gap built on 24 Nov for each
-    // band's width, the pieces cut where it changed, is taken out: every blue line is 5 px on 7.6 again.)
-    const DIV_EDGE = { colour: '#F59E0B', near_m: 25, rail: 3, cache: new Map(), fc: { type: 'FeatureCollection', features: [] }, sig: '' };
+    // band's width, the pieces cut where it changed, is taken out: every blue line is one width again.)
+    // 25 Nov 2026 (John, "Keep 4 px" after a trial of 4 against 5): the rails are sized FROM the line and its casing, never
+    // a written width: each rail covers the casing's white beside the line and shows DIV_EDGE.beyond (1.7 px) of amber
+    // beyond the casing, so 4 px on 6.6 gives 3 px rails, 10 px across (5 on 7.6 gave the same 3 px, 11 across).
+    const DIV_EDGE = { colour: '#F59E0B', near_m: 25, beyond: 1.7,
+        get rail(){ return (FORECAST_CASING_WIDTH - FORECAST_LINE_WIDTH) / 2 + this.beyond; },
+        cache: new Map(), fc: { type: 'FeatureCollection', features: [] }, sig: '' };
     // 24 Nov 2026 (card 5, Q8): the USUAL road of a leg diverted this month — the stretch of its own line (DIV.orig) that
     // the diversion leaves, divOffPieces(usual, diversion), the mirror of the edge — drawn UNDER the forecast lines in pale
     // grey on a white casing with "×" marks along it. One union of the pieces of the routes the overlay lets through (the
