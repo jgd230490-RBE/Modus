@@ -145,7 +145,10 @@ console.log("A-X2 small words");
   ok("A-X2 ...and for visits: 'under 1 lorry visit a day'", !!cv && cv("under 1") === "under 1 lorry visit a day");
   ok("A-X2 every place that joined a count to its words goes through cwN (the shared road popup, its hover tip, the card, the timeline line)",
      html.includes("cwN(f ? f.properties.rl_mv_text : '0')") && html.includes("fig: cwN(p.rl_mv_text != null ? p.rl_mv_text : '0')")
-     && html.includes("escHtml(cwN(secN(v.aday)))") && html.includes("const parts = [cwN(trips), routes")
+     // NARROWED 24 Nov 2026 (card 7): the card's headline reads the rows' whole total through secTot ("under 1" over a route that runs),
+     // and the road's hover tip, which joined its count to CW().short, takes the singular through secShort (seen on live: "under 1 movements a day")
+     && html.includes("escHtml(cwN(secTot(v, 'aday', 'a_day')))") && html.includes("return t + ' ' + secShort(t) + ' · ' + secRoutes(v.n);")
+     && !html.includes("secN(v.aday) + ' ' + CW().short") && html.includes("const parts = [cwN(trips), routes")
      && !/rl_mv_text : '0'\) \+ ' ' \+ CW\(\)\.lower/.test(html) && !html.includes("secN(v.aday) + ' ' + escHtml(CW().lower)"));
   ok("⭐ A-X2 the figures bar's label is 'Movements a day' (two lines at 1422 px, not three); the lorry stays in its tip",
      html.includes('title="A lorry coming and going is 2 movements, as councils count them.">Movements a day</div>')
