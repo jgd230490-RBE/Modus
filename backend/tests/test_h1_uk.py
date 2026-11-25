@@ -1265,7 +1265,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 35   # NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+   _fe_wo.count("var(--warn-text)") == 37   # NARROWED 25 Nov 2026 (the Routes page rethink, the schedule): 35 -> 37, the card's warning mark, its diamond and its words; NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
      # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe

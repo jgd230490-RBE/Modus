@@ -295,8 +295,10 @@ const grow = (el) => act(() => { ROS.filter(r => r.els.includes(el)).forEach(r =
     ok("⭐ DOM: the figures table sits in a sideways-scrolling box the keyboard can reach, named 'All figures' (a narrow panel, full screen)",
        TRY(() => { const b = q('[data-ro="figures"] [data-bo-figures]'); return b.getAttribute("tabindex") === "0" && b.getAttribute("role") === "region"
                      && b.getAttribute("aria-label") === "All figures" && b.classList.contains("kb-scroll") && b.firstElementChild.matches("table[data-bo-table]"); }));
+    // NARROWED 25 Nov 2026 (the Routes page rethink, the schedule): the card now holds its own option's schedule
+    // (table.bo-sch); the options table of "All figures" is still never inside it
     ok("⭐ DOM: 'All figures' opens the options table with the figures (under both columns), not inside the card",
-       TRY(() => !!q('[data-ro="figures"] table[data-bo-table]') && !q('.bo-card table') && q("button[data-bo-all]").getAttribute("aria-expanded") === "true"));
+       TRY(() => !!q('[data-ro="figures"] table[data-bo-table]') && !q('.bo-card table[data-bo-table]') && q("button[data-bo-all]").getAttribute("aria-expanded") === "true"));
 
     // ---- Q4: Show Alt 1 on map ----
     MAP_BOX = { top: -620, bottom: -220, height: 400 }; moved.length = 0;

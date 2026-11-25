@@ -1106,7 +1106,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .row-st.rs-bad{background:var(--st-bad-bg);color:var(--bad-text);} .row-st.rs-bad i{background:var(--bad-text);color:var(--st-bad-bg);}
   .row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);width:14px;height:14px;}
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
-     John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
+     John 16 Nov "Yes, plain words"): since 25 Nov a collision row is two counts with grey bars and plain words. Under 600 px of card the
      head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
   .bo-card{container-type:inline-size;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 10px;max-width:820px;}
   .bo-eye{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
@@ -1132,10 +1132,28 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .bo-h{display:grid;grid-template-columns:116px 140px 1fr;gap:10px;align-items:start;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
   .bo-k{font-weight:600;} .bo-k.bo-sub{font-weight:500;padding-left:12px;}
   .bo-v{font-variant-numeric:tabular-nums;} .bo-v small,.bo-grey{color:var(--muted);} .bo-v small{font-size:12px;}
-  .bo-dash{color:var(--muted);}
   .bo-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
   .bo-fold{margin-left:auto;font-size:13px;font-weight:600;color:var(--navy);background:none;border:0;cursor:pointer;padding:6px 4px;}
   .bo-foot{font-size:12px;color:var(--muted);margin:8px 0 0;}
+  /* 25 Nov 2026 (the Routes page rethink, cards 4 and 7): the option's schedule. A row a measure; the tab's option in
+     the selection tint (sign blue at 6 %); a small bar each on the row's own scale, the route in use and both collision
+     bars grey; the difference a status SHAPE and its words (dot ok, diamond warning), plain text otherwise; no filled
+     cell, no pill. Under 600 px of the card's own width the bars go */
+  .bo-sch{--bo-bar:#62656B;--bo-bar-use:#A9ABB0;border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums;margin:2px 0 0;}
+  .bo-sch th,.bo-sch td{text-align:left;vertical-align:middle;padding:5px 8px;border-bottom:1px solid var(--line);}
+  .bo-sch thead th{font-weight:500;font-size:12px;color:var(--muted);padding:7px 8px 5px;border-bottom:1px solid var(--grey);}
+  .bo-sch tbody th{font-weight:500;color:var(--ink);} .bo-sch tbody th.bo-sub{font-weight:400;padding-left:22px;color:var(--muted);}
+  .bo-sch .bo-pick{background:var(--navy-soft-col);} .bo-sch thead th.bo-pick{color:var(--navy);font-weight:600;}
+  .bo-c{display:flex;align-items:center;gap:8px;} .bo-n{min-width:46px;text-align:right;flex:none;}
+  .bo-bar{display:inline-block;flex:none;height:7px;border-radius:3px;background:var(--bo-bar);} .bo-bar.bo-bar-use{background:var(--bo-bar-use);}
+  .bo-sch td.bo-none{color:var(--muted);}
+  .bo-mk{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap;}
+  .bo-mk i{flex:none;width:9px;height:9px;border-radius:50%;}
+  .bo-mk-ok{color:var(--ok-text);} .bo-mk-ok i{background:var(--ok-text);}
+  .bo-mk-warn{color:var(--warn-text);} .bo-mk-warn i{background:var(--warn-text);border-radius:0;transform:rotate(45deg) scale(.82);}
+  .bo-mk-plain{color:var(--ink);} .bo-mk-plain.bo-mk-none,.bo-mk-plain.bo-mk-off{color:var(--muted);}
+  html[data-theme="dark"] .bo-sch{--bo-bar:#C9CACE;--bo-bar-use:#6B6E74;}
+  @container (max-width:600px){.bo-sch .bo-bar{display:none;}.bo-sch th,.bo-sch td{padding:5px 6px;}.bo-n{min-width:0;}.bo-sch tbody th.bo-sub{padding-left:12px;}.bo-mk{white-space:normal;}}
   @container (max-width:600px){.bo-h{grid-template-columns:1fr auto;gap:2px 8px;}.bo-h .bo-v{grid-column:1 / -1;}.bo-k.bo-sub{padding-left:0;}}
   /* 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117, Q1 to Q4): an open route
      has a panel of its own under the Routes list. One column: the card, then all figures and diversions, then the
@@ -16943,9 +16961,6 @@ function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, ro
 // the history is not counted. Cycle routes and places: a chip, each measure's counts and its percentage. No pick on a
 // trade-off (no Make primary there, Q2); none on a route whose line in use is a dated diversion (Q4). Make primary
 // moves the card's lorry only (Q3).
-const BO_TONE = { fewer: "ok", quicker: "ok", less: "ok", same: "none", more: "warn", slower: "warn", mixed: "warn" };
-const BO_STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin.";
-const BO_NO_HISTORY = "Collisions are not compared: the collision history has not been fetched.";
 // Q9 (John, 16 Nov 2026): the rule names a limit below the lorry that the line IN USE meets ({words, legs, short}); the card
 // says it in one grey sentence of its own, the words John saw on Q9: "The diversion in use meets a 7.5 t limit below this
 // lorry." (taken under his one-hour rule, 17 Nov) from the rule's `short` ("7.5 t limit"); without `short`, around `words`:
@@ -16966,8 +16981,6 @@ const BO_WAIT = "Working out the route options…";
 // its mark "Mixed" (it read "Your call"). The card compares the rule's own words, never a word of its own.
 const BO_PLANNER = "Planner to decide";
 const BO_MARK = { "Suggested": ["Suggested", "ok"], [BO_PLANNER]: ["Mixed", "warn"] };
-// Q9: the rule's sentence about the HGV collisions ("… collisions involving an HGV on it …")
-const BO_HGV = "involving an HGV";
 // Q1: a reason the rule gives as a fragment ("it adds 7.5 t limits, except for access, on Syston Road…") is shown on a
 // row as a sentence. The words are the rule's; nothing here splits or rewrites them.
 function boSay(s){
@@ -16984,13 +16997,6 @@ function boDate(s){
   if(!s) return "";
   const d = new Date(String(s).length > 10 ? s : s + "T12:00:00Z");
   return isNaN(d) ? String(s) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-function boNum(x, d){ if(x == null) return "–"; const v = Math.round(Number(x) * Math.pow(10, d || 1)) / Math.pow(10, d || 1); return String(v); }
-// a measure's percentage in words: none where the base was too small (null) or nothing changed (0)
-function boPct(p, fewer, more){ return p ? ` (${Math.abs(p)} % ${p < 0 ? fewer || "fewer" : more || "more"})` : ""; }
-function boChip(word, notYet){
-  if(!word || word === "not counted") return <RowStatus word={notYet ? "Not counted yet" : "Not counted"} tone="none" />;
-  return <RowStatus word={word.charAt(0).toUpperCase() + word.slice(1)} tone={BO_TONE[word] || "none"} />;
 }
 // the lorry names with the two concrete mixers said once ("both concrete mixers"), as drawn on the third draft's card 5
 function boOthers(list){
@@ -17024,6 +17030,47 @@ function boLineName(r, x){
   const ln = (r.lines || []).find(l => l.alt != null && Number(l.alt) === Number(x.alt) && l.state !== "in_use");
   return (ln && ln.name) || x.label;
 }
+// 25 Nov 2026 (the Routes page rethink, cards 4 and 7; John: "Yes, as recommended", Q12 and Q13): the option's rows are
+// ONE schedule, read from the rule's own `rows` (route_best.option_rows): the measure, the route in use, the tab's option
+// in the selection tint, and the difference with the status shape and the rule's words. Each figure has a small bar on
+// the row's own scale (the larger of the two the full width); the collision rows' bars are both grey and their words
+// plain. Nothing here decides or words anything: the page prints the rows. Bars are hidden from a screen reader; a mark
+// is a shape AND its words. Under 600 px of the card's own width the bars go (the CSS).
+const BO_BAR_W = 86;
+function boBar(v, max, grey){
+  const w = max > 0 && v > 0 ? Math.max(2, Math.round(v / max * BO_BAR_W)) : 0;
+  return <span className={"bo-bar" + (grey ? " bo-bar-use" : "")} aria-hidden="true" style={{ width: w + "px" }} />;
+}
+function boMark(x){
+  if(x.mark === "ok" || x.mark === "warn")
+    return <span className={"bo-mk bo-mk-" + x.mark} data-bo-mark={x.mark}><i aria-hidden="true" />{x.words}</span>;
+  return <span className={"bo-mk-plain bo-mk-" + x.mark} data-bo-mark={x.mark}>{x.words}</span>;
+}
+function BoSchedule({ rows, name }){
+  return (
+    <table className="bo-sch" data-bo-schedule="1">
+      <caption className="sr-only">{name} against the route in use</caption>
+      <thead><tr>
+        <th scope="col">A round trip</th><th scope="col">In use</th>
+        <th scope="col" className="bo-pick">{name}</th><th scope="col">Against the route in use</th>
+      </tr></thead>
+      <tbody>{(rows || []).map(x => {
+        if(x.none != null) return (
+          <tr key={x.key} data-bo-row={x.key}>
+            <th scope="row" className={"bo-k" + (x.sub ? " bo-sub" : "")}>{x.label}</th>
+            <td className="bo-none" colSpan={3}>{x.none}</td>
+          </tr>);
+        const max = Math.max(Number(x.in_use) || 0, Number(x.option) || 0);
+        return (
+          <tr key={x.key} data-bo-row={x.key}>
+            <th scope="row" className={"bo-k" + (x.sub ? " bo-sub" : "")}>{x.label}</th>
+            <td><span className="bo-c"><span className="bo-n">{x.in_use_text}</span>{boBar(Number(x.in_use), max, true)}</span></td>
+            <td className="bo-pick"><span className="bo-c"><span className="bo-n">{x.option_text}</span>{boBar(Number(x.option), max, x.bars === "grey")}</span></td>
+            <td className="bo-d">{boMark(x)}</td>
+          </tr>);
+      })}</tbody>
+    </table>);
+}
 function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoting, busyUses, frame, pick, onPick }){
   const allBtn = (
     <button type="button" className="bo-fold" aria-expanded={showAll ? "true" : "false"} data-bo-all="1"
@@ -17053,28 +17100,6 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
     why = hist === "out_of_date" ? "Not suggested yet: the collision history is out of date." : `Not suggested yet: ${r.held_back}`;
   else if(allOut) why = "Every other option is ruled out.";
   else why = r.why;
-  const sent = o ? (o.sentences || []) : [];
-  const colSent = sent.find(s => s.startsWith(o.label + " had") && !s.includes(BO_HGV));
-  const goodsSent = sent.find(s => s.startsWith(o.label + " had") && s.includes(BO_HGV));
-  const busySent = sent.find(s => s.startsWith("Setting off"));
-  const c = o ? o.counts || {} : {};
-  const colRow = (k, s, key) => {
-    if(hist === "out_of_date") return boRow(k, boChip(null), BO_STALE, { sub: true, grey: true, key });
-    if(hist === "not_fetched") return boRow(k, boChip(null), BO_NO_HISTORY, { sub: true, grey: true, key });
-    return boRow(k, <span className="bo-dash">—</span>, s || "", { sub: true, key });
-  };
-  const pw = o ? o.part_words || {} : {}, hw = o ? o.head_words || {} : {}, p = o ? o.pct || {} : {};
-  const cyc = o ? [
-    `Left-hand turns ${c.left_turns} against ${cu.left_turns}${boPct(p.left_turns)}`,
-    c.cycle_meets != null && cu.cycle_meets != null ? `met ${c.cycle_meets} against ${cu.cycle_meets}${boPct(p.cycle_meets)}` : null,
-    c.cycle_beside_km != null && cu.cycle_beside_km != null ? `beside ${boNum(c.cycle_beside_km, 2)} km against ${boNum(cu.cycle_beside_km, 2)}${boPct(p.cycle_beside_km, "less", "more")}` : null,
-  ].filter(Boolean).join(" · ") : "";
-  const tripsWords = o && (c.trips === cu.trips ? `${c.trips} trips a day either way` : `${c.trips} trips a day, not ${cu.trips}`);
-  const limitsRow = () => {
-    if(!(r.checks || {}).limits_held) return boRow("Limits", <RowStatus word="Not checked" tone="none" />, "No road limits are held.", { grey: true });
-    if((o.added_limits || []).length) return boRow("Limits", <RowStatus word="Added" tone="warn" />, (o.ruled_out || []).map(boSay).join(" "));
-    return boRow("Limits", <RowStatus word="None added" tone="none" />, "");
-  };
   const ownWayBack = o && o.return_alt != null && Number(o.return_alt) === Number(o.alt);
   const canPromote = r.answer === "Suggested" && o && o.chosen && onPromote && !div;
   const tabs = !allOut && (r.options || []).length > 1 && onPick ? r.options : null;
@@ -17118,18 +17143,11 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
           {boRow(boLineName(r, o), <RowStatus word="Ruled out" tone="none" />,
             Array.from(new Set(o.ruled_out || [])).map(boSay).join(" "), { key: "out-" + o.alt })}
         </div>)}
+      {/* 25 Nov 2026 (the Routes page rethink, Q12 and Q13): the option's rows are ONE schedule, the rule's own rows */}
       {o && !allOut && !oOut && (
-        <div className="bo-heads" data-bo-option={o.label}>
-          {/* 24 Nov 2026 (Q9): no "People" heading (the rows name themselves); "Involving an HGV" (it read "Goods vehicle") */}
-          {colRow("Collisions", colSent, "collisions")}
-          {colRow("Involving an HGV", goodsSent, "goods")}
-          {boRow("Cycle routes", boChip(pw.cycle, !counted), cyc, { sub: true, grey: !counted, key: "cycle" })}
-          {boRow("Community", boChip(pw.community, !counted), `${c.places} against ${cu.places}${boPct(p.places)}`, { sub: true, grey: !counted, key: "places" })}
+        <div className="bo-sch-box" data-bo-option={o.label}>
+          <BoSchedule rows={o.rows} name={boLineName(r, o)} />
           {!counted && <p className="bo-state" data-bo-not-counted="community">Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.</p>}
-          {boRow("Time", boChip(hw.time), <>{boNum(c.cycle_min)} min a round trip <small>· {boNum(cu.cycle_min)} now · {tripsWords}{o.n5 ? " · a shorter road that takes longer" : ""}</small></>)}
-          {boRow("Busy hours", boChip(hw.busy), busySent || (hw.busy === "not counted" ? `No busy-hour times held for ${o.label}.` : "At 08:00 and 17:00."), { grey: hw.busy === "not counted" })}
-          {boRow("Carbon", boChip(hw.carbon), <>{boNum(c.co2_kg)} kg CO₂e a trip <small>· {boNum(cu.co2_kg)} now</small></>)}
-          {limitsRow()}
         </div>)}
       <div className="bo-acts">
         {o && onFocus && <button type="button" className="btn-sec" data-bo-show={o.alt}
