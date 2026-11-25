@@ -127,8 +127,8 @@ ok("C2 the map config holds no stock blue: the forecast line Off and the brand a
    && !/#2563EB|#3B82F6/i.test(cfg.replace(/\/\/[^\n]*/g, '')));
 // 25 Nov 2026 (John: "all lines should be the same thickess"): 24 Nov's width by band (Q4, Direction 2) is taken out again;
 // every forecast line and shared section is ONE width in every mode, the amount told by the five blues only (12 Oct's rule)
-ok("C3 one width in every mode: 5 px on a 7.6 px casing",
-   html.includes("const FORECAST_LINE_WIDTH = 5;") && html.includes("const FORECAST_CASING_WIDTH = 7.6;"));
+ok("C3 one width in every mode: 4 px on a 6.6 px casing (John, 25 Nov: 'TRY 4 PX'; was 5 on 7.6)",
+   html.includes("const FORECAST_LINE_WIDTH = 4;") && html.includes("const FORECAST_CASING_WIDTH = 6.6;"));
 ok("C4 the forecast line and its casing, and the shared sections, are drawn at full opacity",
    /id:'forecast-casing'[^\n]*'line-opacity':1\}\}/.test(html) && /id:'forecast-layer'[^\n]*'line-opacity':1\}\}/.test(html)
    && /id: 'road-load-casing'[\s\S]{0,300}'line-opacity': 1 \}/.test(html) && /id: 'road-load-line'[\s\S]{0,300}'line-opacity': 1 \}/.test(html)
@@ -253,7 +253,7 @@ ok("G9 a click on a line keeps its own layer's handler; a near miss goes through
 // NARROWED 25 Nov 2026: the widths it kept are now the one width
 ok("G10 the hover asks the same box (the hand and the tip within 5 px of a line), and the line widths are not widened for it",
    /map\.on\('mousemove', \(e\) => \{\s*(\/\/[^\n]*\n\s*)?let features = routeHitsAt\(e\.point, interactiveLayers\);/.test(html)
-   && html.includes("const FORECAST_LINE_WIDTH = 5;"));
+   && html.includes("const FORECAST_LINE_WIDTH = 4;"));
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("H. Q5: a month on screen opens on Volume; a link's own layers and a picked Off still win");
