@@ -71,14 +71,16 @@ ok("⭐ SRC: Q6: a route opened from the map leaves the page at the map (no move
    && html.includes("if(roQuiet.current){ roQuiet.current = false; return; }") && html.includes('el.scrollIntoView({ block: "start"'));
 ok("⭐ SRC: the map rules hold: the marked stretch is SOLID and dark (no dash, not the limit layer's red), the labels carry no red",
    TRY(() => { const mk = between('m.addLayer({ id: "ol-mark"', "});"); return mk.includes('"line-color": olMarkInk') && !/dasharray|RL_LIMIT_RED|#DC2626|#C8102E/.test(mk); })
-   && html.includes('const OL_MARK = "#334155", OL_MARK_DARK = "#E2E8F0";') && css.length > 200 && !/#DC2626|#C8102E|var\(--red\)|var\(--bad/.test(css));
+   // NARROWED 24 Nov 2026 (Routes rethink): the mark a neutral near-black, no longer the slate #334155 / #E2E8F0
+   && html.includes('const OL_MARK = "#1F2024", OL_MARK_DARK = "#E6E7EA";') && css.length > 200 && !/#DC2626|#C8102E|var\(--red\)|var\(--bad/.test(css));
 ok("⭐ SRC: the sign is the one the Lorry limits layer draws (rlSignImage), on its own layer, shown without ticking that box",
    html.includes('m.addLayer({ id: "ol-sign", type: "symbol", source: "olsigns"')
    && (html.match(/"icon-image": \["concat", "rl-sign-", \["get", "sign"\]\]/g) || []).length === 2 && html.includes("rlSignImage(t), { pixelRatio: 2 }")
    && block.includes('rlRead("limits").then('));
 ok("⭐ SRC: the open route's line in use is drawn in the leg colours (a dated diversion is not option 0), and the route layers give that route up meanwhile",
-   html.includes('m.addLayer({ id: "ol-use-line", type: "line", source: "oluse"') && between('id: "ol-use-line"', "});").includes('"line-color": LEG_COLOR_EXPR, "line-width": 3, "line-offset": LEG_OFFSET')
-   && html.includes('const f = hide ? ["all", base, ["!=", ["get", "route_id"], hide]] : base;'));
+   // NARROWED 24 Nov 2026 (Routes rethink, card 1): 3.2 px on a 6 px casing, and the route layers also keep to the open route
+   html.includes('m.addLayer({ id: "ol-use-line", type: "line", source: "oluse"') && between('id: "ol-use-line"', "});").includes('"line-color": LEG_COLOR_EXPR, "line-width": 3.2, "line-offset": LEG_OFFSET')
+   && html.includes('const f = ["all", base, ...(hide ? [["!=", ["get", "route_id"], hide]] : []), ...(only ? [only] : [])];'));
 ok("⭐ SRC: the label's look: 12 px (the app's floor), the app's surface and ink, a 44 px tap area on a tablet or a touch screen, a Dark edge",
    css.includes("font-size:12px") && css.includes("background:var(--surface);color:var(--ink)") && css.includes(".ol-lab.ol-out{color:var(--muted);}")
    && css.includes("@media (max-width:1024px), (pointer:coarse){.ol-lab::after{") && css.includes('html[data-theme="dark"] .ol-lab[aria-pressed="true"]{border-color:#7AA2FF'));
@@ -342,7 +344,8 @@ w.ResizeObserver = function(){ this.observe = () => {}; this.disconnect = () => 
        MAP.fits.map(x => x.b && x.b.pts && x.b.pts.length).join());
     ok("⭐ DOM: the line in use is drawn by its own layers (both legs of option 0 here) and the route layers give this route up",
        TRY(() => MAP.src.oluse.data.features.length === 2 && MAP.src.oluse.data.features.every(f => f.properties.alt_index === 0 && f.properties.vehicle_profile === P)
-         && JSON.stringify(MAP.filt["route-line"]) === JSON.stringify(["all", ["!=", ["get", "failed"], true], ["!=", ["get", "route_id"], "R001"]])
+         // NARROWED 24 Nov 2026 (Routes rethink, Q2 A): and, the route open, every OTHER route is off too (nothing left to the route layers)
+         && JSON.stringify(MAP.filt["route-line"]) === JSON.stringify(["all", ["!=", ["get", "failed"], true], ["!=", ["get", "route_id"], "R001"], ["==", ["get", "route_id"], "R001"]])
          && JSON.stringify(MAP.filt["route-arrows"]) === JSON.stringify(MAP.filt["route-line"])), JSON.stringify(MAP.filt["route-line"]));
     ok("⭐ DOM: the card shows the option the rule names (Alt 1) with a tab an option, Alt 1's selected, and Make primary on it",
        tabs().map(t => t.textContent + ":" + t.getAttribute("aria-selected")).join() === "Alt 1:true,Alt 2:false" && /Alt 1 had 39 collisions/.test(card())
@@ -402,7 +405,8 @@ w.ResizeObserver = function(){ this.observe = () => {}; this.disconnect = () => 
     const rigRow = qa("table[data-bo-table] tbody tr").find(tr => /8-wheeler/.test(tr.textContent));
     await press(rigRow);
     ok("⭐ DOM: the map is showing another lorry's lines (a row of All figures): no label, and the route layers draw the route again",
-       labs().length === 0 && TRY(() => MAP.src.oluse.data.features.length === 0 && JSON.stringify(MAP.filt["route-line"]) === JSON.stringify(["!=", ["get", "failed"], true])), said().join("|"));
+       // NARROWED 24 Nov 2026 (Routes rethink, Q2 A): the route layers draw THIS route again, and still no other (it is open)
+       labs().length === 0 && TRY(() => MAP.src.oluse.data.features.length === 0 && JSON.stringify(MAP.filt["route-line"]) === JSON.stringify(["all", ["!=", ["get", "failed"], true], ["==", ["get", "route_id"], "R001"]])), said().join("|"));
     await press(q("button[data-bo-show]"));
     ok("DOM: 'Show Alt 1 on map' brings the card's lorry back: the labels return, Alt 1 picked", labs().length === 3 && pressed() === "Alt 1 · 3.5 min quicker");
 
