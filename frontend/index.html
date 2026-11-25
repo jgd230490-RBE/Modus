@@ -591,21 +591,20 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .fig-val{font-size:clamp(1.1rem,1.45vw,1.7rem);}   /* a KPI figure: nowrap, never truncated, sized by clamp() */
   .chart-card{display:flex;flex-direction:column;min-width:0;}
   .chart-card>.chart-box{flex:1 1 auto;}
-  /* the working view's four charts: one column, then 5 tracks (3 + 2) from 1024 px, then 3 columns from 1600 px with
-     the top-routes list running down the right-hand column */
-  .dash-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
-  @media (min-width:1024px){
-    .dash-charts{grid-template-columns:repeat(5,minmax(0,1fr));}
-    .dash-charts>.c-demand,.dash-charts>.c-cost{grid-column:span 3;} .dash-charts>.c-top,.dash-charts>.c-progress{grid-column:span 2;}
+  /* REVERSED 25 Nov 2026 (the Dashboard rethink, B; Q8, Q9): the working view's charts are two rows that follow their
+     OWN width (.dash-charts-box is a size container, as the top strip's is). The three key charts (Material demand,
+     Delivered against plan, Vehicles needed) share one line from 1,000 px, two then one from 640 px (a tablet), one under
+     another below (a phone). Cost over time and Top routes are one row after the carbon target, 3 : 2 from 640 px. */
+  .dash-charts-box{container-type:inline-size;}
+  .dash-charts,.dash-charts2{display:grid;gap:16px 22px;grid-template-columns:minmax(0,1fr);}
+  @container (min-width:640px){
+    .dash-charts{grid-template-columns:repeat(2,minmax(0,1fr));} .dash-charts>.c-fleet{grid-column:1 / -1;}
+    .dash-charts2{grid-template-columns:3fr 2fr;}
   }
-  @media (min-width:1600px){
-    .dash-charts{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"demand progress top" "cost cost top";}
-    .dash-charts>.c-demand{grid-area:demand;} .dash-charts>.c-progress{grid-area:progress;} .dash-charts>.c-cost{grid-area:cost;}
-    .dash-charts>.c-top{grid-area:top;} .dash-charts>.c-top>.chart-box{height:auto;min-height:clamp(200px,28vh,420px);}
-  }
+  @container (min-width:1000px){.dash-charts{grid-template-columns:repeat(3,minmax(0,1fr));} .dash-charts>.c-fleet{grid-column:auto;}}
   .dash-more-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
   @media (min-width:768px){.dash-more-charts{grid-template-columns:repeat(2,minmax(0,1fr));}}
-  @media (min-width:1280px){.dash-more-charts{grid-template-columns:repeat(4,minmax(0,1fr));}}
+  @media (min-width:1280px){.dash-more-charts{grid-template-columns:repeat(3,minmax(0,1fr));}}   /* 25 Nov 2026 (B): three charts now (Vehicles needed moved up) */
   .dash-wall .chart-box{height:clamp(240px,30vh,560px);}
   .dash-wall .chart-box.is-lg{height:clamp(260px,34vh,620px);}
   /* the big screen, one section at a time: the page is exactly the screen's height and the Charts grid shares it */
@@ -754,6 +753,21 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ct-more{margin-top:6px;font-size:14px;color:var(--ink);}
   .ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;padding:2px 0;width:fit-content;}
   .ct-more ul{margin:4px 0 0 18px;list-style:disc;}
+  /* 25 Nov 2026 (the Dashboard rethink, B; Q10): the Dashboard's carbon target as four figures in the look's ruled strip
+     (.fig-strip: the 2 px ink line, hairlines between): four across from 640 px of the section's own width, two below.
+     A figure 20 px Sora; a status is the look's shape and word (RowStatus); no wash, no coloured figure, no top edge. */
+  .ct-sp{flex:1 1 auto;}
+  .ct-figs-box{container-type:inline-size;margin-top:10px;}
+  .ct-figs{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .ct-fig{display:flex;flex-direction:column;padding:10px 12px 11px;}
+  .ct-figs>.ct-fig:nth-child(2n+1){padding-left:2px;}
+  @container (min-width:640px){.ct-figs{grid-template-columns:repeat(4,minmax(0,1fr));} .ct-figs>.ct-fig:nth-child(2n+1){padding-left:12px;} .ct-figs>.ct-fig:nth-child(4n+1){padding-left:2px;}
+    .ct-figs>.ct-fig-wide{grid-column:span 3;}}
+  .ct-fig-l{font-size:13px;font-weight:500;line-height:1.3;color:var(--muted);margin-bottom:3px;}
+  .ct-fig-v{font-size:20px;font-weight:600;line-height:1.15;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ct-fig-st{margin-top:3px;} .ct-fig-st .row-st{white-space:normal;}
+  .ct-fig-s{font-size:12px;line-height:1.35;color:var(--muted);margin-top:2px;}
+  .ct-fig-wide{justify-content:center;}
   /* 11 Oct 2026 — the Gate arrivals panel on the Dashboard (tokens only; 14 px table text; the .ct-* family's strip) */
   .ga-strip{margin-top:12px;}
   /* 24 Nov 2026 (the Dashboard rethink, A2: a gauge for each gate, version c): a half ring a gate, the fullest six on one line at a
@@ -928,6 +942,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-off{opacity:.6;}
   .sim-pour.sim-off{opacity:1;} .sim-pour.sim-off>label{opacity:.6;}   /* 27 Oct 2026 (UI fix 10): the pour note stays full strength, 4.76:1 */
   @media (max-width:767px){.dash-sel{min-height:44px;}}   /* UI fix 10: the Dashboard's month boxes, a 44 px tap on a phone */
+  /* 25 Nov 2026 (the Dashboard rethink, B; Q14): the filter row keeps "Big screen" on its line at 1150 px with the rail
+     folded (it wrapped to a row of its own): 2 px less between the controls and 2 px less inside each side of the boxes
+     and the outline buttons, every control kept (about 50 px back; 38 were needed) */
+  .dash-filt{gap:8px 6px;}
+  .dash-filt select.ctl{padding-left:8px;padding-right:8px;}
+  .dash-filt .btn-sec{padding-left:10px !important;padding-right:10px !important;}
   .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
   .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
   .sim-num{width:76px;}
@@ -2149,9 +2169,32 @@ const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts
   });
   ctx.restore();
 } };
-function fitChartConfig(config, vw){
+// 25 Nov 2026 (the Dashboard rethink, B; the drawing's card 3): THIS MONTH marked on a chart that shares the months with
+// others: a dashed hairline through its column and its axis label in ink. Opt-in (options.plugins.nowMark = { i: the
+// month's index among the labels }); nothing when the month is outside the range. The copied picture draws it in the
+// picture's own light ink (fitChartConfig's `light`).
+const NOW_MARK = { id: "nowMark", afterDatasetsDraw(chart, _args, opts){
+  if(!opts || opts.i == null) return;
+  const A = chart.chartArea, xs = chart.scales && chart.scales.x; if(!A || !xs) return;
+  const x = xs.getPixelForValue(opts.i); if(!(x >= A.left && x <= A.right)) return;
+  const ctx = chart.ctx; ctx.save();
+  ctx.strokeStyle = opts.color || tok("--muted", "#62656B"); ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, A.top); ctx.lineTo(Math.round(x) + .5, A.bottom); ctx.stroke();
+  ctx.restore();
+} };
+function fitChartConfig(config, vw, light){
   const o = { ...(config.options || {}) };
   const plugins = { ...(o.plugins || {}) };
+  if(plugins.nowMark && plugins.nowMark.i != null && config.type !== "doughnut" && config.type !== "pie"){
+    const i = plugins.nowMark.i, ink = light ? CHART_INK : tok("--ink", "#1F2024");
+    plugins.nowMark = { ...plugins.nowMark, color: light ? CHART_MUTED : tok("--muted", "#62656B") };
+    config = { ...config, plugins: [...(config.plugins || []), NOW_MARK] };
+    const sc = { ...(o.scales || {}) }, xa = { ...(sc.x || {}) }, xt = { ...(xa.ticks || {}) };
+    const f0 = xt.font || {};
+    xt.color = (c) => (c && c.tick && c.tick.value === i) ? ink : (light ? CHART_MUTED : tok("--muted", "#62656B"));
+    xt.font = (c) => (c && c.tick && c.tick.value === i) ? { ...f0, weight: "600" } : f0;
+    xa.ticks = xt; sc.x = xa; o.scales = sc;
+  }
   if(plugins.seriesLabels && plugins.seriesLabels.on && vw >= 768){
     const pad = (o.layout && o.layout.padding) || {};
     const padR = Math.round(SERIES_LABEL_PAD * ((plugins.seriesLabels.size || 11) / 11));
@@ -2240,7 +2283,7 @@ function drawChartLight(config, w, h){
   let ch = null;
   try {
     C.defaults.color = CHART_MUTED; C.defaults.borderColor = CHART_GRID;
-    const cfg = fitChartConfig(config, (typeof window !== "undefined" && window.innerWidth) || 1280);
+    const cfg = fitChartConfig(config, (typeof window !== "undefined" && window.innerWidth) || 1280, true);
     ch = new C(cv, { ...cfg, options: { ...(cfg.options || {}), responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: CHART_PNG_SCALE, events: [] } });
     ch.update("none");
     const out = document.createElement("canvas");
@@ -2861,27 +2904,79 @@ function ctFig(ct, err){
 }
 
 // The Dashboard's strip under the six cards. Nothing while the read is on its way.
-function CarbonTargetStrip({ ct, err, onOpen, scheme }){
-  if(!ct) return err ? <div className="ct-strip" data-carbon-target="error"><span className="ct-line">The carbon target did not load.</span></div> : null;
-  if(!ctOk(ct)) return (
-    <div className="ct-strip ct-row" data-carbon-target="none">
-      <span className="ct-line">{CT_NONE} {CT_WHO}</span>
-      {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}
+// REVERSED 25 Nov 2026 (the Dashboard rethink, B; John's Q10 "as recommended"): the strip is FOUR FIGURES under the 2 px ink
+// line (the look's .fig-strip), each with its status where it has one: Target · As forecast · With the agreed decisions ·
+// Transport carbon, in view (the figure the old sixth card showed, which left the top strip for the target's answer, A1
+// Q4). Five lines of text before; the all-in sentence is now in the "i". The statuses are the server's verdicts only
+// (over = a diamond, Q11; on target or under = a dot; the decisions no longer fit = the ring), nothing compared here.
+// It sits after Gate arrivals (Q8). The title row, "Set by …", the button, a team login's scope line and the fold stay.
+// `transport` (the page's in-view transport figures) is optional: without it there is no fourth figure.
+function ctFigCell(k, label, value, st, line, info){
+  return (
+    <div className="ct-fig" data-ct-fig={k} key={k}>
+      <div className="ct-fig-l">{label}{info}</div>
+      <div className="ct-fig-v kpi-num">{value}</div>
+      {st && <div className="ct-fig-st"><RowStatus tone={st.tone} word={st.word} /></div>}
+      {line && <div className="ct-fig-s">{line}</div>}
     </div>
   );
-  const t = ct.target, s = ct.status, [p1, p2] = ctProgress(ct), note = ctScopeNote(ct), by = ctSetBy(t);
+}
+// the server's verdict as a status: "On target", "3,291.7 t over" (a diamond), "0.1 t under" (a dot); null with no verdict
+function ctFigStatus(on, gap){
+  if(on == null || gap == null) return null;
+  if(on) return { tone: "ok", word: "On target" };
+  return gap > 0 ? { tone: "warn", word: `${ctT(Math.abs(gap))} t over` } : { tone: "ok", word: `${ctT(Math.abs(gap))} t under` };
+}
+function ctTransportCell(tr, ct){
+  if(!tr || tr.t == null) return null;
+  const v = `${tr.t >= 1e4 ? bigNum(tr.t) : (+tr.t).toFixed(1)} t`;
+  const line = tr.t > 0 ? `${tr.intensity == null ? "" : `${(+tr.intensity).toFixed(1)} kg/t · `}loaded ${co2T(tr.loaded)} · empty ${co2T(tr.empty)}` : "needs routes worked out";
+  const part = ctOk(ct) && ct.status.approved_transport_t != null ? ` Transport is ${ctT(ct.status.approved_transport_t)} tCO2e of the approved plan as forecast.` : "";
+  return ctFigCell("transport", "Transport carbon, in view", v, null, line,
+    <InfoTip id="dash.carbon" label="Transport carbon, in view" value={`Exactly ${grp(tr.t, 1)} tCO2e on the routed lines in view, transport only.${part}`} />);
+}
+function CarbonTargetStrip({ ct, err, onOpen, scheme, transport }){
+  const btn = onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>;
+  const trCell = ctTransportCell(transport, ct);
+  const head = (by, info) => (
+    <div className="ct-row"><h3 className="ct-h">Carbon target · all-in{scheme ? " · scheme-wide" : ""}{info}</h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
+      <span className="ct-sp" />{btn}</div>
+  );
+  // not loaded, did not load, none set: one line where the three target figures go, the transport figure beside it
+  if(!ctOk(ct)){
+    const state = !ct ? (err ? "error" : "loading") : "none";
+    if(state === "loading" && !trCell) return null;
+    const words = state === "error" ? "The carbon target did not load." : state === "loading" ? "Loading the carbon target." : `${CT_NONE} ${CT_WHO}`;
+    return (
+      <section className="ct-strip" data-carbon-target={state} aria-label="Carbon target">
+        {head(null, null)}
+        <div className="ct-figs-box"><div className="ct-figs fig-strip">
+          <div className="ct-fig ct-fig-wide" data-ct-fig="state"><span className="ct-line">{words}</span></div>
+          {trCell}
+        </div></div>
+      </section>
+    );
+  }
+  const t = ct.target, s = ct.status, team = ctTeam(ct), note = ctScopeNote(ct), by = ctSetBy(t);
   const words = t.lever_words || [];
+  const pct = `${(+t.pct_below).toFixed(1)} %`;
+  const tVal = s.target_t == null ? "—" : `${ctT(s.target_t)} t`;
+  const tLine = team ? (s.target_t == null ? "no share while the agreed decisions do not fit" : `${(+s.share_pct).toFixed(1)} % of the scheme's target`)
+    : t.mode === "cap" ? "a fixed cap" : `${pct} below the approved plan`;
+  const allIn = `${CT_ALLIN}, on ${team ? `the approved plan on ${ctYour()}` : "the whole approved plan"}. ${ctTargetLine(ct)}.`;
   return (
     <section className="ct-strip" data-carbon-target="set" aria-label="Carbon target">
-      <div className="ct-row"><h3 className="ct-h">Carbon target{scheme ? " · scheme-wide" : ""}<InfoTip id="dash.target" /></h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
-        {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}</div>
-      <div className="ct-line"><b>{ctTargetLine(ct)}</b></div>
-      <div className="ct-line">{p1}</div>
-      <div className="ct-line">{p2}</div>
+      {head(by, <InfoTip id="dash.target" value={allIn} />)}
+      <div className="ct-figs-box"><div className="ct-figs fig-strip">
+        {ctFigCell("target", team ? `Target, your ${TEAM().toLowerCase()}'s share` : "Target", tVal, null, tLine)}
+        {ctFigCell("forecast", "As forecast", `${ctT(s.approved_t)} t`, ctFigStatus(s.on_target_as_forecast, s.gap_as_forecast_t), null)}
+        {s.invalid
+          ? ctFigCell("decisions", "With the agreed decisions", "—", { tone: "none", word: "No longer fit the plan" }, null)
+          : ctFigCell("decisions", "With the agreed decisions", `${ctT(s.with_decisions_t)} t`, ctFigStatus(s.on_target_with_decisions, s.gap_with_decisions_t), null)}
+        {trCell}
+      </div></div>
+      {s.invalid && <div className="ct-note">{s.invalid}</div>}
       {note && <div className="ct-note">{note}</div>}
-      <div className="ct-note">
-        {CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : "the whole approved plan"}. The Transport carbon card above counts transport only.<InfoTip id="dash.carbon" label="Transport in this target" value={`Transport is ${ctT(s.approved_transport_t)} tCO2e of the approved plan as forecast: the Transport carbon card's figure with no filters.`} />
-      </div>
       {!ctTeam(ct) && words.length > 0 && (
         <details className="ct-more">
           <summary>The {words.length} agreed decision{words.length === 1 ? "" : "s"}</summary>
@@ -3271,15 +3366,24 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const sumRest = (get) => { let out = null; matRest.forEach(m => { const v = get(m); out = Array.isArray(v) ? (out || v.map(() => 0)).map((x, k) => x + (v[k] || 0)) : (out || 0) + (v || 0); }); return out; };
   const matSets = matHead.map((m, i) => ({ m, data: D.demand[m], c: colorOf(i) }));
   if(otherName) matSets.push({ m: otherName, data: sumRest(m => D.demand[m]), c: tok("--chart-none", "#A8A29E") });
+  // 24 Nov 2026 (the Dashboard rethink, A1): this month's place in the range (none when this month is outside it), for the
+  // strip's small bars. MOVED UP 25 Nov 2026 (B) so the three key charts mark it too.
+  const dcNow = (() => { const d = new Date(); return (d.getFullYear() - months.start_year) * 12 + d.getMonth() + 1; })();
+  const dcCur = dcNow >= D.lo && dcNow <= D.hi ? dcNow - D.lo : null;
+  // 25 Nov 2026 (the Dashboard rethink, B; Q8, Q9): the working view's three key charts share one line and the months:
+  // this month marked on all three (nowMark), and no series names at the right (a third of the line is too narrow for
+  // them; the key under each chart names every series). The big screen keeps its charts as they were.
+  const keyMark = wall ? {} : { nowMark: { i: dcCur } };
+  const keyNamed = wall ? named : {};
   const demandCfg = { type: "bar", data: { labels: D.labels, datasets: matSets.map((x) => ({ label: x.m, data: x.data, backgroundColor: x.c, stack: "s", borderWidth: { top: 2 }, borderColor: SURF, borderSkipped: "start" })) },
-                      options: { ...stackedOpts, plugins: { ...stackedOpts.plugins, ...named } } };
+                      options: { ...stackedOpts, plugins: { ...stackedOpts.plugins, ...keyNamed, ...keyMark } } };
   // planned tonnes as bars, what has been reported delivered as a line over them
   const tripsCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Trips", data: D.tripsM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
   const progressCfg = { type: "bar", data: { labels: D.labels, datasets: [
     { type: "bar", label: "Planned t", data: D.tonnesM, backgroundColor: C1S, borderColor: C1, borderWidth: 1, order: 2 },
     { type: "bar", label: "Delivered t (reported)", data: D.actualM, backgroundColor: C2, borderWidth: 0, order: 1 }] },
-    options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } }, ...named }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
-  const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, ...barScales } };
+    options: { ...commonOpts, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } }, ...keyNamed, ...keyMark }, scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } } };
+  const fleetCfg  = { type: "bar", data: { labels: D.labels, datasets: [{ label: "Vehicles", data: D.vehM, backgroundColor: C1, borderWidth: 0 }] }, options: { ...commonOpts, plugins: { ...commonOpts.plugins, ...keyMark }, ...barScales } };
   const co2Cfg    = { type: "line", data: { labels: D.labels, datasets: [{ label: "tCO₂e", data: D.co2M, borderColor: C1, backgroundColor: C1S, fill: true, tension: .3, pointRadius: 2 }] }, options: { ...commonOpts, ...barScales } };
   const costCfg   = { type: "bar", data: { labels: D.labels, datasets: [
     { label: `Planned ${CUR()} (quote / target)`, data: D.plannedM, backgroundColor: C1, borderWidth: 0 },
@@ -3351,8 +3455,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const acct = (weekShown && weekShown.account) || null;
   // 24 Nov 2026 (the Dashboard rethink, A1): the strip's statuses and this month's bar (none when this month is outside
   // the range). The carbon target is the whole scheme's (or a team login's share) whatever the filters: said on the cell.
-  const dcNow = (() => { const d = new Date(); return (d.getFullYear() - months.start_year) * 12 + d.getMonth() + 1; })();
-  const dcCur = dcNow >= D.lo && dcNow <= D.hi ? dcNow - D.lo : null;
+  // (dcNow and dcCur moved up to the charts, 25 Nov 2026)
   const dcLim = tl && tl._q !== undefined && (tl._q === "initial" || tl._q === tlQ) ? dashLimitStatus(tl, months.start_year) : null;
   const dcWeek = dashWeekStatus(acct);
   const dcDel = dashDeliveredStatus(K.deliveredPct, factors);
@@ -3401,7 +3504,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       {/* 14 Oct 2026: on a filled big screen the page header folds into the big-screen bar (range, updated, clock,
           Exit), so a 1366 × 768 TV keeps its height for the figures */}
       {!fill && <PageHeader title="Dashboard" kicker={firstRun ? undefined : `${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}${sites.length ? ` · ${sites.length} site${sites.length === 1 ? "" : "s"}` : ""}`}
-        actions={firstRun ? null : <div className="flex flex-wrap gap-2 items-center">
+        actions={firstRun ? null : <div className="flex flex-wrap items-center dash-filt">
           {!wall && <>
             <select className={sel + " dash-sel"} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
             <span className="self-center text-slate-400 text-sm">→</span>
@@ -3440,7 +3543,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>}
       </PageHeader>}
-      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={firstRun ? null : `${D.lines} plan line${D.lines === 1 ? "" : "s"} in view`} />}
+      {/* 25 Nov 2026 (the Dashboard rethink, B; Q14): no "N plan lines in view" line while no filter chip shows (the first
+          figure and the coverage line say it); with a chip on, the count says what the filters leave */}
+      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={firstRun || !applied.length ? null : `${D.lines} plan line${D.lines === 1 ? "" : "s"} in view`} />}
 
       {wall && <div className="dash-wallbar">
         <span className="dash-wallbar-lbl">Big screen</span>
@@ -3513,34 +3618,45 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             <Card k="target" label="Carbon target" value={dcCt.value} st={dcCt.st} st2={dcCt.st2} lines={dcCt.lines} edge={dcCt.edge === undefined ? null : dcCt.edge}
                   info={{ id: "dash.fig.target", value: ctOk(ct) ? [ctTargetLine(ct), ...ctProgress(ct)].join(". ") + "." : `${CT_NONE} ${CT_WHO}` }} />
           </div></div>
-          <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />
       {D.empty && (pendingOnly
         ? <EmptyState kind="none" title="No approved lines yet" body="The plan is drawn from approved forecast lines."
             action={canApprove ? <button type="button" className="btn-sec" data-dash-empty-go="forecasts" onClick={() => onOpen && onOpen("forecasts")}>Open Forecasts</button> : null} />
         : <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Clear the filters to see the plan."
             action={<button type="button" className="btn-sec" data-dash-empty-go="clear" onClick={() => { clearAll(); setFromM(1); setToM(months.count); }}>Clear the filters</button>} />)}
-          {!D.empty && <div className="dash-charts" data-dash-charts="1">
+          {/* 25 Nov 2026 (the Dashboard rethink, B; John's "the rest as your recommendation", Q8 and Q9): the page reads
+              figures, then the three key charts on ONE line sharing the months (Material demand, Delivered against plan,
+              Vehicles needed; this month marked on all three), then Gate arrivals, then the carbon target, then Cost over
+              time and Top routes. REVERSES 11 Oct (the carbon target under the six cards) and BENDS 14 Oct (four key
+              charts on the first screen, Gate arrivals below them). The rows follow their OWN width (.dash-charts-box). */}
+          {!D.empty && <div className="dash-charts-box"><div className="dash-charts" data-dash-charts="1">
             <div className="card p-4 chart-card c-demand">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} size="lg" title={`Material demand over time (${unitLabel})`} scope={dashScope} />
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
+          <ChartCanvas config={demandCfg} size="lg" title={`Material demand (${unitLabel})`} scope={dashScope} />
           {otherNames && <p className="text-[12px] text-slate-500 mt-1" data-other-mats="1">{otherNames}</p>}
+        </div>
+            <div className="card p-4 chart-card c-progress">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(tonnes)</span><InfoTip id="dash.chart.progress" /></div>
+          <ChartCanvas config={progressCfg} size="lg" title={"Delivered against plan (tonnes)"} scope={dashScope} />
+        </div>
+            <div className="card p-4 chart-card c-fleet">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
+          <ChartCanvas config={fleetCfg} size="lg" title={"Vehicles needed"} scope={dashScope} />
+        </div>
+          </div></div>}
+          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />
+          {/* 25 Nov 2026 (B, Q10): the carbon target as four figures, after Gate arrivals; "Transport carbon, in view" left
+              the top strip (A1, Q4) and is its fourth figure */}
+          <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} transport={{ t: K.totCo2, intensity: K.intensity, loaded: K.totCo2L, empty: K.totCo2E }} />
+          {!D.empty && <div className="dash-charts-box"><div className="dash-charts2" data-dash-charts="2">
+            <div className="card p-4 chart-card c-cost">
+          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
+          <ChartCanvas config={costCfg} title={`Cost over time (${CUR()}, planned vs fair)`} scope={dashScope} />
         </div>
             <div className="card p-4 chart-card c-top">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
           <ChartCanvas config={topCfg} title={"Top routes by tonnage"} scope={dashScope} />
         </div>
-            <div className="card p-4 chart-card c-progress">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} size="lg" title={"Delivered against plan (t, reported actuals)"} scope={dashScope} />
-        </div>
-            <div className="card p-4 chart-card c-cost">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          <ChartCanvas config={costCfg} title={`Cost over time (${CUR()}, planned vs fair)`} scope={dashScope} />
-        </div>
-          </div>}
-          {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
-              below them, so the four key charts are on the first screen at 1920 x 1080 */}
-          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />
+          </div></div>}
           {!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
@@ -3595,15 +3711,11 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             </div>
           </details>
           <details className="dash-more">
-            <summary>More charts: trips, vehicles needed, carbon over time, material split</summary>
+            <summary>More charts: trips, carbon over time, material split</summary>
             <div className="pt-3 dash-more-charts">
               <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
           <ChartCanvas config={tripsCfg} title={"Trips over time"} scope={dashScope} />
-        </div>
-              <div className="card p-4 chart-card">
-          <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} title={"Vehicles needed over time"} scope={dashScope} />
         </div>
               <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>

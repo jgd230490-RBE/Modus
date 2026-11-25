@@ -296,7 +296,10 @@ async function carbonTargetDom(){
   const e1 = d1.el.querySelector('[data-carbon-target="error"]');
   ok("⭐ CARBON DOM: the Dashboard's own read of the target fails: one line says so, the programme figures stay",
      // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): Transport carbon left the strip (task B shows it in the carbon section)
-     !!e1 && e1.textContent === "The carbon target did not load." && d1.el.textContent.includes("Material in view"));
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B): the section keeps its title row and its transport figure in this state;
+     // its one sentence is the failure's
+     !!e1 && e1.querySelector('[data-ct-fig="state"]') && e1.querySelector('[data-ct-fig="state"]').textContent === "The carbon target did not load."
+     && !!e1.querySelector('[data-ct-fig="transport"]') && d1.el.textContent.includes("Material in view"));
   d1.done();
   const f1 = mount(w.Forecasts, { meta: dMeta, who: "t", access: plannerAcc, onEdit(){}, onChanged(){} });
   await settle(50);
@@ -320,7 +323,9 @@ async function carbonTargetDom(){
   const go3 = byText(d3.el, "button", "Open the Carbon planner");
   if (go3) act(() => { go3.click(); });
   ok("CARBON DOM: with a target set, the strip reads it and still offers the Carbon planner",
-     !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 41.4 tCO2e, on target")
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10): the verdict is the figure "With the agreed decisions" and its status
+     !!d3.el.querySelector('[data-carbon-target="set"]') && !!d3.el.querySelector('[data-ct-fig="decisions"]')
+     && /With the agreed decisions\s*41\.4 t\s*On target/.test(d3.el.querySelector('[data-ct-fig="decisions"]').textContent)
      && opened.length === 2 && opened[1] === "carbon");
   d3.done();
 
@@ -477,13 +482,24 @@ async function infoTipDom(){
   const CTX = FIX("carbon_target.json");
   const box2 = w.document.createElement("div"); w.document.body.appendChild(box2);
   const root2 = w.ReactDOM.createRoot(box2);
-  act(() => { root2.render(h(w.CarbonTargetStrip, { ct: CTX, err: false, onOpen(){} })); });
-  const bt = box2.querySelector('button[aria-label="About: Transport in this target"]');
+  // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10): the transport part is in the "i" of the section's fourth figure,
+  // "Transport carbon, in view" (the strip is given the Dashboard's transport figures), not a "Transport in this target" box
+  act(() => { root2.render(h(w.CarbonTargetStrip, { ct: CTX, err: false, onOpen(){}, transport: { t: 864.04, intensity: 1.8, loaded: 595.2, empty: 268.8 } })); });
+  const bt = box2.querySelector('button[aria-label="About: Transport carbon, in view"]');
   if (bt) { click(bt); await tick(); }
   const p2 = w.document.querySelector(".info-pop");
   ok("INFO BOX: the carbon target's transport part (once a hover title) opens in its info box with the figure",
-     !!bt && !!p2 && /Transport is \d[\d ]*\.\d tCO2e of the approved plan as forecast/.test(p2.textContent)
-     && !box2.querySelector(".ct-note[title]"), p2 ? p2.textContent.slice(0, 160) : "no panel");
+     !!bt && !!p2 && /Transport is \d[\d ,]*\.\d tCO2e of the approved plan as forecast/.test(p2.textContent)
+     && /Exactly 864\.0 tCO2e on the routed lines in view, transport only/.test(p2.textContent)
+     && !box2.querySelector(".ct-note[title]") && !box2.querySelector('button[aria-label="About: Transport in this target"]'), p2 ? p2.textContent.slice(0, 160) : "no panel");
+  act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  // 25 Nov 2026 (the Dashboard rethink, B; Q10): the all-in sentence (and the target's own line) is the title's "i"
+  const bt2 = box2.querySelector('button[aria-label="About: Carbon target"]') || [...box2.querySelectorAll(".ct-h button")][0];
+  if (bt2) { click(bt2); await tick(); }
+  const p3 = w.document.querySelector(".info-pop");
+  ok("⭐ INFO BOX: the carbon target's title 'i' carries the all-in sentence and the target line, and no 'card above'",
+     !!bt2 && !!p3 && /All-in: making the material, transport and waste disposal, on the whole approved plan\. Target: /.test(p3.textContent)
+     && !/card above/.test(box2.textContent + p3.textContent), p3 ? p3.textContent.slice(0, 200) : "no panel");
   act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
   act(() => { root2.unmount(); }); box2.remove();
 }

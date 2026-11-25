@@ -246,8 +246,10 @@ ok("⭐ ...how to read it: as forecast vs with the agreed decisions, the one on-
    and "within 0.05 tCO2e either way" in text and "always reads over the target, by the agreed cut" in text)
 ok("...the target is all-in and shows on the Dashboard, Forecasts and Submit forecast, not on the map or the summary PDF",
    "It does not show on the public map or in the summary PDF." in text
-   and "<h2 id=\"3-2-the-carbon-target-strip\">3.2 The carbon target strip</h2>" in src
-   and "The Transport carbon card counts transport only, so the two never match." in text)
+   # NARROWED 25 Nov 2026 (the Dashboard rethink, B): the section is "The carbon target" (its anchor kept: the app links to it), and Transport
+   # carbon is its fourth figure, not a card above it
+   and "<h2 id=\"3-2-the-carbon-target-strip\">3.2 The carbon target</h2>" in src
+   and "Transport carbon counts transport only, so the two never match." in text and "The Transport carbon card counts" not in text)
 # REVERSED 13 Oct 2026 (the user, 12 Oct: each team gets its own share of the target): it asserted "not split by team"
 # and "with no verdict" in the guide; the guide now says how a team's share is split and that each figure has a verdict
 ok("...a team code: its own share of the target (split by each team's plan with the agreed decisions), its figures with a verdict",
@@ -517,7 +519,7 @@ ok("the shared demo: one callout names what not to press, and the map's first to
 ok("\U0001f534 the Dashboard: no claim that it calculates nothing of its own; the filters skip this week's plan, "
    "the target strip and two folded sections; a focused line narrows the cards and charts only",
    "calculates nothing of its own" not in text and "narrow every chart and figure" not in text
-   and "except <strong>Planned this week</strong> and the carbon target strip" in src
+   and "except <strong>Planned this week</strong> and the carbon target;" in src   # NARROWED 25 Nov 2026 (the Dashboard rethink, B): no longer a "strip"
    and "Top routes highlights its bar and Route planning detail still lists every line" in text
    and "held to plan. It ignores the filters." in text and "Carbon planner (§6.4)" not in text)
 
@@ -804,6 +806,7 @@ ok("E (W5): the guide says the left menu shows icons only below 768 px and opens
    "Below 768 px the left menu shows its icons only" in src and "opens it over the page until you pick one" in src)
 
 # 14 Oct 2026: the gate chart is described where the Dashboard is
+_gp = src[src.find('<p id="ug-gate-busiest">'):src.find("</p>", src.find('<p id="ug-gate-busiest">'))]   # 25 Nov 2026: the paragraph alone
 # NARROWED 14 Oct 2026 (bundle G, W17): capacity is the gate's open minutes (its hours less the peak bands, else the shift),
 # and the two steps are named: gold "Queue likely" from 85 %, red "Over gate capacity" past it
 ok("the guide explains the gate chart: the track, the bar, the marker, capacity worked out, the 85 % step, red and grey, Gate by gate",
@@ -812,8 +815,27 @@ ok("the guide explains the gate chart: the track, the bar, the marker, capacity 
    and "a gate with no hours typed is open the default gate hours, 08:00 to 17:00 unless changed on Configuration → Planning" in src
    and "less its shut times and any no-delivery peak bands set on Configuration → Planning (a shut time inside a band counts once)" in src
    and "a gate with no hours typed uses the shift" not in src and "9 hours at 3 minutes a lorry is 180 a day" in src
-   and "<strong>Queue likely</strong>" in src and "<strong>Over gate capacity</strong>" in src
-   and "A grey bar has no check-in time typed" in src and "<strong>Gate by gate</strong> under the chart opens the table" in src)
+   and "<strong>Queue likely</strong>" in src
+   # REVERSED 25 Nov 2026 (the Dashboard rethink, B; the dials of task A2): in the Dashboard's Gate arrivals paragraph,
+   # "Over capacity" (the dial's word), no grey bar (an empty ring and "No check-in time typed"), no track or marker, and the
+   # fold under the dials, "Gate by gate" or "All N gates" (the Look-ahead's and the Simulation's "Over gate capacity" stay)
+   and "<strong>Over gate capacity</strong>" not in _gp and "<strong>Over capacity</strong>" in _gp
+   and "A grey bar" not in _gp and "an empty ring and the words <strong>No check-in time typed</strong>" in _gp
+   and "The fold under the dials (<strong>Gate by gate</strong>, or <strong>All N gates</strong> when there are more gates than dials) opens the table" in _gp
+   and "a dial for each of the six fullest gates, and for every other gate that is flagged" in _gp and "pale track" not in _gp and "dark marker" not in _gp)
+# 25 Nov 2026 (the Dashboard rethink, B): the page's order, the three key charts with this month marked, the carbon target's four figures
+ok("⭐ the guide's Dashboard: the order from the top, the three key charts on one line with this month marked, Vehicles out of More charts",
+   "From the top: the six figures, three key charts on one line, Gate arrivals, the carbon target, Cost over time and Top routes" in text
+   and "<strong>Material demand</strong>, <strong>Delivered against plan</strong> and <strong>Vehicles needed</strong>, over the same months, with this month marked on each by a dashed line" in src
+   and "<li><strong>More charts</strong> — trips, carbon over time and the material split.</li>" in src and "Four charts follow" not in text)
+ok("⭐ the guide's carbon target: four figures (Target, As forecast, With the agreed decisions, Transport carbon, in view), each verdict a status, all-in in the i",
+   all(f"<strong>{w}</strong>" in src for w in ("Target", "As forecast", "With the agreed decisions", "Transport carbon, in view"))
+   and "The <strong>i</strong> beside the title says so, with the target in words." in src and "Under the cards sits" not in text
+   and '<a href="#3-2-the-carbon-target-strip">3.2 The carbon target</a>' in src)
+ok("⭐ the guide's six figures: one ruled strip, a status where the plan gives a measure, the small bars, no Transport carbon row, the count only with a filter",
+   "The six figures sit in one ruled strip." in text and "<tr><td>Carbon target</td>" in src and "<tr><td>Transport carbon</td>" not in src
+   and "(with no filter on there is no count: the first figure says it)" in text and "<strong>Over a road limit</strong>" in src
+   and "both counted to the last whole week reported" in text)
 # 14 Oct 2026 (bundle G, W7): the CLP monitoring section, in the guide and its contents, with the honest limit
 ok("⭐ the guide's §3.5 CLP monitoring: in the contents, says planned not observed, names every chart, the empty-state rule and the per-load caveat",
    '<a href="#3-5-clp-monitoring">3.5 CLP monitoring</a>' in src and '<h2 id="3-5-clp-monitoring">3.5 CLP monitoring</h2>' in src

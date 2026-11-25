@@ -565,29 +565,42 @@ if (loaded) {
                      factors: { ...meta.factors, material_density_t_per_m3: { "Small aggregate": 1.6 }, vehicle_payload_t: { "Rigid 8-wheeler (32t)": 20 } } };
     const dash = (ct, extra) => render("the Dashboard renders with a carbon target state", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: ct, ...(extra || {}) }));
     const dSet = dash(CT, { onOpen(){} });
+    // 25 Nov 2026 (the Dashboard rethink, B; Q10): the carbon target is four FIGURES (Target, As forecast, With the agreed decisions, Transport carbon in
+    // view), each with the server's verdict as a status (a shape and a word). One figure's markup, to the next figure or the end.
+    const ctFigOf = (out, k) => { const i = out.indexOf(`data-ct-fig="${k}"`); if (i < 0) return ""; const j = out.slice(i + 10).search(/data-ct-fig="|<\/section>/); return j < 0 ? out.slice(i) : out.slice(i, i + 10 + j); };
     // NARROWED 11 Oct 2026 (a gap carries its unit, as on the Carbon page: "117.7 tCO2e over the target")
-    ok("⭐ Dashboard: the strip reads the contract's words — 74.0% below the approved plan = 41.4 tCO2e; as forecast 159.1, 117.7 over; with the agreed decisions 43.4, on target",
-      dSet.includes('data-carbon-target="set"') && dSet.includes("<b>Target: 74.0% below the approved plan = 41.4 tCO2e</b>")
-      && dSet.includes(">As forecast: 159.1 tCO2e, 117.7 tCO2e over the target<") && dSet.includes(">With the agreed decisions: 41.4 tCO2e, on target<"));
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the three sentences became three figures with their statuses; the target sentence is in the "i"
+    ok("⭐ Dashboard: the carbon target's figures read the contract — target 41.4 t, 74.0 % below the approved plan; as forecast 159.1 t, 117.7 t over (a diamond); with the agreed decisions 41.4 t, on target (a dot)",
+      dSet.includes('data-carbon-target="set"') && /41\.4 t<\/div><div class="ct-fig-s">74\.0 % below the approved plan</.test(ctFigOf(dSet, "target"))
+      && ctFigOf(dSet, "forecast").includes(">159.1 t<") && /data-row-status="warn"><i aria-hidden="true"><\/i>117\.7 t over</.test(ctFigOf(dSet, "forecast"))
+      && ctFigOf(dSet, "decisions").includes(">41.4 t<") && /data-row-status="ok"><i aria-hidden="true"><\/i>On target</.test(ctFigOf(dSet, "decisions"))
+      && !dSet.includes(">As forecast: 159.1 tCO2e"));
     // NARROWED 11 Oct 2026 (R1 + R2): there is no rounding to absorb (the % is held to 6 dp, the gap is 0.0) and the verdict is
     // the server's; the page follows it — a 2.0 gap the server calls on target reads on target, never "2.0 over"
     const dFollow = dash(FOLLOW);
     ok("...the gap at set time is 0.0 and reads on target, not 0.0 over; the verdict is the server's (a 2.0 gap it calls on target reads on target)",
       !dSet.includes("0.0 over") && !dSet.includes("0.0 under") && CT.status.gap_with_decisions_t === 0 && CT.status.on_target_with_decisions === true
-      && dFollow.includes(">With the agreed decisions: 41.4 tCO2e, on target<") && !dFollow.includes("2.0 tCO2e over"));
+      // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the verdict is the figure's status
+      && />On target</.test(ctFigOf(dFollow, "decisions")) && !dFollow.includes("2.0 t over") && !dFollow.includes("2.0 tCO2e over"));
     ok("...the strip offers the Carbon planner with a target set too (it only did with none)", dSet.includes(">Open the Carbon planner</button>"));
-    ok("...says once that it is all-in beside the transport-only card, with the transport part (14.1) on hover; who set it, with no date for a scrubbed one",
-      dSet.includes("All-in: making the material, transport and waste disposal, on the whole approved plan. The Transport carbon card above counts transport only.")
-      // 13 Oct 2026 (W3, narrowed): the transport part is in an info box, not on hover (dom_frontend opens it and reads 14.1)
-      && dSet.includes('aria-label="About: Transport in this target"') && !dSet.includes('title="Transport is 14.1')
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the all-in sentence is in the title's "i" (dom_frontend opens it); the transport figure is the
+    // section's fourth, "Transport carbon, in view", with its own "i" carrying the approved plan's transport part
+    ok("...all-in in the title and its 'i', the transport figure beside the target's as the fourth figure; who set it, with no date for a scrubbed one",
+      dSet.includes(">Carbon target · all-in<button") && !dSet.includes("The Transport carbon card above counts transport only")
+      && ctFigOf(dSet, "transport").includes(">Transport carbon, in view<button") && ctFigOf(dSet, "transport").includes('aria-label="About: Transport carbon, in view"')
+      && /loaded [\d.,]+ t · empty [\d.,]+ t/.test(ctFigOf(dSet, "transport")) && !dSet.includes('title="Transport is 14.1')
       && dSet.includes(">Set by Sam (planner)<"));
     ok("...the 2 agreed decisions, collapsed, in the server's words",
       dSet.includes("<summary>The 2 agreed decisions</summary>") && dSet.includes("<li>Recycled content 30% — Small aggregate</li>"));
-    ok("🔴 ...under the six cards (still six), above the charts; nothing undefined or NaN",
+    ok("🔴 ...after the six cards (still six) and the three key charts, before Cost over time; nothing undefined or NaN",
       // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): a cell may carry its status edge class; the sixth is the target's answer
       (dSet.match(/class="card dash-card min-w-0( dc-(ok|warn|bad))?"/g) || []).length === 6 && dSet.indexOf('data-dash-card="target"') > 0
       && dSet.indexOf('data-dash-card="target"') < dSet.indexOf('data-carbon-target="set"')
-      && dSet.indexOf('data-carbon-target="set"') < dSet.indexOf("Material demand over time") && !/undefined|NaN/.test(dSet));
+      // REVERSED 25 Nov 2026 (the Dashboard rethink, B; Q10), Q8): the carbon target follows the three key charts and Gate arrivals, before Cost over time
+      && dSet.indexOf('data-carbon-target="set"') > dSet.indexOf("Material demand (") && dSet.indexOf('data-carbon-target="set"') > dSet.indexOf("Vehicles needed (")
+      // (Gate arrivals draws nothing here while its read is out: its place before the target is pinned in parse_frontend)
+      && (dSet.indexOf("data-gate-arrivals=") < 0 || dSet.indexOf('data-carbon-target="set"') > dSet.indexOf("data-gate-arrivals="))
+      && dSet.indexOf('data-carbon-target="set"') < dSet.indexOf("Cost over time") && !/undefined|NaN/.test(dSet));
     const dNone = dash(NONE, { onOpen(){} }), dNoNav = dash(NONE);
     ok("⭐ ...no target: says so and who sets it, with a button to the Carbon planner (only when the page can switch)",
       dNone.includes('data-carbon-target="none"') && dNone.includes("No carbon target set yet. A planner sets it in the Carbon planner.")
@@ -595,12 +608,15 @@ if (loaded) {
     const dCap = dash(CAP), dUnder = dash(UNDER), dBad = dash(BAD);
     // NARROWED 11 Oct 2026 (a cap reads "a fixed cap of" on every page, so the % / cap toggle shows everywhere; a gap carries its unit)
     ok("...a cap: a fixed cap of 41.4 tCO2e (74.0% below the approved plan when it was set); a gap below the target reads 12.3 tCO2e under",
-      dCap.includes("<b>Target: a fixed cap of 41.4 tCO2e (74.0% below the approved plan when it was set)</b>") && dCap.includes("tCO2e, on target<")
-      && dUnder.includes(">With the agreed decisions: 41.4 tCO2e, 12.3 tCO2e under the target<"));
+      // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the target figure says "a fixed cap" (its sentence is in the "i"); the verdicts are statuses
+      /41\.4 t<\/div><div class="ct-fig-s">a fixed cap</.test(ctFigOf(dCap, "target")) && />On target</.test(ctFigOf(dCap, "decisions"))
+      && /data-row-status="ok"><i aria-hidden="true"><\/i>12\.3 t under</.test(ctFigOf(dUnder, "decisions")));
     // NARROWED 11 Oct 2026 (the server's new sentence; the gap carries its unit)
     ok("...decisions that no longer apply: the server's sentence in place of the second line, the as-forecast line kept",
       dBad.includes(">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner.<")
-      && !dBad.includes("With the agreed decisions:") && dBad.includes(">As forecast: 159.1 tCO2e, 117.7 tCO2e over the target<") && !/undefined|NaN/.test(dBad));
+      // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the figure is "—" with the ring and "No longer fit the plan"; the sentence under the figures
+      && /—<\/div><div class="ct-fig-st"><span class="row-st rs-none" data-row-status="none"><i aria-hidden="true"><\/i>No longer fit the plan</.test(ctFigOf(dBad, "decisions"))
+      && /117\.7 t over</.test(ctFigOf(dBad, "forecast")) && !/undefined|NaN/.test(dBad));
     const dTp = dash(TEAMP), dTc = dash(TEAMC);
     // REVERSED 11 Oct 2026 (the review): it asserted "with the scheme's cut applied to them" for a team code in % mode. A team
     // code's figures are now never compared with the scheme's target, % or cap, and the strip no longer says they are "on the
@@ -608,11 +624,12 @@ if (loaded) {
     // REVERSED 13 Oct 2026 (each team its share): it asserted "for the whole scheme, not split by team" and no verdict
     ok("⭐ ...a team code: its own share of the target, % or cap, with its own verdicts; no decisions listed; no team id",
       [dTp, dTc].every(o => o.includes("These figures are for your team&#x27;s lines only, against their share of the scheme&#x27;s target: the target split by each team&#x27;s plan with the agreed decisions. The shares add up to the target.")
-        && o.includes("As forecast: 159.1 tCO2e, 117.7 tCO2e over the target") && o.includes("With the agreed decisions: 41.4 tCO2e, on target")
-        && !o.includes("agreed decisions</summary>")
-        && !o.includes("whole approved plan") && o.includes("All-in: making the material, transport and waste disposal, on the approved plan on your team&#x27;s lines."))
-      && dTp.includes("<b>Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s target (74.0% below the approved plan)</b>") && !dTp.includes("scheme&#x27;s cut")
-      && dTc.includes("<b>Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s fixed cap of 41.4 tCO2e</b>")
+        // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the team's figures and verdicts as figures; its share under the target figure; the
+        // target sentence ("Target for your team's lines …") and the all-in sentence are in the "i" (ui_fix_dash_order reads them)
+        && /117\.7 t over</.test(ctFigOf(o, "forecast")) && />On target</.test(ctFigOf(o, "decisions"))
+        && !o.includes("agreed decisions</summary>") && !o.includes("whole approved plan")
+        && /Target, your team&#x27;s share<\/div><div class="ct-fig-v kpi-num">32\.7 t<\/div><div class="ct-fig-s">79\.1 % of the scheme&#x27;s target</.test(ctFigOf(o, "target")))
+      && !dTp.includes("scheme&#x27;s cut")
       && !/IPT\d/.test(seg(dTp, "data-carbon-target", "Material demand") + seg(dTc, "data-carbon-target", "Material demand"))
       && !/undefined|NaN/.test(dTp + dTc));
     // ---- 11 Oct 2026: Gate arrivals on the Dashboard, from fixtures/gate_arrivals.json (test_gate_arrivals.py writes it:
@@ -919,7 +936,9 @@ if (loaded) {
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
     const dCap2 = dash(CAP2);
     ok("⭐ R2 ...a cap 2.0 tCO2e over reads '2.0 tCO2e over the target' on the Dashboard (it read 'on target' there and 'over' on the Carbon page)",
-      dCap2.includes(">With the agreed decisions: 7,002.8 tCO2e, 2.0 tCO2e over the target<") && !dCap2.includes("7,002.8 tCO2e, on target"));
+      // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10)): the figure and its status
+      ctFigOf(dCap2, "decisions").includes(">7,002.8 t<") && /data-row-status="warn"><i aria-hidden="true"><\/i>2\.0 t over</.test(ctFigOf(dCap2, "decisions"))
+      && !/>On target</.test(ctFigOf(dCap2, "decisions")));
 
     const rowsCt = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
       quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,

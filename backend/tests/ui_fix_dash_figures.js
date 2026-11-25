@@ -159,7 +159,9 @@ ok("⭐ Delivered: one ink bar to a 'plan' mark, the bar stopping at 110 % past 
 
 // ------------------------------------------------------------------ 7. the strip in the Dashboard
 const dash = (() => { const i = code.indexOf("\nfunction Dashboard("); return code.slice(i, code.indexOf("\n}\n", i) + 3); })();
-const strip = dash.slice(dash.indexOf('<div className="dash-cards-box">'), dash.indexOf("<CarbonTargetStrip ct={ct}"));
+// NARROWED 25 Nov 2026 (the Dashboard rethink, B): the carbon target moved down the page (after the charts and Gate
+// arrivals), so the strip is read up to the empty message that follows it
+const strip = dash.slice(dash.indexOf('<div className="dash-cards-box">'), dash.indexOf("{D.empty && (pendingOnly"));
 const keys = (strip.match(/<Card k="([a-z]+)"/g) || []).map(s => s.slice(9, -1));
 ok("⭐ six figures in this order: Material in view, Lorry movements a day, Vehicles needed, Planned this week, Delivered against plan, Carbon target",
    JSON.stringify(keys) === JSON.stringify(["material", "movements", "vehicles", "week", "delivered", "target"]) && strip.includes('label="Carbon target"'), keys);
@@ -230,7 +232,8 @@ ok("the big screen keeps its own entries (dash.vehicles, dash.delivered, dash.ca
 
 // ------------------------------------------------------------------ 11. what this task does not touch
 ok("the big screen, the carbon target strip and Gate arrivals are not this task's: still there as they were",
-   code.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />") && /\nfunction WallSection\(/.test(code) && /\nfunction GateArrivalsPanel\(/.test(code)
+   // NARROWED 25 Nov 2026 (the Dashboard rethink, B): task B moved the carbon target and gave it its transport figure
+   code.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} transport={") && /\nfunction WallSection\(/.test(code) && /\nfunction GateArrivalsPanel\(/.test(code)
    && code.includes("const Fig = ({ value, label, sub, info, tone })"));
 
 report();

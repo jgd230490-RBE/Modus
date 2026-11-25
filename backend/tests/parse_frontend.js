@@ -2438,7 +2438,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const mxCt = _mxc.slice(_mxc.indexOf("{cost && cost.carbon && (() => {"), _mxc.indexOf("{ctCellsTarget(ct)}</div>}") + 26);
   const GETS = /fetch\(`\$\{API\}\/carbon\/target`\)/g;
   ok("⭐ CARBON TARGET: one block of helpers before the Dashboard — the strip, the Forecasts line and the word helpers",
-    ctSrc.length > 3000 && ctc.includes("function CarbonTargetStrip({ ct, err, onOpen, scheme })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
+    ctSrc.length > 3000 && /* NARROWED 25 Nov 2026 (the Dashboard rethink, B): + transport, the fourth figure */ ctc.includes("function CarbonTargetStrip({ ct, err, onOpen, scheme, transport })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
     && ["ctGap", "ctTargetLine", "ctProgress", "ctScopeNote", "ctSetBy", "ctCellsTarget", "ctFig"].every(f => ctc.includes(`function ${f}(`)));
   ok("🔴 ...each of the three surfaces reads it in its OWN read, a GET with no method: nothing on them writes the target",
     [_dbc, _fcc, _mxc].every(b => (b.match(GETS) || []).length === 1 && !/carbon\/target`,/.test(b))
@@ -2451,10 +2451,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("🔴 ...the Dashboard's new hooks sit before its early returns (React #310 blanked the app on 5 Oct)",
     _dbc.indexOf("const [ct, setCt]") > 0 && _dbc.indexOf("const [ct, setCt]") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("fetch(`${API}/carbon/target`)") < _dbc.indexOf("if(err) return"));
-  ok("⭐ Dashboard: a strip under the six cards, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
+  ok("⭐ Dashboard: the carbon target is a section after Gate arrivals, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the named cards and the strip's size container (task B moves the strip)
-    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />") && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B); John's Q8 "as recommended"): the carbon target is no longer under the six cards (11 Oct): it
+    // follows the three key charts and Gate arrivals, and comes before Cost over time and Top routes and the folds
+    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} transport={{ t: K.totCo2, intensity: K.intensity, loaded: K.totCo2L, empty: K.totCo2E }} />") && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6
     && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">')
+    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf("<GateArrivalsPanel") && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
+    && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<div className="dash-charts2" data-dash-charts="2">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
     // 14 Oct 2026 (narrowed, D9): the Portal tells the Dashboard it is on a phone (no big screen there)
@@ -2468,7 +2472,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue
     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): + initialLimits
     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, initialLimits, onWall, onOpen, phone, canApprove })")
-    && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B): the button is made once (`btn`) and drawn in the title row of every state
+    && ctc.includes('const btn = onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>;'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
     (_dbWl.match(/<Fig value=\{ctW\.value\} label="tCO2e target, all-in" sub=\{ctW\.sub\} info=\{\{ id: "dash\.target", value: ctW\.title \}\} \/>/g) || []).length === 1
@@ -2511,25 +2516,34 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && ctc.includes("s.invalid ? (dash ? `With the agreed decisions: —` : s.invalid)")
     && ctc.includes('${gap > 0 ? "over" : "under"} the target') && ctc.includes("pct = `${(+t.pct_below).toFixed(1)}%`"));
   ok("⭐ the same three things on the Dashboard, Forecasts, Submit forecast and the big screen: the target line and both figures, from one pair of helpers",
-    (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4 && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 4
+    (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): the Dashboard's strip shows As forecast and With the agreed decisions as two FIGURES with the
+    // server's verdicts (ctFigStatus), not as ctProgress's sentences: three users left in this block, a fourth is the top strip's "i"
+    && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 3 && ctc.includes("function ctFigStatus(on, gap){")
     && ctc.includes("return `${ctTargetLine(ct)} · ${p1} · ${p2}`;") && ctc.includes("<div className=\"ct-line\">{p1} · {p2}</div>")
     && !ctc.includes("approved plan now") && !ctc.includes("the scheme's cut") && ctc.includes("with the agreed decisions: \" + g2"));
   ok("...Submit forecast prints the server's sentence under its line when the decisions no longer apply",
     _mxc.includes("{ct && ctOk(ct) && ct.status.invalid && <div className=\"w-full ct-note\">{ct.status.invalid}</div>}"));
   ok("...the Dashboard's strip offers the Carbon planner whether a target is set or not",
-    (ctc.match(/\{onOpen && <button type="button" className="btn-sec" onClick=\{\(\) => onOpen\("carbon"\)\}>Open the Carbon planner<\/button>\}/g) || []).length === 2);
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): ONE button, in the title row the strip draws in every state (none set, not loaded, set)
+    ctc.includes('const btn = onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>;')
+    && (ctc.match(/\{btn\}/g) || []).length === 1 && (ctc.match(/\{head\(/g) || []).length === 2);
   ok("🔴 the Dashboard's subtitle names a team, never its id (it printed the raw id; on main too)",
     code.includes('(ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt))') && !code.includes('(ipt === "none" ? "no " + TEAM().toLowerCase() : ipt)'));
   ok("...all-in said once where transport-only figures sit: the strip names the Transport carbon card, the big-screen figure the group it joins",
     ctc.includes('const CT_ALLIN = "All-in: making the material, transport and waste disposal";')
     // NARROWED 11 Oct 2026 (the review: a team code read "your team's lines only" and "on the whole approved plan" about the same figures)
-    && ctc.includes("{CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : \"the whole approved plan\"}. The Transport carbon card above counts transport only.")
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B); Q10): the all-in sentence moved into the strip's "i" (with the target line); the Transport
+    // carbon card left the top strip (A1) and is the strip's fourth figure, "Transport carbon, in view", so nothing says "card above"
+    && ctc.includes("const allIn = `${CT_ALLIN}, on ${team ? `the approved plan on ${ctYour()}` : \"the whole approved plan\"}. ${ctTargetLine(ct)}.`;")
+    && ctc.includes('<InfoTip id="dash.target" value={allIn} />') && !ctc.includes("The Transport carbon card above counts transport only.")
     && ctc.includes('CT_ALLIN + ". The other carbon figures here are transport only"') && ctc.includes("s.approved_transport_t"));
   ok("...no target says who sets it; a team code reads its own lines in the tenant's word (a cap is not compared), never a team id",
     // NARROWED 11 Oct 2026 (one "no target" sentence, CT_NONE + CT_WHO, on all four pages; a team code's figures are never compared
     // with the scheme's target in either mode, so "with the scheme's cut applied to them" is REVERSED)
     ctc.includes('const CT_NONE = "No carbon target set yet.";') && ctc.includes('const CT_WHO = "A planner sets it in the Carbon planner.";')
-    && (ctc.match(/\{CT_NONE\} \{CT_WHO\}/g) || []).length === 2 && (ctc.match(/`\$\{CT_NONE\} \$\{CT_WHO\}`/g) || []).length === 2
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): the Dashboard's strip writes the sentence as a template (it picks one of three states' words)
+    && (ctc.match(/\{CT_NONE\} \{CT_WHO\}/g) || []).length === 1 && (ctc.match(/`\$\{CT_NONE\} \$\{CT_WHO\}`/g) || []).length === 3
     && !/No carbon target set yet\. A planner|No scheme carbon target|No carbon target is set yet/.test(code)
     && ctc.includes("const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;") && ctc.includes('ct.status.scope === "team"')
     // REVERSED 13 Oct 2026 (each team its share): "The target is for the whole scheme, so they are not compared with it." and
@@ -2581,11 +2595,13 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (_dbc.match(/fetch\(`\$\{API\}\/gates\/arrivals/g) || []).length === 1);
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
-  ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
+  ok("⭐ the panel sits under the three key charts, before the carbon target and the first collapsed section; the six cards, five sections, eight charts are untouched",
     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + the months with a queue and the sites picked
     _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")
-    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
-    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B); Q8): Gate arrivals follows the three key charts and comes BEFORE the carbon target, and
+    // Cost over time (with Top routes) comes after both
+    && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
+    && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf("<ChartCanvas config={costCfg} title=")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
     && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5   // NARROWED 24 Nov 2026 (A1): named cards
     // 13 Oct 2026 (W5): narrowed — the five sections no longer carry onToggle={onMore} (see the W5 block)
@@ -3380,10 +3396,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _db.includes('const fill = wall && wallLayout !== "all";') && _db.includes('(fill ? " dash-fill" : "")')
      && /\.dash-wall\.dash-fill\{height:100%;display:flex;flex-direction:column;\}/.test(html)
      && /\.dash-wall\.dash-fill \.wall-charts\{height:100%;grid-auto-rows:minmax\(0,1fr\);\}/.test(html));
-  ok("W5: the four charts: one column, 3 + 2 from 1024 px, three columns from 1600 px (top routes down the right); More charts 1 / 2 / 4",
-     /@media \(min-width:1600px\)\{\n\s*\.dash-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-areas:"demand progress top" "cost cost top";\}/.test(html)
-     && ["c-demand", "c-top", "c-progress", "c-cost"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
-     && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="pt-3 dash-more-charts">')
+  // REVERSED 25 Nov 2026 (the Dashboard rethink, B); Q8, Q9): two rows by their OWN width: the three key charts on one line from 1,000 px (two and one
+  // from 640, one under another below), Cost and Top routes 3 : 2 from 640; More charts 1 / 2 / 3 (Vehicles needed moved up)
+  ok("W5: the charts: the three key charts on one line, Cost and Top routes a row after the carbon target, by their own width; More charts 1 / 2 / 3",
+     /\.dash-charts-box\{container-type:inline-size;\}/.test(html)
+     && /@container \(min-width:1000px\)\{\.dash-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);\}/.test(html)
+     && /\.dash-charts2\{grid-template-columns:3fr 2fr;\}/.test(html) && !/grid-template-areas:"demand progress top"/.test(html)
+     && /@media \(min-width:1280px\)\{\.dash-more-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);\}\}/.test(html)
+     && ["c-demand", "c-top", "c-progress", "c-cost", "c-fleet"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
+     && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="dash-charts2" data-dash-charts="2">') && _db.includes('<div className="pt-3 dash-more-charts">')
      && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
   // NARROWED 16 Oct 2026 (S7): two more observers, the Simulation's map (it opens folded at 0 × 0, like the Today map)
   // and its timeline (it redraws to its own width)
@@ -3477,7 +3498,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W16 (D39): every multi-series Dashboard chart names its series on the chart from 768 px; stacked segments have a 2 px surface gap",
      /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
      && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
-     && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): the three key charts share one line on the working view, a third too narrow for names at
+     // the right (the key under each names every series): `keyNamed` gives them the names on the big screen only; Cost keeps them
+     && (src.match(/\.\.\.named \}/g) || []).length === 1 && (src.match(/\.\.\.keyNamed, \.\.\.keyMark \}/g) || []).length === 2
+     && src.includes("const keyNamed = wall ? named : {};") && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
      // NARROWED 23 Nov 2026 (own look, stage 2): the fallback ink is #1F2024
      && /ctx\.fillStyle = tok\("--ink", "#1F2024"\);/.test(src));
   // REVERSED 24 Nov 2026 (own look, B1 stage 2): the four shapes of the one status rule (design language §2): amber a DIAMOND
@@ -5284,7 +5308,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && dash.includes("<GateArrivalsPanel ga={gaShown}") && dash.includes("<SimDashLine ga={gaShown}") && (dash.match(/<DashboardToday meta=\{meta\} week=\{weekShown\}/g) || []).length === 2
      && dash.includes("const wkTot = (weekShown && weekShown.commit") && dash.includes('<AbnormalStrip onOpen={onOpen} sites={sites} />')
      && code.includes('const siteQ = (sites && sites.length) ? "?sites=" + sites.map(encodeURIComponent).join(",") : "";')
-     && code.includes('Carbon target{scheme ? " · scheme-wide" : ""}') && !/<BulletinMenu[^>]*sites/.test(dash)
+     && code.includes('Carbon target · all-in{scheme ? " · scheme-wide" : ""}')   // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): "· all-in" (the drawing) && !/<BulletinMenu[^>]*sites/.test(dash)
      && dash.includes("{sites.length ? ` · ${sitesWords(sites, locList)}` : \"\"}"));
   ok("CHART BUTTONS: ONE component (ChartTools) drawn by ChartCanvas; Copy writes a PNG to the clipboard and falls back to a download that says 'Saved instead'; Download saves the same PNG",
      code.includes("function ChartTools({ title, scope, getPlot, inline }){") && code.includes('new ClipboardItem({ "image/png": make() })') && code.includes('await download("Saved instead")')
