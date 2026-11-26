@@ -3049,6 +3049,8 @@ RS_OFFSET = 1.8                  # pt: each leg sits this far left of its own tr
 RS_IN, RS_OUT = "#15803D", "#B91C1C"      # the gate a lorry comes in by / leaves by (squares on the last mile)
 RS_BOTH = "#1F2024"              # one gate both ways (navy)
 RS_BODY_SIZES = (8.4, 7.8, 7.2)
+#: 25 Nov 2026 (card 4): the "Take care on this route" block's own sizes when it is too long at the body's smallest
+RS_TK_SIZES = (6.8, 6.4)
 
 
 def _rs_offset(pts, d):
@@ -3258,6 +3260,74 @@ def _rs_block(c, x, y, w, head, body, size, draw=True, grey_body=False):
     return used + 4
 
 
+def _rs_take_care(c, x, y, w, P, size, draw=True, cols=1, holding=False):
+    """
+    25 Nov 2026 (the Look-ahead rethink, card 4): the "Take care on this route" block (route_points.points) drawn at
+    (x, y) in width w; cols=1 stacks the two ways (the right-hand column), cols=2 sets them side by side (full width, a
+    diversion's page). A 1 pt ink rule over its title, no box. Returns the height used. Never draws a map.
+    """
+    R, B = _BF("regular"), _BF("bold")
+    lead = size * 1.28
+    INK = (0.09, 0.10, 0.12)
+
+    def para(t, font, sz, colour, xx, ww, top):
+        h = 0.0
+        for ln in _wrap(_pdf_safe(t), font, sz, ww) or [""]:
+            if draw:
+                c.setFillColorRGB(*colour); c.setFont(font, sz); c.drawString(xx, top - h - sz, ln)
+            h += sz * 1.28
+        return h
+
+    used = 0.0
+    if draw:
+        c.saveState(); c.setStrokeColorRGB(*INK); c.setLineWidth(1.0); c.line(x, y, x + w, y); c.restoreState()
+    used += 3
+    used += para(P["head"], B, size + 1.6, INK, x, w, y - used) + 2
+    for i, t in enumerate(P.get("sentences") or []):
+        used += para(t, B if i == 0 else R, size, NAVY_RGB, x, w, y - used) + 1.5
+    for cl in P.get("closures") or []:
+        used += para(cl["text"], B, size, NAVY_RGB, x, w, y - used) + 1.5
+    if P.get("nothing"):
+        used += para(P["nothing"], R, size, NAVY_RGB, x, w, y - used) + 1.5
+    import route_points as _rpl
+    legs = _rpl.legs_shown(P)             # 26 Nov 2026: nothing stored = the one sentence, no way columns (card 4)
+    gap = 6 * mm
+    colw = (w - gap) / 2 if cols == 2 else w
+    meas = c if c is not None else None
+    ws = [i["w"] for L in legs for i in L["limits"] + L["places"]]
+    wc = (max([(meas.stringWidth(_pdf_safe(t), B, size) if meas else len(t) * size * 0.55) for t in ws] or [0]) + 6)
+    wc = min(max(wc, 12 * mm), 26 * mm)
+
+    def leg_block(L, xx, top):
+        h = para(f"{L['title']} · {L['length']}" if L.get("length") else L["title"], B, size, NAVY_RGB, xx, colw, top) + 1
+        rows = [(i["w"], i["text"], True) for i in L["limits"]] + [(i["w"], i["text"], False) for i in L["places"]]
+        if not rows and not L.get("more") and not L.get("shared"):
+            h += para("Nothing held this way.", R, size, GREY, xx, colw, top - h) + 1
+        for wtxt, txt, is_lim in rows:
+            if draw:
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B if is_lim else R, size); c.drawString(xx, top - h - size, _pdf_safe(wtxt))
+            h += para(txt, R if is_lim else B, size, NAVY_RGB, xx + wc, colw - wc, top - h) + 1
+        return h
+
+    if cols == 2 and len(legs) == 2:
+        top = y - used - 2
+        used += 2 + max(leg_block(legs[0], x, top), leg_block(legs[1], x + colw + gap, top))
+    else:
+        for L in legs:
+            used += 2 + leg_block(L, x, y - used - 2)
+    if holding and P.get("holding"):
+        used += para(P["holding"], R, size, NAVY_RGB, x, w, y - used - 2) + 3.5
+    used += 2
+    if draw:
+        c.saveState(); c.setStrokeColorRGB(0.78, 0.78, 0.80); c.setLineWidth(0.4); c.line(x, y - used, x + w, y - used)
+        c.restoreState()
+    used += 2
+    import route_points as _rp
+    foot = P["foot"] + ((" " + _rp.checked_words(P)) if _rp.checked_words(P) else "")   # "Limits checked 24 Nov 2026."
+    used += para(foot, R, size - 0.6, GREY, x, w, y - used)
+    return used + 6
+
+
 def route_sheet_lines(S):
     """The words of the Arriving and Leaving blocks (route_sheet.sheet's gates, hours and no-delivery windows)."""
     e, x_, lo, li = S["entry"], S["exit"], S["load_exit"], S.get("load_entry") or {}
@@ -3311,7 +3381,8 @@ def _holding_steps(H, gate_word):
     line1 = f"1. Go to {H['name']} first" + (": " + "; ".join(where) if where else "") + "."
     if H.get("straight"):
         line1 += " (This route's line does not pass it: the run from it to the gate is drawn straight.)"
-    return [line1, "2. Wait there to be called forward."]
+    # 25 Nov 2026 (card 4): the Driver sheet's words, "until called to site"
+    return [line1, "2. Wait there until called to site."]
 
 
 def route_sheet_blocks(S):
@@ -3320,7 +3391,8 @@ def route_sheet_blocks(S):
     screen tells the planner which words are missing instead. not_typed stays in the tuple (always False now)."""
     out = []
     heads = [("Why this route", S.get("route_reason")),
-             ("Permitted diversions", S.get("permitted_deviations")),
+             # 25 Nov 2026 (card 4): the field's own name; "diversion" is a dated closure's way round on this sheet
+             ("Permitted deviations", S.get("permitted_deviations")),
              (f"Site rules at B, {S['dest']}", S.get("site_rules_dest")),
              (f"Site rules at A, {S['origin']}", S.get("site_rules_origin"))]
     H = S.get("holding")
@@ -3346,8 +3418,11 @@ def build_route_sheet_pdf(S):
     words_blocks = route_sheet_blocks(S)
     arriving, leaving = route_sheet_lines(S)
     e, x_ = S["entry"], S["exit"]
+    if "take_care" not in S:               # 25 Nov 2026 (card 4): the block in place of the limit lines
+        S["take_care"] = rs.take_care(S)
+    TK = S.get("take_care")
 
-    def layout(size, draw, c=None):
+    def layout(size, draw, c=None, place="side", tk=None):
         """Lays the page out top down at body size `size`; returns the lowest y used (points from the bottom)."""
         y = H - m
         if draw:
@@ -3471,10 +3546,22 @@ def build_route_sheet_pdf(S):
         yr = top2
         yr -= _rs_block(c, rx, yr, rw, f"Arriving at B, {S['dest']}", arriving, size, draw)
         yr -= _rs_block(c, rx, yr, rw, "Leaving B", leaving, size, draw)
-        lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(
-            S["limits_status"], "Lorry limits")
-        yr -= _rs_block(c, rx, yr, rw, lim_head, S["limits_lines"], size, draw)
+        if TK and place == "side":
+            yr -= 2
+            yr -= _rs_take_care(c, rx, yr, rw, TK, tk or size, draw, cols=1)
+        elif not TK:
+            lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(
+                S["limits_status"], "Lorry limits")
+            yr -= _rs_block(c, rx, yr, rw, lim_head, S["limits_lines"], size, draw)
+        if TK and place == "full2":       # the longest routes: the typed words stacked beside the last mile instead
+            for head, body, grey in words_blocks:
+                yr -= _rs_block(c, rx, yr, rw, head, body, size, draw, grey_body=grey)
         y = min(yl, yr) - 4
+        if TK and place in ("full", "full2"):   # too long for the right-hand column: full width, the two ways side by side
+            y -= 2
+            y -= _rs_take_care(c, m, y, cw, TK, tk or size, draw, cols=2)
+        if TK and place == "full2":
+            return y
         # the typed words, two columns
         colw = (cw - 6 * mm) / 2
         for i in range(0, len(words_blocks), 2):
@@ -3487,24 +3574,36 @@ def build_route_sheet_pdf(S):
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=A4)
     # the sizing pass: the largest body size that leaves room for the footer (measured on this canvas, nothing drawn)
-    size = RS_BODY_SIZES[-1]
-    for s in RS_BODY_SIZES:
-        if layout(s, False, c) >= m + footer_h:
-            size = s
+    # 25 Nov 2026 (card 4): the block beside the last mile at every size first, then full width under it
+    # and, last, the block alone at RS_TK_SIZES under a body at the smallest size (the longest routes)
+    tries = [(s, "side", None) for s in RS_BODY_SIZES]
+    if TK:
+        tries += [(s, "full", None) for s in RS_BODY_SIZES] + [(RS_BODY_SIZES[-1], "full", t) for t in RS_TK_SIZES]
+        # then the typed words beside the last mile, the block full width under both (10 of live's 200 sheets)
+        tries += [(s, "full2", None) for s in RS_BODY_SIZES] + [(RS_BODY_SIZES[-1], "full2", t) for t in RS_TK_SIZES]
+    size, place, tk = tries[-1]
+    for s, pl, t in tries:
+        if layout(s, False, c, pl, t) >= m + footer_h:
+            size, place, tk = s, pl, t
             break
-    S["body_size"] = size
+    S["body_size"], S["take_care_place"], S["take_care_size"] = size, (place if TK else None), (tk or size)
     c.setTitle(_pdf_safe(f"{S['tenant']} · Route sheet · {S['route_id']}"))
     c.setAuthor("Wayscope")
-    S["lowest_y"] = layout(size, True, c)
+    S["lowest_y"] = layout(size, True, c, place, tk)
     S["footer_top"] = m + footer_h
     foot = [f"From the scheme's routes as stored in Wayscope on {S['issued']}. A planning document: the site team's "
             "instructions and the road signs come first."]
     if S.get("basemap"):
         foot.append("Map " + basemap.credit() + ".")
-    if (S.get("community") or {}).get("credit"):
+    # 25 Nov 2026 (card 4): ONE community credit line for the last mile's features and the places the block names
+    _cs = set((S.get("community") or {}).get("sources") or []) | set((TK or {}).get("credit_sources") or [])
+    if _cs:
+        import community as _community
+        foot.append(_community.credit_line(sorted(_cs)))
+    elif (S.get("community") or {}).get("credit"):
         foot.append(S["community"]["credit"])
     # 11 Nov 2026 (CLOCS card C-F1): the limit lines name no supplier now; their credit goes here
-    if S.get("limits_lines"):
+    if S.get("limits_lines") or TK:
         import limits as _limits
         _lc = _limits.credit_for([S.get("route_id")])
         if _lc:
@@ -3548,13 +3647,17 @@ def _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size):
     blocks = [("Why", [dv["why"] if dv.get("why") else ", ".join(dv["because"]) + ". In these dates this route goes the way above."]),
               ("Loaded, A to B", [dv.get("loaded_words") or "—"]),
               ("Empty, back to A", [dv.get("return_words") or "—"])]
-    lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(dv["limits_status"], "Lorry limits")
-    blocks.append((lim_head, dv["limits_lines"]))
+    if not dv.get("take_care"):             # 25 Nov 2026 (card 4): the page's own block replaces its limit lines
+        lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(dv["limits_status"], "Lorry limits")
+        blocks.append((lim_head, dv["limits_lines"]))
     colw = (cw - 6 * mm) / 2
     for i in range(0, len(blocks), 2):
         hs = [_rs_block(c, m + j * (colw + 6 * mm), y, colw, head, body, size, True)
               for j, (head, body) in enumerate(blocks[i:i + 2])]
         y -= max(hs)
+    if dv.get("take_care"):
+        y -= 2
+        y -= _rs_take_care(c, m, y, cw, dv["take_care"], size, True, cols=2)
     if dv.get("back_on") or dv.get("other_times"):
         c.setFillColorRGB(*GREY); c.setFont(R, 8.4)
         c.drawString(m, y - 10, _pdf_safe(dv.get("other_times") or f"Back to page 1's route from {dv['back_on']}."))

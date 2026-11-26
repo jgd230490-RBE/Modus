@@ -378,7 +378,48 @@ ok("4: ...each page names the yard, the lorry type, 'lorry n of N', the day and 
    and "Wednesday 25 November 2026" in txt and "round trip" in txt)
 ok("4: ...the break is a row in words, the route sheets are named, the not-modelled sentence and 'sends nothing' are printed",
    "Break, 45 min" in txt or "Break, 30 min" in txt)
-ok("4: ...the rule's caveats", "not a check of anyone" in txt and "Wayscope sends nothing" in txt and "Driving at most 9 h" in txt)
+# 25 Nov 2026 (the Look-ahead rethink, card 4, John's "Yes, as recommended" to Q12 to Q16): REVERSED. The sheet no longer
+# prints "Wayscope sends nothing" (a note for the planner, kept on the screen in data["words"]) nor "Driving at most 9 h"
+# and the not-modelled list (to the guide); "a planning figure, not a check of anyone's hours" stays.
+ok("4: ...the rule's caveat on the sheet: 'a planning figure, not a check of anyone's hours'; NOT 'Wayscope sends nothing', "
+   "'Driving at most 9 h' or the not-modelled list (25 Nov, reversed)",
+   "not a check of anyone" in re.sub(r"\s+", " ", txt) and "Wayscope sends nothing" not in txt and "Driving at most 9 h" not in txt
+   and dh.NOT_MODELLED_WORDS[:40] not in re.sub(r"\s+", " ", txt))
+ok("4: ...'Wayscope sends nothing' and the not-modelled list stay in the plan's words for the screen",
+   D["words"]["sends_nothing"] == lp.SENDS_NOTHING and D["words"]["not_modelled"] == dh.NOT_MODELLED_WORDS)
+_t1 = re.sub(r"\s+", " ", txt)
+ok("4 (card 4): the sheet's top line names the fleet operator and the driver",
+   "A planning sheet for the fleet operator and the driver · not a delivery note · planning payloads, not plated weights" in _t1
+   and "for the haulier" not in _t1, _t1[:300])
+ok("4 (card 4): 'leave about … · back about …', never 'the yard'", "leave about " in _t1 and "the yard" not in _t1)
+ok("4 (card 4): the small print: the route sheet(s) to follow and the planning-times line, then who made it",
+   re.search(r"Roads and turns: route sheets? R\d{3}", _t1) is not None and "not a sat-nav. Planning times: a planning figure, "
+   "not a check of anyone's hours." in _t1 and f"Made {D['made_at']} by {D['made_by']}." in _t1)
+ok("4 (card 4): every page carries a 'Take care on this route' block and 'Road signs come first'",
+   _t1.count("Take care on this route") >= n_lorries and _t1.count("Road signs come first") >= n_lorries,
+   str((_t1.count("Take care on this route"), n_lorries)))
+ok("4 (card 4): the break's row: 'Break, 45 min, about here. It may be taken as 15 + 30.' (the split only for 45 min)",
+   lp.break_words(45) == "Break, 45 min, about here. It may be taken as 15 + 30." and lp.break_words(30) == "Break, 30 min, about here."
+   and ("Break, 45 min, about here. It may be taken as 15 + 30." in _t1 or "Break, 30 min, about here." in _t1))
+ok("4 (card 4): 'load point' for 'yard' in the sentences a person reads",
+   "one load point." in lp.RULE_WORDS and lp.ONE_YARD_WORDS == "One load point and one kind of lorry a lorry-day."
+   and "yard" not in (lp.RULE_WORDS + lp.ONE_YARD_WORDS).lower())
+SP = lp.driver_pages(D, "chained", DAY)
+ok("4 (card 4): driver_pages: one page a lorry, the same heads the PDF prints",
+   len(SP["pages"]) == n_lorries and all(pg["head"] in _t1 for pg in SP["pages"]) and SP["sub"] in _t1)
+_b0 = C["days"][DAY][0]
+SP1 = lp.driver_pages(D, "chained", DAY, yard=_b0["yard_id"], vehicle=_b0["vehicle"], lorry=1)
+ok("4 (card 4): narrowed to one load point, one lorry type and one lorry: one page, that lorry",
+   len(SP1["pages"]) == 1 and SP1["pages"][0]["lorry"] == 1 and SP1["pages"][0]["yard_id"] == _b0["yard_id"])
+_one = pdf_text(lp.build_pdf(D, "chained", DAY, yard=_b0["yard_id"], vehicle=_b0["vehicle"], lorry=1))
+ok("4 (card 4): ...and its PDF is that one page", _one.count("\f") <= 1 and SP1["pages"][0]["head"] in re.sub(r"\s+", " ", _one))
+for _kw, _want in ((dict(yard="L999"), "No lorry from that load point"), (dict(vehicle="Nope"), "No lorry of that type"),
+                   (dict(yard=_b0["yard_id"], vehicle=_b0["vehicle"], lorry=99), "No such lorry")):
+    try:
+        lp.driver_pages(D, "chained", DAY, **_kw)
+        ok(f"4 (card 4): a filter that leaves nothing is refused: {_kw}", False)
+    except lp.PlanError as e:
+        ok(f"4 (card 4): a filter that leaves nothing is refused in words: {_kw}", _want in str(e), str(e))
 ok("4: ...never 'compliant', 'utilisation', 'fill rate' or 'movement'", not re.search(r"compliant|utilisation|fill rate|movement", txt, re.I))
 ok("4: the stamp: DRAFT when the week is not all confirmed, else CONFIRMED", ("CONFIRMED" in txt) == D["week_confirmed"] or "DRAFT" in txt)
 try:
@@ -466,6 +507,43 @@ for kw, code in (({"day": DAY, "format": "docx"}, 400), ({"day": "2026-11-28", "
         ok(f"6: refusal {kw}", False)
     except _HTTPException as e:
         ok(f"6: refusal {kw} -> {code}", e.status_code == code, str(e.status_code))
+
+# 25 Nov 2026 (the Look-ahead rethink, card 4): the Driver sheet as data, and the download narrowed to one lorry
+SH = main.forecast_week_lorry_plan_sheet(day=DAY, view="chained", bucket="commit")
+_LPD = main._lorry_plan_data("commit")
+ok("6 (card 4): GET …/lorry-plan/sheet: the pages driver_pages builds from the same kept plan the download prints",
+   json.dumps(SH, sort_keys=True, default=str) == json.dumps(lp.driver_pages(_LPD, "chained", DAY), sort_keys=True, default=str)
+   and len(SH["pages"]) >= 1 and all(pg["take_care"] for pg in SH["pages"]))
+_raw = re.sub(r"\s+", " ", pdf_text(main.forecast_week_lorry_plan_file(day=DAY, format="pdf", view="chained", bucket="commit").body, raw=True))
+_missing = [w for pg in SH["pages"] for w in ([pg["head"], pg["line"]] + pg["small"][:1]
+            + [P["head"] for P in pg["take_care"]] + [i["text"] for P in pg["take_care"] for L in P["legs"] for i in L["limits"] + L["places"]]
+            + [x for P in pg["take_care"] for x in P.get("sentences") or []] + [P["foot"] for P in pg["take_care"]])
+            if re.sub(r"\s+", " ", w).replace("→", "to") not in _raw.replace("→", "to")]
+ok("6 (card 4): ...and every line the read returns is printed on the PDF (heads, the day's line, the block's rows and sentences)",
+   not _missing, str(_missing[:4]))
+_b = SH["pages"][0]
+r = main.forecast_week_lorry_plan_file(day=DAY, format="pdf", view="chained", bucket="commit", yard=_b["yard_id"], vehicle=_b["vehicle"], lorry=_b["lorry"])
+ok("6 (card 4): the download narrowed to one load point, lorry type and lorry: one page, named for it",
+   f'-lorry-{_b["lorry"]}.pdf' in r.headers["Content-Disposition"] and lp.slug(_b["yard_id"]) in r.headers["Content-Disposition"]
+   and pdf_text(r.body).rstrip("\f").count("\f") == 0 and _b["head"] in re.sub(r"\s+", " ", pdf_text(r.body)), r.headers["Content-Disposition"])
+r = main.forecast_week_lorry_plan_file(day=DAY, format="xlsx", view="chained", bucket="commit", yard=_b["yard_id"], vehicle=_b["vehicle"], lorry=_b["lorry"])
+_ws = openpyxl.load_workbook(io.BytesIO(r.body)).active
+ok("6 (card 4): ...the XLSX too: only that lorry's rows", _ws.max_row > 5 and all(_ws.cell(row=i, column=3).value == _b["lorry"] for i in range(6, _ws.max_row + 1)))
+for kw in ({"lorry": 99, "yard": _b["yard_id"], "vehicle": _b["vehicle"]}, {"yard": "L999"}):
+    try:
+        main.forecast_week_lorry_plan_file(day=DAY, format="pdf", view="chained", bucket="commit", **kw)
+        ok(f"6 (card 4): a narrowed download that leaves nothing is refused {kw}", False)
+    except _HTTPException as e:
+        ok(f"6 (card 4): a narrowed download that leaves nothing is refused {kw} -> 400", e.status_code == 400 and "No " in str(e.detail), str(e.detail))
+for kw in ({"view": "booked"}, {"lorry": 99}):
+    try:
+        main.forecast_week_lorry_plan_sheet(day=DAY, bucket="commit", **dict({"view": "chained"}, **kw))
+        ok(f"6 (card 4): the sheet read refuses {kw}", False)
+    except _HTTPException as e:
+        ok(f"6 (card 4): the sheet read refuses {kw} in words -> 400", e.status_code == 400, str(e.detail))
+ok("6 (card 4): the new read goes after _gate_arrivals_build in main.py",
+   open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read().index('@app.get("/api/forecast-weeks/lorry-plan/sheet")')
+   > open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read().index("def _gate_arrivals_build("))
 _tok = access._ACCESS.set(TEAM)
 try:
     main.forecast_week_lorry_plan_apply(bucket="commit")
