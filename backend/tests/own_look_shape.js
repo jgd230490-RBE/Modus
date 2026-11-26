@@ -84,7 +84,9 @@ ok("4 figures: the Look-ahead's tiles and the Submit page's six figures are .fig
    code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">')
    && code.includes('<div className="px-4 py-3 min-w-0" data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
    && code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes("divide-x divide-slate-200 text-white kpi-num"));
-const ruled = sel => new RegExp("\\n  \\." + sel + "\\{[^}]*border-top:2px solid var\\(--ink\\);").test(css);
+// NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the Dashboard's ink line is each cell's top edge (2 px,
+// or 4 px in a status's colour), not the strip's border
+const ruled = sel => sel === "dash-cards" ? /\n  \.dash-cards \.dash-card\{[^}]*inset 0 2px 0 var\(--ink\)/.test(css) : new RegExp("\\n  \\." + sel + "\\{[^}]*border-top:2px solid var\\(--ink\\);").test(css);
 ok("4 figures: every other row of figures is ruled under the ink line (Dashboard, Routes tiles, lorry plan, abnormal loads, pours, the phone's day)",
    ["dash-cards", "rc-tiles", "lp-kpis", "al-stats", "pour-figs", "ph-figs"].every(ruled), ["dash-cards", "rc-tiles", "lp-kpis", "al-stats", "pour-figs", "ph-figs"].filter(x => !ruled(x)));
 ok("4 figures: no figure cell keeps a box (border + corner) of its own",
@@ -124,7 +126,8 @@ ok("6 place: no dot before the place line (the mark is its only sign)", !/\.kick
 ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) are ink in every state; no amber or red bar fill",
    code.includes('background: "var(--ink)" }} /></div>') && !code.includes('tone || "var(--green)"') && !/<Bar [^>]*tone=/.test(code)
    && css.includes(".ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--ink);}") && !/\.ga-li-(warn|bad) \.ga-pbar i\{/.test(css)
-   && css.includes(".ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--ink);}"));
+   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the gates' old key and its bar went with the chart (the dials' key names two marks); none is coloured
+   && !css.includes(".ga-key-bar{") && !/\.ga-key-(near|cap)\{[^}]*var\(--(red|gold|warn|bad)/.test(css));
 // ---------------------------------------------------------------- stage 8: a chosen tab or day is an underline only
 ok("8 select: a chosen tab is sign blue words on a 2 px sign blue underline, no tint or outline; a chosen day the same with 3 px",
    css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}')
@@ -184,8 +187,10 @@ ok("5 best option: the card's eyebrow is not small capitals", /\n  \.bo-eye\{(?!
 // (measured in Chrome at 1150, 1280 and 1366 px: every figure's top equal per row, each label 36 px; a jsdom harness
 // cannot lay out, so the measure itself is the session's Chrome probe and this pins its cause)
 ok("4 strip: a Dashboard label keeps its last word and its i together, and the i does not make the line taller",
-   code.includes('<div className="dash-card-l">{dashLabelHead(label)}<span className="dash-card-lw">{dashLabelLast(label)}{info && <InfoTip')
-   && css.includes(".dash-card-lw{white-space:nowrap;} .dash-card-l .ibtn{vertical-align:top;}"));
+   // NARROWED 26 Nov 2026 (the Dashboard rethink batch): the strip's new Card ties the last word to the "i" itself (.dc-nw)
+   code.includes('<div className="dash-card-l">{head}<span className="dc-nw">{last}{info && <InfoTip')
+   && css.includes(".dash-cards .dc-nw{white-space:nowrap;}") && css.includes(".dash-card-l .ibtn{vertical-align:top;}")
+   && !code.includes("dashLabelHead(") && !code.includes("dash-card-lw"));
 ok("2 status: on the phone Look-ahead the chip stays a flex row, so its shape is drawn (the line's block-span rule made it 0 px)",
    css.includes(".ph-line .ph-l>.row-st{display:flex;width:fit-content;}"));
 ok("8 day: the chosen day keeps the ordinary border; only the underline marks it",
@@ -217,8 +222,9 @@ ok("5 sections: the open route's Vehicles, Gates and Temporary haul roads are ru
 // columns (measured in Chrome at 390, 1000 and 1280 px)
 ok("4 strip: the first figure of every row takes the 2 px start, at every column count",
    css.includes(".dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}")
-   && css.includes("@media (min-width:900px){.dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
-   && css.includes("@media (min-width:1280px){.dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}}"));
+   // NARROWED 26 Nov 2026 (the Dashboard rethink batch): the strip's columns follow its OWN width (a size container), three from 560 px, six from 1,000 px
+   && css.includes("@container (min-width:560px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));} .dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
+   && css.includes("@container (min-width:1000px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));} .dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}"));
 // 26 Nov 2026 (an independent read of the diff): the status shape has its own display, so no cell rule can turn it into a 0 px
 // inline box again (the tablet cards made it 0 x 17 px at 900 px), and a card cell keeps the chip a flex row (the 7 px gap)
 ok("2 status: the shape is an inline block of its own; a tablet card cell keeps the chip a flex row",

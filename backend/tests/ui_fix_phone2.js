@@ -53,43 +53,45 @@ const mount = (C, props) => { const el = w.document.createElement("div"); w.docu
     const ga = { ...GAF, gates };
     const props = { ga, err: false, month: ga.month, months: { start_year: 2026, count: 60 }, onMonth(){} };
     const ph = mount(w.GateArrivalsPanel, { ...props, phone: true });
-    const list = ph.el.querySelector("[data-ga-list]");
+    // REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials): the phone's plain list became the same dials as the desk, two across (John: "a gauge for each
+    // gate"; the brief: "a phone two across"). Each check below is the list's check turned round.
+    const list = ph.el.querySelector("ul.ga-dials");
     const lis = [...ph.el.querySelectorAll("[data-ga-li]")];
-    ok("PHONE GATES: a list, no chart and no key — one row a gate that has arrivals (the gate with 0 is left out)",
-       !!list && !ph.el.querySelector("[data-ga-chart]") && !ph.el.querySelector("canvas") && !ph.el.querySelector(".ga-key") && lis.length === 4,
-       `rows ${lis.length}`);
+    ok("PHONE GATES: REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials) — dials two across (ga-dials-phone), no chart canvas, no old list; one dial a gate that has arrivals (the gate with 0 is left out)",
+       !!list && list.classList.contains("ga-dials-phone") && !ph.el.querySelector("[data-ga-list]") && !ph.el.querySelector("[data-ga-chart]") && !ph.el.querySelector("canvas")
+       && !!ph.el.querySelector(".ga-key") && lis.length === 4, `dials ${lis.length}`);
     ok("PHONE GATES: the fullest gate first, by its share of its own capacity (no capacity last)",
        lis.map(l => l.getAttribute("data-ga-li")).join("|") === "903|902|901|904", lis.map(l => l.getAttribute("data-ga-li")).join("|"));
     const t = (l) => l.textContent.replace(/\s+/g, " ");
-    ok("PHONE GATES: the whole name is printed, never cut (the long name, then the gate under it)",
-       t(lis[2]).includes("Melton Compound gate with a very long whole name") && t(lis[2]).includes("North weighbridge (in)")
-       && !/…|\.\.\./.test(t(lis[2])));
-    ok("PHONE GATES: lorries a day and the share of capacity on every row; amber says queue likely, red says over capacity; a gate with no check-in says so",
-       t(lis[2]).includes("27.9 a day · 82 %") && !/queue likely|over capacity/.test(t(lis[2]))
-       && t(lis[1]).includes("31.5 a day · 93 % · queue likely") && t(lis[0]).includes("18.2 a day · 120 % · over capacity")
-       && t(lis[3]).includes("9.0 a day · no check-in time typed"), lis.map(t).join(" || "));
-    const bar = (l) => l.querySelector(".ga-pbar i");
-    ok("PHONE GATES: a thin bar under each, as wide as the gate's own share (capped at 100 %), amber from the server's amber flag, red on red; none without a capacity",
-       bar(lis[2]).style.width === "82%" && bar(lis[1]).style.width === "93%" && bar(lis[0]).style.width === "100%" && !bar(lis[3])
-       && lis[0].classList.contains("ga-li-bad") && lis[1].classList.contains("ga-li-warn") && !lis[2].classList.contains("ga-li-warn") && !lis[2].classList.contains("ga-li-bad"));
+    ok("PHONE GATES: NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials) — the dial prints the place (the whole name in its title, never lost); two dials of one place print the gate",
+       lis[2].querySelector(".ga-d-name").getAttribute("title") === "Melton Compound gate with a very long whole name, North weighbridge (in)"
+       && t(lis[2]).includes("Melton Compound gate with a very long whole name"));
+    ok("PHONE GATES: NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials) — the share in the middle and 'N a day of C' on every dial; amber says queue likely, red over capacity, a fine gate no word; a gate with no check-in says so",
+       t(lis[2]).includes("82 %") && !/Queue likely|Over capacity/.test(t(lis[2]))
+       && t(lis[1]).includes("93 %") && t(lis[1]).includes("Queue likely") && t(lis[0]).includes("120 %") && t(lis[0]).includes("Over capacity")
+       && /27\.9 a day of \d/.test(t(lis[2])) && t(lis[3]).includes("9.0 a day") && t(lis[3]).includes("No check-in time typed") && t(lis[3]).includes("—"), lis.map(t).join(" || "));
+    ok("PHONE GATES: REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials) — no thin bar; the arc's tone is the server's flag (bad on red, warn on amber, ok otherwise), the ring alone without a capacity",
+       !ph.el.querySelector(".ga-pbar") && lis[0].getAttribute("data-ga-tone") === "bad" && lis[1].getAttribute("data-ga-tone") === "warn"
+       && lis[2].getAttribute("data-ga-tone") === "ok" && lis[3].getAttribute("data-ga-tone") === "none" && !lis[3].querySelector(".ga-d-arc") && !!lis[2].querySelector(".ga-d-arc"));
     ok("PHONE GATES: the headline counts the red gates first", ph.el.querySelector(".ga-head-v").textContent === "1 gate over capacity");
-    ok("PHONE GATES: the Gate by gate detail table is still there under the list", !!ph.el.querySelector("[data-ga-table]"));
+    ok("PHONE GATES: the Gate by gate detail table is still there under the dials", !!ph.el.querySelector("[data-ga-table]"));
     ph.done();
 
     const dk = mount(w.GateArrivalsPanel, { ...props, phone: false });
-    ok("DESK GATES: unchanged — the chart and its key, no list", !!dk.el.querySelector("[data-ga-chart]") && !!dk.el.querySelector(".ga-key") && !dk.el.querySelector("[data-ga-list]"));
+    ok("DESK GATES: REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials) — the same dials, six across on a desk (no phone class), the key line, no chart, no list",
+       !!dk.el.querySelector("[data-ga-dials]") && !dk.el.querySelector(".ga-dials-phone") && !!dk.el.querySelector(".ga-key") && !dk.el.querySelector("[data-ga-chart]") && !dk.el.querySelector("[data-ga-list]"));
     dk.done();
     const dk2 = mount(w.GateArrivalsPanel, props);
-    ok("DESK GATES: with no `phone` prop the panel is the desk panel", !!dk2.el.querySelector("[data-ga-chart]") && !dk2.el.querySelector("[data-ga-list]"));
+    ok("DESK GATES: with no `phone` prop the panel is the desk panel", !!dk2.el.querySelector("[data-ga-dials]") && !dk2.el.querySelector(".ga-dials-phone") && !dk2.el.querySelector("[data-ga-list]"));
     dk2.done();
 
     // ---- source: the CSS and the wiring ---------------------------------------------------------------------
     const css = (sel) => { const m = html.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\{([^}]*)\\}")); return m ? m[1] : ""; };
-    ok("PHONE GATES: a name wraps (overflow-wrap) and the bar is 6 px high; type is 13 px or more; the amber / red words are the text-grade colours",
-       /overflow-wrap:anywhere/.test(css(".ga-li-name")) && /height:6px/.test(css(".ga-pbar")) && /font-size:13px/.test(css(".ga-li-fig")) && /font-size:13px/.test(css(".ga-li-name small"))
-       && /var\(--warn-text\)/.test(css(".ga-li-warn .ga-li-fig")) && /var\(--bad-text\)/.test(css(".ga-li-bad .ga-li-fig"))
-       // REVERSED 24 Nov 2026 (own look, B1 stage 7): the bar is ink in every state (a small bar beside a status); amber / red
-       // stay on the figure's words above
+    ok("PHONE GATES: REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials) — the list's CSS is gone; the dials two across on a phone; a name cut with an ellipsis (its title holds it whole); 12 px type at least",
+       !/\.ga-li-(name|fig|warn|bad)/.test(html.replace(/\.gw-cap\.ga-li-(warn|bad)/g, "")) && !/\.ga-list\{/.test(html)
+       && /grid-template-columns:repeat\(2,/.test(css(".ga-dials-phone")) && /text-overflow:ellipsis/.test(css(".ga-d-name")) && /font-size:12px/.test(css(".ga-d-fig"))
+       // REVERSED 24 Nov 2026 (own look, B1 stage 7): the bar is ink in every state (a small bar beside a status); kept for the
+       // Look-ahead's GatesWeek, which still draws it
        && /var\(--ink\)/.test(css(".ga-pbar i")) && !/\.ga-li-(warn|bad) \.ga-pbar i\{/.test(html));
     ok("PHONE GATES: the Dashboard hands its `phone` to the panel", html.includes("sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")   /* NARROWED 11 Nov 2026 (CLOCS idea C-I1) */);
 

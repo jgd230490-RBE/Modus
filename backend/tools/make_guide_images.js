@@ -214,7 +214,7 @@ function figWeeks() {
 const HOLDERS = {
   // [the figure caption in frontend/help/index.html, word for word; what to capture; the chrome drawn]
   S01: ["The sign-in screen", "the site address, before signing in", "app"],
-  S02: ["The Dashboard — the six cards, the carbon target and the charts", "Dashboard, Approved, the demo's four months", "app"],
+  S02: ["The Dashboard — the six figures, the three key charts and Gate arrivals", "Dashboard, Approved, the demo's four months", "app"],
   S03: ["The Stockpile capacity section on the Dashboard", "Dashboard, Stockpile capacity opened", "app"],
   S04: ["Submit forecast — one line across a year, with the totals strip", "Submit forecast, a demo route picked", "app"],
   S05: ["Forecasts — the list with its filters, cost and status (planner view)", "Forecasts, as the planner", "app"],
