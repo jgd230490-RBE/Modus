@@ -9,10 +9,11 @@
  * (metadata 'wayscope:own'), and labelAnchor() never answers a stamped layer, whatever its id.
  * Seen in Chrome after that fix: a basemap switch makes the pick, the abnormal loads and the traffic limits again BEFORE
  * the forecast lines, which then come in over them. So the layers over the lines have ONE order (OVER_LINES,
- * restackOverLines(), run by raiseMarks() on every forecast re-add and by selectRoute()): part C.
- * The real labelAnchor(), restackOverLines() and addLayer wrapper are run against a stand-in map; no browser (the real
- * pictures are in notes\route-lines-plan-1126\check\fix\). On main 3a3e592, 17 of the 22 checks fail (A4, A5, B3, B4 and
- * B5 hold there too).
+ * restackOverLines(), run by raiseMarks() on every forecast re-add, by selectRoute() and by the two month functions):
+ * part C. A pick sits where a pick always drew: over an abnormal load and a traffic limit's band, under the limit's badge.
+ * The real labelAnchor(), restackOverLines(), applyAbnormalPublicMonth(), applyTrafficMonth() and addLayer wrapper are run
+ * against a stand-in map; no browser (the real pictures are in notes\route-lines-plan-1126\check\fix\). On main 3a3e592,
+ * 22 of the 27 checks fail (A4, A5, B3, B4 and B5 hold there too); on 74f506e (the pick under the limits), 6 fail.
  */
 const fs = require("fs");
 const path = require("path");
@@ -170,17 +171,35 @@ const restackSrc = (olm ? olm[0] : "") + "\n" + fnSrc("restackOverLines");
 function sandbox2(base) {
   const map = stubMap(base);
   let moves = 0; const mv = map.moveLayer; map.moveLayer = (a, b) => { moves++; mv(a, b); };
-  const api = new Function("map", "styleHasSlots", "SLOT_TYPES", "EMISSIVE",
-    wrapperSrc + "\n" + fnSrc("labelAnchor") + "\n" + restackSrc + "\nreturn { labelAnchor, restackOverLines, OVER_LINES };")(
-      map, () => false, new Set(["line", "fill"]), { line: "line-emissive-strength" });
+  map.setFilter = () => {}; map.getSource = () => ({ setData: () => {} });
+  // the two month functions run for real, with stand-ins for what they read besides the map
+  const api = new Function("map", "styleHasSlots", "SLOT_TYPES", "EMISSIVE", "mapModeMonth", "ABP", "abnormalPublicMonthIds", "TL",
+    "setAbnormalDots", "renderAbnormalPublicPanel", "renderAbnormalLegend", "TLIM", "trafficFeatures", "renderTrafficPanel",
+    wrapperSrc + "\n" + fnSrc("labelAnchor") + "\n" + restackSrc + "\n" + fnSrc("applyAbnormalPublicMonth") + "\n" + fnSrc("applyTrafficMonth")
+    + "\nreturn { labelAnchor, restackOverLines, OVER_LINES, applyAbnormalPublicMonth, applyTrafficMonth };")(
+      map, () => false, new Set(["line", "fill"]), { line: "line-emissive-strength" }, () => "2027-04", { data: { features: [] } },
+      () => null, { playing: false }, () => {}, () => {}, () => {}, {}, () => ({ shapes: {}, badges: {} }), () => {});
   const ids = () => map.layers.map(l => l.id);
   return { map, api, ids, at: id => ids().indexOf(id), moves: () => moves };
 }
-// the order the stack must read, bottom to top, between the forecast lines and the basemap's names
-const WANT = ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line", "diversion-edge", "busy-casing", "busy-core",
+// the order the stack must read, bottom to top, between the forecast lines and the basemap's names. CHANGED 26 Nov 2026 (the
+// plan session, after reading the diff): the pick goes back where a pick has always drawn, OVER an abnormal load and a
+// traffic limit's fill, band and edge, UNDER the limit's badge (the old selectRoute() put it just under the anchor, which was
+// that badge before PR #330); the busy-hours road goes with it, under it
+const WANT = ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line", "diversion-edge",
+  "abnormal-public-casing", "abnormal-public-lines", "traffic-limit-fill", "traffic-limit-band", "traffic-limit-edge",
+  "busy-casing", "busy-core", "sel-glow", "sel-casing", "sel-core", "traffic-limit-badge"];
+// the order 74f506e set (the pick under the abnormal loads and the limits): reversed, it must NOT be what results
+const WANT_74f506e = ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line", "diversion-edge", "busy-casing", "busy-core",
   "sel-glow", "sel-casing", "sel-core", "abnormal-public-casing", "abnormal-public-lines",
   "traffic-limit-fill", "traffic-limit-band", "traffic-limit-edge", "traffic-limit-badge"];
 const inOrder = (s, list, top) => list.every((id, i) => s.at(id) >= 0 && (i === 0 || s.at(id) > s.at(list[i - 1]))) && s.at(list[list.length - 1]) < s.at(top);
+// the pick's place among the abnormal loads and the traffic limit's layers
+const pickPlace = s => ({
+  overAbnormal: s.at("sel-glow") > s.at("abnormal-public-lines"),
+  overLimitFillBandEdge: ["traffic-limit-fill", "traffic-limit-band", "traffic-limit-edge"].every(id => s.at("sel-glow") > s.at(id)),
+  underLimitBadge: s.at("sel-core") < s.at("traffic-limit-badge") });
+const pickRight = p => p && p.overAbnormal === true && p.overLimitFillBandEdge === true && p.underLimitBadge === true;
 {
   // after a switch to Streets, as read in Chrome on 26 Nov 2026 (main 3a3e592): the pick, the abnormal loads and the
   // traffic limits made again BEFORE the forecast lines, which then came in over them
@@ -196,15 +215,55 @@ const inOrder = (s, list, top) => list.every((id, i) => s.at(id) >= 0 && (i === 
     ["traffic-limit-band", "traffic-limit-edge"].forEach(id => add(LN(id, "traffic-limit-source")));
     add(T("traffic-limit-badge", "traffic-limit-badges"));
     ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line", "diversion-edge"].forEach(id => add(LN(id, "routes-source")));
+    ["abnormal-public-ends", "abnormal-public-dot"].forEach(id => s.map.addLayer({ id, type: "circle", source: "abnormal-public-ends" }));
     r = { before: inOrder(s, WANT, "road-label-simple") };
     s.api.restackOverLines();
     r.after = inOrder(s, WANT.concat(["busy-hours-at"]), "road-label-simple");
+    r.old = inOrder(s, WANT_74f506e, "road-label-simple");
+    r.pick = pickPlace(s);
   } catch (e) { r = "threw " + e; }
-  ok("⭐ C1 after a basemap switch the stack is put back: forecast lines, shared sections, rails, busy road, pick, abnormal, traffic limits, the pick's hours, then the basemap's names",
-     r && r.before === false && r.after === true, { r, ids: s && s.ids() });
+  // REVERSED 26 Nov 2026 (the plan session): it read "… busy road, pick, abnormal, traffic limits …" (74f506e's order)
+  ok("⭐ C1 after a basemap switch the stack is put back: forecast lines, shared sections, rails, abnormal, a limit's fill / band / edge, busy road, pick, the limit's badge, the pick's hours, then the basemap's names (and not 74f506e's order, the pick under the abnormal loads and limits)",
+     r && r.before === false && r.after === true && r.old === false, { r, ids: s && s.ids() });
   let m2 = null;
   try { const n = s.moves(); s.api.restackOverLines(); m2 = s.moves() - n; } catch (e) { m2 = "threw " + e; }
   ok("C2 once the order holds it moves nothing (it runs on every forecast re-add)", m2 === 0, m2);
+  ok("⭐ C7 after a basemap switch the pick is over the abnormal-load line and a traffic limit's fill, band and edge, and under the limit's badge",
+     r && pickRight(r.pick), r && r.pick);
+  // a month moves on with the route's panel open: the two month functions move their layers to just under the names
+  // (the old flip that put them back over the pick); now each ends in the one order
+  let m = null;
+  try {
+    s.api.applyAbnormalPublicMonth();
+    m = { abnormal: pickPlace(s), orderA: inOrder(s, WANT.concat(["busy-hours-at"]), "road-label-simple") };
+    s.api.applyTrafficMonth();
+    m.traffic = pickPlace(s); m.orderT = inOrder(s, WANT.concat(["busy-hours-at"]), "road-label-simple");
+    m.endsOnTop = s.at("abnormal-public-dot") > s.at("road-label-simple");
+  } catch (e) { m = "threw " + e; }
+  ok("⭐ C8 after a month change (the real applyAbnormalPublicMonth, then applyTrafficMonth) the pick stays over the abnormal load and the limit's band, under its badge, and the whole order holds",
+     m && pickRight(m.abnormal) && pickRight(m.traffic) && m.orderA === true && m.orderT === true, { m, ids: s && s.ids() });
+  ok("C9 the abnormal load's ring and dot still go to the very top on a month change", m && m.endsOnTop === true, m);
+}
+{
+  // the moment of a pick, with the month's limits and abnormal loads already made over the lines (as at load): the pick
+  // goes in as the old selectRoute() put it (just under the anchor), and the one order then puts the badge back over it
+  let s = null, r = null;
+  try {
+    s = sandbox2(BASEMAP);
+    const add = (l) => s.map.addLayer(l, s.api.labelAnchor());
+    ["sel-glow", "sel-casing", "sel-core", "busy-casing", "busy-core"].forEach(id => add(LN(id, "selected-route")));
+    ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line"].forEach(id => add(LN(id, "routes-source")));
+    ["abnormal-public-casing", "abnormal-public-lines"].forEach(id => add(LN(id, "abnormal-public-source")));
+    add({ id: "traffic-limit-fill", type: "fill", source: "traffic-limit-source" });
+    ["traffic-limit-band", "traffic-limit-edge"].forEach(id => add(LN(id, "traffic-limit-source")));
+    add(T("traffic-limit-badge", "traffic-limit-badges"));
+    s.api.restackOverLines();                                          // raiseMarks at load
+    ["busy-casing", "busy-core", "sel-glow", "sel-casing", "sel-core"].forEach(id => s.map.moveLayer(id, s.api.labelAnchor()));
+    s.api.restackOverLines();                                          // selectRoute
+    r = pickPlace(s);
+  } catch (e) { r = "threw " + e; }
+  ok("⭐ C10 at the moment of a pick it is over the abnormal-load line and the limit's fill, band and edge, under the limit's badge",
+     pickRight(r), r);
 }
 {
   // a busy-hours pill nobody has put under the names (no pick) stays where it is, over them
@@ -240,9 +299,14 @@ const inOrder = (s, list, top) => list.every((id, i) => s.at(id) >= 0 && (i === 
 ok("⭐ C5 raiseMarks() (every forecast re-add) and selectRoute() both put the stack in the one order; selectRoute no longer moves the pick on its own",
    fnSrc("raiseMarks").includes("restackOverLines();") && fnSrc("selectRoute").includes("restackOverLines();")
    && !fnSrc("selectRoute").includes("['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach"));
-ok("C6 OVER_LINES lists the shared sections first and the traffic limits last, as the comment says",
-   !!olm && /'road-load-casing', 'road-load-line', 'diversion-edge', 'busy-casing', 'busy-core',\s+'sel-glow', 'sel-casing', 'sel-core', 'abnormal-public-casing', 'abnormal-public-lines',\s+'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'\]/.test(olm[0])
-   && html.includes("A NEW layer that must draw over the\n    // month's lines joins OVER_LINES here"));
+// REVERSED 26 Nov 2026 (the plan session): it pinned 74f506e's list (the busy road and the pick before the abnormal loads)
+ok("C6 OVER_LINES lists the shared sections first, then the rails, the abnormal loads, a limit's fill / band / edge, the busy road, the pick and the limit's badge last, as the comment says",
+   !!olm && /'road-load-casing', 'road-load-line', 'diversion-edge', 'abnormal-public-casing', 'abnormal-public-lines',\s+'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'busy-casing', 'busy-core',\s+'sel-glow', 'sel-casing', 'sel-core', 'traffic-limit-badge'\]/.test(olm[0])
+   && !/'sel-core', 'abnormal-public-casing'/.test(olm[0])
+   && html.includes("A NEW layer\n    // that must draw over the month's lines joins OVER_LINES here"));
+ok("⭐ C11 the two month functions put the stack back in the one order right after their own move (the flip over the pick ends)",
+   /map\.moveLayer\(l, labelAnchor\(\)\)\); \['abnormal-public-ends', 'abnormal-public-dot'\]\.forEach\(l => map\.moveLayer\(l\)\); \} catch \(e\) \{\}\n\s+if \(typeof restackOverLines === 'function'\) restackOverLines\(\);/.test(fnSrc("applyAbnormalPublicMonth"))
+   && /'traffic-limit-badge'\]\.forEach\(l => map\.moveLayer\(l, labelAnchor\(\)\)\); \} catch \(e\) \{\}\n\s+if \(typeof restackOverLines === 'function'\) restackOverLines\(\);/.test(fnSrc("applyTrafficMonth")));
 
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);

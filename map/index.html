@@ -3121,13 +3121,16 @@
     // 26 Nov 2026 (claude/map-label-anchor; notes\route-lines-plan-1126): THE ONE ORDER over the month's lines. Each of these
     // layers was put "before labelAnchor()" by its own adder at its own moment, so the stack was whatever order they came
     // in: after a basemap switch the pick, the abnormal loads and the traffic limits were made BEFORE the forecast lines were
-    // made again, and ended UNDER them. Read bottom to top: the shared road sections, the amber rails, the busy-hours road,
-    // the pick, the abnormal loads, the traffic limits, then the basemap's names. raiseMarks() (on every forecast re-add)
-    // and selectRoute() call this; it moves nothing while the order already holds. A NEW layer that must draw over the
-    // month's lines joins OVER_LINES here, never a moveLayer of its own.
-    const OVER_LINES = ['road-load-casing', 'road-load-line', 'diversion-edge', 'busy-casing', 'busy-core',
-        'sel-glow', 'sel-casing', 'sel-core', 'abnormal-public-casing', 'abnormal-public-lines',
-        'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'];
+    // made again, and ended UNDER them. Read bottom to top: the shared road sections, the amber rails, the abnormal loads,
+    // a traffic limit's fill, band and edge, the busy-hours road, the pick, the limit's badge, the pick's hours, then the
+    // basemap's names. The pick sits where a pick has always drawn (the old selectRoute() put it just under the anchor,
+    // which was the limit's badge): over an abnormal load and a limit's band, under the limit's badge; a month change no
+    // longer flips it (applyAbnormalPublicMonth and applyTrafficMonth call this after their own move). raiseMarks() (on
+    // every forecast re-add) and selectRoute() call it too; it moves nothing while the order already holds. A NEW layer
+    // that must draw over the month's lines joins OVER_LINES here, never a moveLayer of its own.
+    const OVER_LINES = ['road-load-casing', 'road-load-line', 'diversion-edge', 'abnormal-public-casing', 'abnormal-public-lines',
+        'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'busy-casing', 'busy-core',
+        'sel-glow', 'sel-casing', 'sel-core', 'traffic-limit-badge'];
     function restackOverLines() {
         if (!map || !map.getStyle) return;
         let layers; try { layers = map.getStyle().layers || []; } catch (e) { return; }
@@ -7129,7 +7132,7 @@
         const src=map.getSource('selected-route'); if(src) src.setData({type:'FeatureCollection',features:feats});
         showBusyRoad(rl);
         // NARROWED 26 Nov 2026 (claude/map-label-anchor): the pick takes its place in the one order over the lines
-        // (restackOverLines: under the abnormal loads and the traffic limits, over the busy-hours road), the pill last
+        // (restackOverLines: over the abnormal loads, a limit's band and the busy-hours road, under the limit's badge), the pill last
         if(map.getLayer('busy-hours-at')) { try { map.moveLayer('busy-hours-at', labelAnchor()); } catch(e){} }
         restackOverLines();
         setRouteDim(routeId);
@@ -11596,6 +11599,7 @@
             // above the month's blue routes (added after these layers when the timeline opens) and still under the names: the
             // load's line is the thing to see in its month; the ring and the dot on top of everything
             try { ['abnormal-public-casing', 'abnormal-public-lines'].forEach(l => map.moveLayer(l, labelAnchor())); ['abnormal-public-ends', 'abnormal-public-dot'].forEach(l => map.moveLayer(l)); } catch (e) {}
+            if (typeof restackOverLines === 'function') restackOverLines();   // 26 Nov 2026: back under a picked route (the one order over the lines)
             const lineFilter = ids ? ['all', ['==', ['geometry-type'], 'LineString'], ['in', ['get', 'id'], ['literal', ids]]] : ['==', ['geometry-type'], 'LineString'];
             try { ['abnormal-public-casing', 'abnormal-public-lines'].forEach(l => map.setFilter(l, lineFilter)); } catch (e) {}
             const ends = m ? ABP.active.map(f => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: f.geometry.coordinates[f.geometry.coordinates.length - 1] } })) : [];
@@ -11754,6 +11758,7 @@
             try { map.getSource('traffic-limit-source').setData(fc.shapes); map.getSource('traffic-limit-badges').setData(fc.badges); } catch (e) {}
             // above the month's blue routes (added later when the timeline opens), still under the road names
             try { ['traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'].forEach(l => map.moveLayer(l, labelAnchor())); } catch (e) {}
+            if (typeof restackOverLines === 'function') restackOverLines();   // 26 Nov 2026: the band back under a picked route, the badge over it (the one order)
         }
         renderTrafficPanel();
     }
