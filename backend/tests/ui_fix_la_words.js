@@ -234,6 +234,11 @@ try {
   let c = await closures({});
   ok("⭐ CLOSURES: \"Road closures checked 24 Nov, 14:56 · Check again\" (UK time, no source, no ISO date, no UTC)",
      c.text === "Road closures checked 24 Nov, 14:56" && c.btn === "Check again" && clean(c.all), c.all);
+  c = await closures({ restrictions_checked_at: "2026-11-24T14:56:32+00:00" });
+  ok("⭐ CLOSURES: the stored time in the server's own form (\"…T14:56:32+00:00\") reads \"24 Nov, 14:56\"",
+     c.text === "Road closures checked 24 Nov, 14:56" && clean(c.all), c.all);
+  c = await closures({ restrictions_checked_at: "2026-07-01 13:05:00" });
+  ok("CLOSURES: a summer time with no zone is UTC and reads in UK time (BST): \"1 Jul, 14:05\"", c.text === "Road closures checked 1 Jul, 14:05", c.text);
   c = await closures({ restrictions: "partial", restrictions_unchecked: ["R001", "R002", "R003"] });
   ok("⭐ CLOSURES: a count of routes, never their codes: \"Road closures: 3 routes not checked since they were re-routed · Check now\"",
      c.text === "Road closures: 3 routes not checked since they were re-routed" && c.btn === "Check now" && clean(c.all), c.all);

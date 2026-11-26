@@ -12374,7 +12374,7 @@ function LaKpi({ label, value, unit, sub, warn, edge, info, tone }){
 // 25 Nov 2026 (B1): a day in this year without its year ("23 Nov"), another year's with it; the closures line's time in UK
 // time as Config's cfgWhen reads it (the page holds no time zone of the organisation's own: Europe/London, as cfgWhen)
 const laDay = (iso) => { if(!iso) return ""; const d = new Date(String(iso).slice(0, 10) + "T00:00:00"); if(isNaN(d)) return String(iso); return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() === new Date().getFullYear() ? "" : " " + d.getFullYear()}`; };
-const laWhen = (s) => { if(!s) return ""; const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); if(isNaN(d)) return String(s);
+const laWhen = (s) => { if(!s) return ""; const t = String(s).replace(" ", "T"); const d = new Date(/(Z|[+-]\d\d:?\d\d)$/.test(t) ? t : t + "Z");   /* with or without its zone ("…+00:00" as stored) */ if(isNaN(d)) return String(s);
   const o = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" };
   if(d.getUTCFullYear() !== new Date().getUTCFullYear()) o.year = "numeric";
   return d.toLocaleString("en-GB", o); };
