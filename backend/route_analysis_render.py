@@ -32,7 +32,10 @@ except Exception:                       # the harness without reportlab stops at
     A4 = landscape = mm = ImageReader = rl_canvas = None
 
 RED = "#B91C1C"
-BUSY_BLUE = "#2563EB"
+# 26 Nov 2026 (the printed maps' route lines, card 3b; John, Q10 "Go with blue"): the legs are band blues now, so the
+# busy-hours road leaves the blues for ink, as route_map_export.BUSY_ROAD did (it was the stock blue #2563EB, which sat
+# beside the dark blue legs as a second near-identical blue). The name is kept: one constant, read in two places.
+BUSY_BLUE = "#3A3C41"
 ZONE_RED = "#DC2626"
 CYCLE_BLUE = "#0369A1"
 USUAL_GREY = "#71717A"

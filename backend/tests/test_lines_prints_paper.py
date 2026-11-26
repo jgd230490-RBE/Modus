@@ -94,6 +94,12 @@ ok("Q4: the key's words stay (Laden (out), Empty (return), Busy-hours road, Way 
 # ---- Q6: the busy-hours road ----------------------------------------------------------------------------------------
 ok("⭐ Q6: the printed busy-hours road is ink #3A3C41 (not the plan blue, not the sign blue)",
    rme.BUSY_ROAD.upper() == INK and rme.BUSY_ROAD.upper() not in {"#3B82F6", "#0B4EA2"}, rme.BUSY_ROAD)
+ok("⭐ Q6: the Route analysis's busy-hours page draws the other road in ink too, never a stock blue beside the blue legs "
+   "(found on R013's page in the build: #2563EB against #0051C4)",
+   rar.BUSY_BLUE.upper() == INK and rar.BUSY_BLUE.upper() not in {"#2563EB", "#3B82F6", "#0B4EA2"}, rar.BUSY_BLUE)
+_src = read("backend/route_analysis_render.py")
+ok("Q6: the busy-hours page's map, and its key, read BUSY_BLUE",
+   '_rs_line(c, P, use["loaded"], BUSY_BLUE' in _src and "_k_line(BUSY_BLUE)" in _src)
 
 # ---- Q7 / Q8: the collision evidence ---------------------------------------------------------------------------------
 ex = read("backend/export.py")
