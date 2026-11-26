@@ -372,8 +372,19 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .slp-eye{width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center;color:var(--muted);flex:none;}
   .slp-eye:hover{background:var(--surface-2);} .slp-eye::before{content:"◉";} .slp-eye[aria-pressed="false"]::before{content:"○";}
   /* 5 Nov 2026: a site's layout full screen — the Locations grid over the whole window (z 70: under the i boxes and messages) */
-  .sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:8px;gap:8px !important;background:var(--surface-3);align-content:stretch;}
+  .sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:0;gap:0 !important;background:var(--bg);align-content:stretch;}
+  /* 26 Nov 2026 (own look B1, after): full screen sits on the page white, its columns divided by hairlines, not cards on grey
+     (design language, Sections); the columns lose their ink top rule, the sections inside keep theirs */
+  .sl-full>.card,.sl-full>.space-y-4,.sl-full>.space-y-3{border-top:0 !important;padding-left:12px !important;padding-right:12px !important;}
+  .sl-full>.dm-map,.sl-full>.card.overflow-hidden{padding:0 !important;}
+  .sl-full>[data-route-full-list],.sl-full>[data-site-layout-palette]{border-right:1px solid var(--line) !important;}
+  .sl-full>[data-route-full-details],.sl-full>[data-site-layout-side],.sl-full>.space-y-4{border-left:1px solid var(--line) !important;}
+  .sl-full>[data-site-layout-draw]{border-bottom:1px solid var(--line) !important;}
+  /* an open column is 25 px wider than before (12 + 12 padding and the hairline), so what is inside keeps its width; a folded
+     strip stays 44 px with 7 px each side for its 28 px button */
+  .sl-full>:has(.sl-fold[aria-expanded="false"]){padding-left:7px !important;padding-right:7px !important;}
   .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;} .sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}
+  html[data-theme="dark"] .mapboxgl-ctrl-group button.sl-full-btn{color:var(--ink);}   /* 26 Nov 2026 (B1 after): in Dark the glyph was dark on the dark button; light as + and − are */
   .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
   .sl-fold:hover{background:var(--surface-2);}
   .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:6px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 var(--f-text);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
@@ -1215,10 +1226,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      24 Nov 2026 (own look, B1 item 2; John's yes to the second and third mockups): a status is a SHAPE and a WORD with no
      tinted pill: dot = ok, diamond = warning, square = bad, ring = none; the shapes 10 px, the ring a 2 px stroke in the
      second-text grey. A CLP draft (rs-draft, on no mockup) is the ring with its word. The word keeps its tone's text colour. */
-  .row-st{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;line-height:1.35;color:var(--st-none);white-space:nowrap;}
-  .row-st i{flex:none;display:inline-block;vertical-align:middle;box-sizing:border-box;width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var(--st-none);}
+  .row-st{display:inline-flex;align-items:flex-start;gap:7px;font-size:13px;font-weight:600;line-height:1.35;color:var(--st-none);white-space:nowrap;}
+  .row-st i{flex:none;display:inline-block;vertical-align:middle;box-sizing:border-box;width:10px;height:10px;margin-top:calc(.675em - 5px);border-radius:50%;background:transparent;border:2px solid var(--st-none);}
+  /* 26 Nov 2026 (own look B1, after): the shape sits on the FIRST line's middle however many lines the word takes: the row is
+     top-aligned and the shape drops half a line (1.35 / 2 = .675em) less half its own height */
   .row-st.rs-ok{color:var(--ok-text);} .row-st.rs-ok i{background:var(--green);border:0;}
-  .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate(45deg);}
+  .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:calc(.675em - 4.5px) 1px 0;transform:rotate(45deg);}
   .row-st.rs-bad{color:var(--bad-text);} .row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}
   .row-st.rs-draft i{background:transparent;border:2px solid var(--st-none);}
   [data-route-notes] .row-st, [data-busy-in-use] .row-st{white-space:normal;}   /* 26 Nov 2026 (B1): a long status word wraps in a narrow cell, its shape kept on the first line */
@@ -20584,9 +20597,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       {/* 5 Nov 2026: in full screen (sl-full) the same grid lies over the whole window: the Drawing bar, then palette | map |
           settings filling the height (either side folds to a strip); before Draw, the map | the site's panel */}
       <div ref={fullGrid} className={(drawing ? "grid gap-3" : "grid dm-grid gap-4") + (full ? " sl-full" : "")} data-drawing={drawing ? "1" : undefined} data-full={full ? "1" : undefined}
-        style={full ? (drawing ? { gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)" }
-          : onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 300}px minmax(0, 1fr) ${fold.r ? 44 : 380}px`, gridTemplateRows: "minmax(0, 1fr)" }
-          : { gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" })
+        style={full ? (drawing ? { gridTemplateColumns: `${fold.l ? 44 : 257}px minmax(0, 1fr) ${fold.r ? 44 : 325}px`, gridTemplateRows: "auto minmax(0, 1fr)" }
+          : onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 325}px minmax(0, 1fr) ${fold.r ? 44 : 405}px`, gridTemplateRows: "minmax(0, 1fr)" }
+          : { gridTemplateColumns: "minmax(0, 1fr) 405px", gridTemplateRows: "minmax(0, 1fr)" })
           : drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>
         {/* ONE map instance, shared by both sub-tabs — this div is never unmounted */}
         <div className={drawing ? "card overflow-hidden" : "dm-map card overflow-hidden"}
