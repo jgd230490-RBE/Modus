@@ -405,6 +405,41 @@ ok("4 (card 4): 'load point' for 'yard' in the sentences a person reads",
    "one load point." in lp.RULE_WORDS and lp.ONE_YARD_WORDS == "One load point and one kind of lorry a lorry-day."
    and "yard" not in (lp.RULE_WORDS + lp.ONE_YARD_WORDS).lower())
 SP = lp.driver_pages(D, "chained", DAY)
+
+
+
+def ring_count(pdf):
+    """26 Nov 2026 (card 4 as drawn): how many times a page sets the limit ring's red as its stroke colour (one a ring)."""
+    import base64
+    import zlib
+    n = 0
+    for m in re.finditer(rb"stream\r?\n(.*?)endstream", pdf, re.S):
+        raw, s = m.group(1).strip(), None
+        for dec in (lambda b: zlib.decompress(b), lambda b: zlib.decompress(base64.a85decode(b.replace(b"~>", b""), adobe=False))):
+            try:
+                s = dec(raw)
+                break
+            except Exception:
+                continue
+        n += len(re.findall(rb"0?\.75294\d* 0?\.22352\d* 0?\.16862\d* RG", s if s is not None else raw))
+    return n
+
+# 26 Nov 2026 (card 4 as drawn): a limit's row opens with the red ring on the Driver sheet too, at the limit and over it
+_SPR = copy.deepcopy(SP)
+_P = next(P for pg in _SPR["pages"] for P in pg.get("take_care") or [])
+if not _P.get("legs"):
+    _P["legs"] = [{"leg": "loaded", "title": "Going loaded", "length": "3 miles", "places": [], "more": 0}]
+_L0 = _P["legs"][0]
+_L0["limits"] = [{"kind": "limit", "limit_kind": "height", "w": "4.0 m", "text": "Height limit 4.0 m (13'0\") · Melton Road",
+                  "at_km": 1.0},
+                 {"kind": "limit", "limit_kind": "weight", "w": "7.5 t", "text": "Weight limit · Main Street · this lorry is over it",
+                  "at_km": 2.0}]
+_P.pop("nothing", None)
+_pdf_r = lp.build_pdf(D, "chained", DAY, sheet=_SPR)
+ok("4 (card 4 as drawn, 26 Nov): the Driver sheet's limit rows each open with the red ring (at and over alike), none elsewhere",
+   ring_count(_pdf_r) == 2 and ring_count(lp.build_pdf(D, "chained", DAY, sheet=SP)) == sum(
+       len(L["limits"]) for pg in SP["pages"] for P in pg.get("take_care") or [] for L in __import__("route_points").legs_shown(P))
+   and "7.5 t" in pdf_text(_pdf_r), (ring_count(_pdf_r),))
 ok("4 (card 4): driver_pages: one page a lorry, the same heads the PDF prints",
    len(SP["pages"]) == n_lorries and all(pg["head"] in _t1 for pg in SP["pages"]) and SP["sub"] in _t1)
 _b0 = C["days"][DAY][0]

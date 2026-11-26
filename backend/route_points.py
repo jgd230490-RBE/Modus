@@ -45,6 +45,10 @@ CUT_PLACES = 3
 LIMIT_ON_LINE_M = 30.0
 VERDICTS = ("exceeds", "at_limit")
 
+#: 26 Nov 2026 (card 4 as drawn, the batch's second look): a limit's row on both sheets opens with a red ring, as the
+#: limit's own sign does, the same ring at the limit and over it (the row's words say which). The card's colour.
+LIMIT_RING = "#C0392B"
+
 HEAD = "Take care on this route"
 FOOT = "What Wayscope holds within 250 m of the route. Road signs come first."
 NOT_CHECKED = "Limits not checked for this lorry"
