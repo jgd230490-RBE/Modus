@@ -301,6 +301,39 @@ try {
      || norm(ph3.el.querySelector("[data-ph-note]").textContent).includes("not routed yet"), norm(ph3.el.querySelector("[data-ph-note]").textContent));
   ph3.done();
 
+  // ---------------------------------------------------------------- 26 Nov 2026: card c1's figures (the batch's second look)
+  // R10's days add to 840 (170 × 4 + 160) against a week of 850: the line says "days add to 840" under its week, so the site's
+  // 865 t (its lines' days) reads right against 850 + 25; every line figure is whole tonnes, as the card draws them.
+  w.sessionStorage.clear();
+  const PD = pageOf();
+  { const r10 = PD.commit.lines[0];
+    r10.days[4] = { ...r10.days[4], planned_qty: 160, derived: { ...r10.days[4].derived, tonnes: 160 } };
+    r10.week = { ...r10.week, planned_qty: 850 }; r10.week_derived = { ...r10.week_derived, tonnes: 840 };
+    r10.days_sum = 840; r10.days_ne_week = true;
+    PD.commit.sites = rollUp(PD.commit.lines); }
+  const dd = desk(PD);
+  const dA = dd.el.querySelector('tr[data-la-site="L001"]');
+  const dLines = []; { let x = dA.nextElementSibling; while (x && !x.hasAttribute("data-la-site") && !x.classList.contains("la-total")) { if (x.classList.contains("la-ln")) dLines.push(x); x = x.nextElementSibling; } }
+  const wkCell = (tr) => [...tr.querySelectorAll("td.num")].pop();
+  ok("⭐ CARD c1: a line whose days do not add to its week says so under the week figure (\"850 t\", then \"days add to 840\")",
+     dLines.length === 2 && norm(wkCell(dLines[0]).textContent).startsWith("850 t") && !!wkCell(dLines[0]).querySelector("[data-la-daysum]")
+     && norm(wkCell(dLines[0]).querySelector("[data-la-daysum]").textContent) === "days add to 840", dLines[0] && norm(wkCell(dLines[0]).textContent));
+  ok("CARD c1: ...only where they differ (R11's week has no such line), and the site's week is the days' 865 t",
+     !wkCell(dLines[1]).querySelector("[data-la-daysum]") && norm([...dA.querySelectorAll("td.la-site-n")].pop().textContent) === "865 t"
+     && dd.el.querySelectorAll("[data-la-daysum]").length === 1, norm([...dA.querySelectorAll("td.la-site-n")].pop().textContent));
+  // the figure cells only: a line's details (the "By day" table, the "Days and week disagree" sentence) keep one decimal
+  ok("⭐ CARD c1: a line's figures are WHOLE tonnes (170 … 160, 850 t; 5 … 25 t), never \"170.0\"",
+     [...dLines[0].querySelectorAll("td.num")].map(x => norm(x.childNodes[0] && x.textContent).replace(/days add to.*/, "").replace(/✎/g, "").trim()).join("|") === "170|170|170|170|160|850 t"
+     && [...dLines[1].querySelectorAll("td.num")].map(x => norm(x.textContent)).join("|") === "5|5|5|5|5|25 t"
+     && !/\d\.0\b/.test([...dd.el.querySelectorAll('[data-rd-table="lookahead"] tbody td.num')].map(x => norm(x.textContent)).join(" | ").replace(/days add to [\d,.]+/g, "")),
+     [...dLines[0].querySelectorAll("td.num")].map(x => norm(x.textContent)).join("|") );
+  pressUnit(dd.el, "Loads");
+  ok("CARD c1: under Loads the line's figures stay whole and the \"days add to\" line goes (it speaks of tonnes)",
+     !dd.el.querySelector("[data-la-daysum]") && !/\d\.\d\b/.test([...dd.el.querySelectorAll('[data-rd-table="lookahead"] tbody td.num')].map(x => norm(x.textContent)).join(" | ")));
+  pressUnit(dd.el, "Lorries");
+  ok("CARD c1: under Lorries too", !dd.el.querySelector("[data-la-daysum]") && !/\d\.\d\b/.test([...dd.el.querySelectorAll('[data-rd-table="lookahead"] tbody td.num')].map(x => norm(x.textContent)).join(" | ")));
+  dd.done();
+
   // ---------------------------------------------------------------- one list for desk and phone
   const L2 = linesOf("derived");
   const S0 = F.laSiteList({ sites: rollUp(L2) }, L2);
