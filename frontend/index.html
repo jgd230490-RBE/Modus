@@ -21273,6 +21273,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       })()}
                       {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
+                        // 26 Nov 2026 (PR #331): amber chips moved to the solid warning background (4.84:1); the 12 % tint read 4.25:1 (axe, Routes at 1366 px)
+                        // 26 Nov 2026 (own look B1, taking main bbf9c7e in): then the status chip took them with NO background at all, the
+                        // word on the page itself: --warn-text #B45309 on white 5.02:1 (Dark #FBBF24), so the tint's fault cannot occur
                         const ps = (divPeriods || []).filter(p => p.route_id === r.id);
                         if(!ps.length) return null;
                         const used = ps.filter(p => p.status === "in_use"), bad = ps.filter(p => p.status !== "in_use");
