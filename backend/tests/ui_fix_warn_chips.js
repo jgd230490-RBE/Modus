@@ -31,23 +31,27 @@ const tok = (name, dark) => {
 
 ok("🔴 no amber word sits on a see-through amber tint any more",
    !/background: "rgba\(180,83,9,\.1[02]\)", color: "var\(--warn-text\)"/.test(html));
+// REVERSED 26 Nov 2026 (the own look's shape branch taken in with main): the five amber words are no longer chips on a
+// solid tint. Each is a status, a shape and a word with no background (RowStatus, or the .st-line sentence), so the
+// pair that must pass is --warn-text on the surface itself, in ink and in Dark.
 const solid = (html.match(/background: "var\(--st-warn-bg\)", color: "var\(--warn-text\)"/g) || []).length;
-ok("🔴 the five amber words sit on the solid var(--st-warn-bg)", solid === 5, String(solid));
-
+ok("🔴 REVERSED: no amber word sits on a tint at all (the five are a shape and a word)", solid === 0, String(solid));
 const chip = html.slice(html.indexOf("<span data-route-diverted={r.id}"), html.indexOf("<span data-route-diverted={r.id}") + 500);
-ok("the Routes list's 'Diverted …' chip is one of them", /background: "var\(--st-warn-bg\)", color: "var\(--warn-text\)"/.test(chip), chip.slice(0, 120));
-ok("...and its red 'Not diverted' side is unchanged (5.38:1 on white already)", /background: "rgba\(197,48,48,\.12\)", color: "var\(--bad-text\)"/.test(chip));
-const busy = html.slice(html.indexOf("data-route-busy={r.id}"), html.indexOf("data-route-busy={r.id}") + 400);
-ok("the busy-hours chip in the Routes list is one of them", /var\(--st-warn-bg\)/.test(busy));
-const hold = html.slice(html.indexOf("<span data-route-holding={hr.state}"), html.indexOf("<span data-route-holding={hr.state}") + 600);
-ok("the holding-area 'Route again' chip is one of them", /var\(--st-warn-bg\)/.test(hold));
-const stuck = html.slice(html.indexOf("no way round yet. Until you find one") - 300, html.indexOf("no way round yet. Until you find one"));
-ok("the 'no way round yet' box is one of them", /var\(--st-warn-bg\)/.test(stuck));
+ok("the Routes list's 'Diverted …' word is a RowStatus, no tint", /<RowStatus /.test(chip) && !/st-warn-bg|rgba\(/.test(chip), chip.slice(0, 160));
+const busyI = html.indexOf("paused: the road changed");
+const busy = html.slice(busyI - 200, busyI + 200);
+ok("the paused busy-hours word in the Routes list is a RowStatus", busyI > 0 && /<RowStatus word=\{`Busy hours: Alt \$\{u\.alt\}`\} tone="warn" \/>/.test(busy));
+const hold = html.slice(html.indexOf('hr.state === "route_again") return <span data-route-holding'), html.indexOf('hr.state === "route_again") return <span data-route-holding') + 400);
+ok("the holding-area 'Route again' word is a RowStatus", /<RowStatus word=\{words\} tone="warn" \/>/.test(hold));
+const stuckI = html.indexOf("no way round yet. Until you find one");
+const stuck = html.slice(stuckI - 300, stuckI);
+ok("the 'no way round yet' line is a status sentence (.st-line), no box", stuckI > 0 && /st-line st-warn/.test(stuck) && !/st-warn-bg/.test(stuck));
 
-const warnInk = tok("warn-text", false), bgInk = tok("st-warn-bg", false);
-const warnDk = tok("warn-text", true), bgDk = tok("st-warn-bg", true);
-ok("ink: --warn-text on --st-warn-bg passes 4.5:1", warnInk && bgInk && ratio(warnInk, bgInk) >= 4.5, `${warnInk} on ${bgInk} ${warnInk && bgInk ? ratio(warnInk, bgInk).toFixed(2) : "?"}`);
-ok("Dark: --warn-text on --st-warn-bg passes 4.5:1", warnDk && bgDk && ratio(warnDk, bgDk) >= 4.5, `${warnDk} on ${bgDk} ${warnDk && bgDk ? ratio(warnDk, bgDk).toFixed(2) : "?"}`);
+const tokv = (name, dark) => { const v = (html.match(new RegExp("--" + name + ":(#[0-9A-Fa-f]{6})", "g")) || []).map(m => m.split(":")[1]); return dark ? v[1] : v[0]; };
+const warnInk = tokv("warn-text", false), bgInk = tokv("surface", false);
+const warnDk = tokv("warn-text", true), bgDk = tokv("surface", true);
+ok("ink: --warn-text on the surface passes 4.5:1", warnInk && bgInk && ratio(warnInk, bgInk) >= 4.5, `${warnInk} on ${bgInk} ${warnInk && bgInk ? ratio(warnInk, bgInk).toFixed(2) : "?"}`);
+ok("Dark: --warn-text on the surface passes 4.5:1", warnDk && bgDk && ratio(warnDk, bgDk) >= 4.5, `${warnDk} on ${bgDk} ${warnDk && bgDk ? ratio(warnDk, bgDk).toFixed(2) : "?"}`);
 ok("the old pair really failed (the audit's 4.25:1)", Math.abs(ratio("#B45309", "#F6EAE1") - 4.25) < 0.01);
 
 console.log(`ui_fix_warn_chips.js: ${pass} passed, ${fail.length} failed`);
