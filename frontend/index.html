@@ -12813,6 +12813,9 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed, today, show, v
   const dests = {};
   const pal = lpPalette();
   const colour = (d) => { if(!(d in dests)) dests[d] = pal[Object.keys(dests).length % pal.length]; return dests[d]; };
+  // 25 Nov 2026 (C1, a fault found in passing: the key under the rows was always empty, the rows giving out the colours only
+  // after the panel had drawn it): every site on the day shown has its colour before anything is drawn
+  (blocks || []).forEach(y => (y.lorries || []).forEach(r => (r.blocks || []).forEach(b => { if(b.kind === "trip") colour(b.dest_name); })));
   const booked = data ? data.booked : null;
   const dayBooked = booked ? (booked.by_day[shown] || 0) : 0;
   const dayN = v && v.by_day ? (v.by_day[shown] || 0) : dayBooked;

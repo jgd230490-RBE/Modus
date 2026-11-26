@@ -184,6 +184,11 @@ const cells = (el) => [...el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.
      /\.lp-name\.is-cut\{[^}]*visibility:hidden/.test(html) && between("function LorryPlanRow(", "function LorryPlan(").includes('n.classList.add("is-cut")'));
   const colours = new Set([...m.el.querySelectorAll(".lp-blk:not(.is-break)")].map(b => b.style.background));
   ok("C1: one colour a site (three sites, three colours)", colours.size === 3, [...colours].join(" "));
+  // a fault found in passing (25 Nov 2026): the key was always empty (the rows gave out the colours after it was drawn)
+  const keyItems = [...m.el.querySelectorAll("[data-lp-key] span")].map(s => ({ t: norm(s.textContent), c: s.querySelector("i").style.background }));
+  ok("⭐ C1: the key names each site in the colour its blocks carry, then the break and free",
+     keyItems.map(k => k.t).join("|") === "Melton Compound|Tilton Viaduct site|Stockpile North|required break|free"
+     && keyItems.slice(0, 3).every(k => colours.has(k.c)), JSON.stringify(keyItems));
   const hexOf = (s) => { const m2 = /^#([0-9a-f]{6})$/i.exec(s.trim()); return m2 ? s.trim() : null; };
   const hue = (h) => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
     if (!d) return null; let x = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; x *= 60; return x < 0 ? x + 360 : x; };
