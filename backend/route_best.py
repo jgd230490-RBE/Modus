@@ -85,6 +85,13 @@ How each decision of John's is held (section numbers of the 16 Nov note):
     "Diversion" (it read "Way round"). The words above that say "ahead", "behind" or "A trade-off" describe the rule's
     working, never a sentence.
 
+  * 25 Nov 2026 (the Routes page rethink, cards 4, 5 and 7; John: "Yes, as recommended", Q11 to Q13). Each option left
+    in carries `rows` (option_rows): the schedule the card and the Route analysis summary page print, one row a measure
+    with its two figures, a mark (ok / warn / none / plain / off) and the difference in words. Every mark is the rule's
+    own step for that measure (`_heads` adds the time head's two halves, `detail["time_rows"]`); a collision row is
+    "plain": its two counts and the rule's "fewer" / "more", never ok or warn, never a percentage or a ratio. Nothing
+    is decided again: the answers are the same (test_route_best §16 and §17).
+
 Every threshold is a named constant below: STARTING VALUES that John has not set (he sets them on the all-50 table, Q9).
 
 WHAT IS NOT VERIFIED: run on stubbed and local lines only; never on live's figures (local worktree databases hold stand-in
@@ -857,7 +864,10 @@ def _heads(use, opt, ctx, hist, searched_ok):
         carbon = 1 if c <= -CARBON_PCT else -1 if c >= CARBON_PCT else 0
     heads = {"people": mix(parts.values()), "time": time, "busy": mix(busy_steps.values()), "carbon": carbon}
     return heads, parts, {"cycle_measures": cyc, "cycle_part": cycle_part, "community_part": place_part,
-                          "busy_hours": busy_steps, "time_tolerance_min": round(tol, 1), "time_gap_min": round(dt, 1)}
+                          "busy_hours": busy_steps, "time_tolerance_min": round(tol, 1), "time_gap_min": round(dt, 1),
+                          # 25 Nov 2026 (the schedule): the two halves of the time head, as the rule tested them
+                          "time_rows": {"round_trip": 1 if dt <= -tol else -1 if dt >= tol else 0,
+                                        "trips": (dtrips > 0) - (dtrips < 0)}}
 
 
 def _pcts(use, opt):
@@ -1349,7 +1359,117 @@ def option_entry(alt, m, use, ctx, hist, reasons=(), added=(), searched=True):
     o["head_words"] = {k: (_HEAD_WORDS[k].get(v) if v is not None else "not counted") for k, v in heads.items()}
     o["part_words"] = {k: (_PART_WORDS.get(v) if v is not None else "not counted") for k, v in parts.items()}
     o["sentences"] = sentences(o, use, ctx, hist)
+    o["rows"] = option_rows(o, use, ctx, hist)      # 25 Nov 2026: the schedule the card and the file print
     return o
+
+
+# --------------------------------------------------------------------------- #
+#  The schedule: one row a measure (25 Nov 2026)                               #
+# --------------------------------------------------------------------------- #
+#: 25 Nov 2026 (the Routes page rethink, cards 4, 5 and 7; John: "Yes, as recommended", Q11 to Q13). The card's rows
+#: and the summary page's schedule print THESE rows, so the screen and the file read the same and neither works anything
+#: out. Each row: {key, label, sub, unit, in_use, option, in_use_text, option_text, mark, words, bars, none}. `mark`:
+#: "ok" the option is on the better side by this rule's own threshold, "warn" the worse side, "none" the rule calls it
+#: the same, "plain" a collision count (never ok or warn, never a percentage or a ratio: 4c, 4e), "off" not counted.
+#: Every mark is read from the option's parts, heads and detail as `_heads` set them; nothing here decides anything.
+#: A row with no figures carries `none`, the words that stand in for them. A ruled-out option has no rows (None).
+ROW_MARKS = ("ok", "warn", "none", "plain", "off")
+ROW_SAME = "the same"
+ROW_NOT_COUNTED = "Not counted yet"           # the card's word for a cycle or community row before the wide fetch
+ROW_COLLISIONS = "Collisions on the road"
+ROW_STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin."
+ROW_NOT_SEARCHED = "Not compared: its roads were not searched at the last collision fetch."
+ROW_NO_LIMITS = "Not checked: no road limits are held."
+ROW_NO_LIMIT_ADDED = "None"
+#: what the rule's step values mean on a row
+_ROW_MARK = {1: "ok", -1: "warn", 0: "none"}
+
+
+def _row_mark(v):
+    return _ROW_MARK.get(v, "off")
+
+
+def _row_diff(a, u, unit, dp, p=None, fewer="fewer", more="more"):
+    """The difference in words: the rule's percentage where it gives one ('31 % fewer'), else in the row's unit
+    ('13 more', '1.55 km less')."""
+    if p:
+        return f"{abs(p)} % {fewer if p < 0 else more}"
+    d = round(float(a) - float(u), dp)
+    return f"{_n(abs(d), dp)}{' ' + unit if unit in ('km', 'kg') else ''} {fewer if d < 0 else more}"
+
+
+def option_rows(o, use, ctx, hist):
+    """The schedule rows of one option against the line in use (see ROW_MARKS). None for a ruled-out option."""
+    if o.get("ruled_out"):
+        return None
+    c, pt, det, hd, p = o["counts"], o["parts"], o["detail"], o["heads"], o["pct"]
+    rows = []
+
+    def add(key, label, unit, u, a, mark, words, dp=0, bars="ink", sub=False, none=None):
+        rows.append({"key": key, "label": label, "sub": sub, "unit": unit, "in_use": u, "option": a,
+                     "in_use_text": ("" if u is None else _n(u, dp)), "option_text": ("" if a is None else _n(a, dp)),
+                     "mark": mark, "words": words, "bars": (None if none is not None else bars), "none": none})
+
+    def stepped(key, label, unit, u, a, v, dp=0, p_=None, fewer="fewer", more="more", counted=True, sub=False):
+        if not counted:
+            return add(key, label, unit, u, a, "off", ROW_NOT_COUNTED, dp, sub=sub)
+        m = _row_mark(v)
+        words = ROW_SAME if m == "none" else _row_diff(a, u, unit, dp, p_, fewer, more) if m in ("ok", "warn") else ""
+        add(key, label, unit, u, a, m, words, dp, sub=sub)
+
+    # collisions (4c, 4e): the two counts with grey bars and the rule's own "fewer" / "more" where its test says clearly
+    head = f"{ROW_COLLISIONS}, {ctx.period}" if getattr(ctx, "period", "") else ROW_COLLISIONS
+    if hist == "current" and o.get("searched"):
+        for key, label, sub in (("collisions", head, False), ("goods", HGV_WORDS, True)):
+            v = pt.get(key)
+            add(key, label, "count", use[key], c[key], "plain", {1: "fewer", -1: "more"}.get(v, ""), bars="grey", sub=sub)
+    else:
+        add("collisions", head, None, None, None, "off", "",
+            none=(ROW_STALE if hist == "out_of_date" else NO_HISTORY_WORDS if hist == "not_fetched" else ROW_NOT_SEARCHED))
+    # the cycle measures and community places (4d, 4f: a percentage for each part where its base allows, no blend)
+    cyc, counted = det["cycle_measures"], pt.get("cycle") is not None
+    stepped("left_turns", "Left-hand turns", "count", use["left_turns"], c["left_turns"], cyc.get("left_turns"),
+            p_=p.get("left_turns"), counted=counted)
+    if c.get("cycle_meets") is not None and use.get("cycle_meets") is not None:
+        stepped("cycle_meets", "Cycle routes met", "count", use["cycle_meets"], c["cycle_meets"], cyc.get("cycle_meets"),
+                p_=p.get("cycle_meets"), counted=counted)
+    if c.get("cycle_beside_km") is not None and use.get("cycle_beside_km") is not None:
+        stepped("cycle_beside_km", "km beside a cycle route", "km", use["cycle_beside_km"], c["cycle_beside_km"],
+                cyc.get("cycle_beside_km"), dp=2, p_=p.get("cycle_beside_km"), fewer="less", counted=counted)
+    stepped("places", "Community: schools, hospitals, health centres", "count", use["places"], c["places"],
+            det.get("community_part"), p_=p.get("places"), counted=pt.get("community") is not None)
+    # time: the round trip and the trips a day, the two halves of the time head
+    tr = det["time_rows"]
+    m = _row_mark(tr["round_trip"])
+    dt = half_min(use["cycle_min"], c["cycle_min"])
+    add("round_trip", "Round trip, min", "min", use["cycle_min"], c["cycle_min"], m,
+        ROW_SAME if m == "none" or not dt else f"{_n(abs(dt))} min " + ("longer" if dt > 0 else "quicker"), 1)
+    m = _row_mark(tr["trips"])
+    d = int(c["trips"]) - int(use["trips"])
+    add("trips", "Trips a lorry fits a day", "trips", use["trips"], c["trips"], m,
+        ROW_SAME if m == "none" else f"{abs(d)} " + ("more" if d > 0 else "fewer"))
+    # the busy hours: a row an hour held on both sides, else one row that says why they are not compared
+    held = [h for h in BUSY_HOURS if det["busy_hours"].get(h) is not None]
+    for h in held:
+        m = _row_mark(det["busy_hours"][h])
+        dh = half_min(use["busy_at"][h], c["busy_min"][h])
+        add(f"busy_{h}", f"Setting off at {h}", "min", use["busy_at"][h], c["busy_min"][h], m,
+            ROW_SAME if m == "none" or not dh else f"{_n(abs(dh))} min " + ("longer" if dh > 0 else "quicker"), 1)
+    if not held:
+        add("busy", "Busy hours", None, None, None, "off", "",
+            none=f"Not compared: no busy-hour times held for {o['label']}.")
+    # carbon
+    v = hd.get("carbon")
+    m = _row_mark(v)
+    dk = round(float(c["co2_kg"]) - float(use["co2_kg"]), 1)
+    add("carbon", f"Carbon, kg {CO2E} a trip", "kg", use["co2_kg"], c["co2_kg"], m,
+        ROW_SAME if m == "none" else (f"{_n(abs(dk))} kg " + ("less" if dk < 0 else "more")) if m != "off" else "", 1)
+    # limits: an option left in is one that adds none below the lorry (N1); with none held nothing was checked
+    if getattr(ctx, "lims", None):
+        add("limits", "Limits added", None, None, None, "none", "", none=ROW_NO_LIMIT_ADDED)
+    else:
+        add("limits", "Limits added", None, None, None, "off", "", none=ROW_NO_LIMITS)
+    return rows
 
 
 def _answer(out, use, ctx, hist):

@@ -55,6 +55,7 @@ FIXTURE_WRITERS = {
     "test_costlines.py": ("cost_lines.json", "cost_preview.json"),
     "test_gate_arrivals.py": ("gate_arrivals.json", "lookahead_gates_week.json"),
     "test_lookahead.py": ("lookahead_page.json",),
+    "test_route_best.py": ("route_rows_1125.json",),   # 26 Nov 2026: the Routes card's schedule rows (ui_fix_routes_schedule.js)
     "test_sim.py": ("sim_day.json",),
 }
 BROWSER_ONLY = {"browser_check.js", "help_browser_check.js", "look_check.js", "map_browser_check.js", "ui_audit.js"}

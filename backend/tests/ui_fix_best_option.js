@@ -39,9 +39,14 @@ ok("⭐ SRC: the card component exists and reads /api/routes/<id>/best-option (n
 ok("⭐ SRC: 'Counts only: nothing is scored or ranked' is GONE from the app and the user guide's Routes section (John's Q1, 16 Nov)",
    !html.includes("Counts only: nothing is scored or ranked") && !guide.includes("nothing is scored or ranked"));
 {
-  const col = (bo.match(/const colRow = [\s\S]*?\n  \};/) || [""])[0];
-  ok("⭐ SRC: a collision row never carries a status tint: its code names no rs-ok / rs-warn / rs-bad and no tone but none",
-     col.length > 0 && !/rs-(ok|warn|bad)|tone="(ok|warn|bad)"/.test(col) && col.includes("bo-dash"));
+  // REVERSED 25 Nov 2026 (the Routes page rethink, Q12 and Q13; John: "Yes, as recommended"): the rows are ONE schedule
+  // printed from the rule's own `rows` (it was colRow, a dash and the rule's sentence). The page marks a row only from
+  // the rule's `mark`, writes no word of a difference itself, and a collision row's "plain" mark draws no shape (the rule
+  // never gives a collision row ok or warn: test_route_best §17's guard)
+  const sch = fnSrc("BoSchedule") + fnSrc("boMark") + fnSrc("boBar");
+  ok("⭐ SRC: a collision row never carries a status: the schedule marks a row only from the rule's mark (ok / warn draw a shape, every other mark plain words) and writes no difference, percentage or 'Better' of its own",
+     sch.length > 0 && sch.includes('if(x.mark === "ok" || x.mark === "warn")') && !/rs-(ok|warn|bad)|RowStatus/.test(sch)
+     && !/fewer|more|Better|safer|%/.test(sch.replace(/\/\/.*$/gm, "")) && !bo.includes("colRow") && !bo.includes("bo-dash"));
 }
 ok("⭐ SRC: the card says no 'Better', 'safer', 'risk', 'rate' or 'ratio', and no '%' next to a collision count",
    bo.length > 0 && !/\b(Better|better|safer|Safer|risk|ratio)\b/.test(bo) && !/collisions?[^"`\n]{0,40}%/.test(bo));
@@ -69,10 +74,13 @@ ok("⭐ SRC: the 'i' box: at most 30 words and a user-guide link (R1)",
   // every fixed sentence the card writes itself, 25 words or fewer (R1)
   // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Working out the route options…" (it read "Working out the best option…")
   const own = ["Working out the route options…", "Not suggested yet: the collision history is out of date.", "Every other option is ruled out.",
-               "Collision history out of date. Fetch it again on Config → Map and bulletin.",
-               "Collisions are not compared: the collision history has not been fetched.",
-               "Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.",
-               "No road limits are held."];
+               "Cycle routes and community places are shown, not counted: they have not been fetched along every option yet."];
+  // NARROWED 25 Nov 2026 (the schedule): the rows' own words (history out of date, never fetched, no limits held) are the
+  // rule's now (route_best.ROW_STALE, NO_HISTORY_WORDS, ROW_NO_LIMITS), each still 25 words or fewer
+  const rb = read("backend", "route_best.py");
+  ok("SRC: the rows' fixed words are the rule's, each 25 words or fewer",
+     ["Collision history out of date. Fetch it again on Config → Map and bulletin.", "Collisions are not compared: the collision history has not been fetched.",
+      "Not checked: no road limits are held."].every(w => rb.includes(w) && !html.includes(w) && w.split(/\s+/).length <= 25));
   ok("⭐ SRC: the card's own fixed sentences are in it and each is 25 words or fewer",
      own.every(s => html.includes(s) && s.split(/\s+/).length <= 25), own.filter(s => !html.includes(s)).join(" | "));
 }
@@ -109,7 +117,9 @@ ok("⭐ GUIDE: the user guide's Routes section has the Best option entry, names 
   ok("⭐ GONE: the card says no 'ahead', 'behind', 'Left turns', 'People' or 'goods vehicle'; it names 'Route options', 'Mixed', 'Community', "
      + "'Involving an HGV', 'Left-hand turns' and 'as the main route'",
      card.length > 1000 && !/\b(ahead|behind)\b|Left turns|"Places"|"People"|goods vehicle/.test(card)
-     && ["Route options", "\"Community\"", "\"Involving an HGV\"", "Left-hand turns", "as the main route"].every(k => card.includes(k))
+     // NARROWED 25 Nov 2026 (the schedule): the row labels are the rule's own (route_best.option_rows), not the card's
+     && ["Route options", "as the main route"].every(k => card.includes(k))
+     && ['"Community: schools, hospitals, health centres"', 'HGV_WORDS = "involving an HGV"', '"Left-hand turns"'].every(k => read("backend", "route_best.py").includes(k))
      && html.includes('const BO_MARK = { "Suggested": ["Suggested", "ok"], [BO_PLANNER]: ["Mixed", "warn"] };')
      && html.includes('const BO_PLANNER = "Planner to decide";'),
      card.length);
@@ -176,7 +186,7 @@ function opt(alt, o){
                 // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the rule's words "involving an HGV" (it read "a goods vehicle over 3.5 t")
                 "Alt " + alt + " had 1 collision involving an HGV on it against 4 on the route in use, 2021–2025.",
                 "A round trip makes 9 left turns against 10 (10 % fewer), meets a cycle route 4 times against 6 (33 % fewer) and runs 0.17 km beside one against 0.24 km.",
-                "Carbon is 56 kg CO2e a trip against 57.7 kg."] }, o || {});
+                "Carbon is 56 kg CO2e a trip against 57.7 kg."], rows: ROWS050() }, o || {});
 }
 function route(o){
   return Object.assign({ route: "R050", answer: "Suggested", option: "Alt 1", alt: 1,
@@ -187,7 +197,22 @@ function route(o){
     counts_in_use: CU(), checks: { limits_held: true, community_all_options: true, collision_history: "current" } }, o || {});
 }
 const B = (r) => ({ day: "2026-11-16", checks: {}, route: r });
-const noTint = (host) => ["collisions", "goods"].every(k => { const el = row(host, k); return el && !el.querySelector(".rs-ok,.rs-warn,.rs-bad") && !/Better|safer/.test(el.textContent); });
+// 25 Nov 2026 (the Routes page rethink, the schedule): the rule's rows (route_best.option_rows) for these typed options, in
+// its shape; the rule's own rows on its own figures are checked in test_route_best §17 and ui_fix_routes_schedule.js
+function RW(key, label, u, a, mark, words, x){ return Object.assign({ key, label, sub: false, unit: "count", in_use: u, option: a, in_use_text: String(u),
+  option_text: String(a), mark, words, bars: "ink", none: null }, x || {}); }
+function RN(key, label, none, mark){ return { key, label, sub: false, unit: null, in_use: null, option: null, in_use_text: "", option_text: "", mark: mark || "off", words: "", bars: null, none }; }
+const COLL = "Collisions on the road, 2021–2025";
+const ROWS050 = () => [RW("collisions", COLL, 39, 39, "plain", "", { bars: "grey" }), RW("goods", "involving an HGV", 4, 1, "plain", "", { bars: "grey", sub: true }),
+  RW("left_turns", "Left-hand turns", 10, 9, "none", "the same"), RW("cycle_meets", "Cycle routes met", 6, 4, "ok", "33 % fewer"),
+  RW("cycle_beside_km", "km beside a cycle route", 0.24, 0.17, "none", "the same", { unit: "km" }),
+  RW("places", "Community: schools, hospitals, health centres", 7, 2, "ok", "71 % fewer"),
+  RW("round_trip", "Round trip, min", 104, 100.5, "none", "the same", { unit: "min" }), RW("trips", "Trips a lorry fits a day", 5, 5, "none", "the same", { unit: "trips" }),
+  RN("busy", "Busy hours", "Not compared: no busy-hour times held for Alt 1."), RW("carbon", "Carbon, kg CO₂e a trip", 57.7, 56, "none", "the same", { unit: "kg" }),
+  RN("limits", "Limits added", "None", "none")];
+const withRows = (rows, f) => ROWS050().map(x => rows[x.key] === undefined ? x : rows[x.key]).filter(Boolean).map(f || (x => x));
+// NARROWED 25 Nov 2026 (the schedule): no mark shape either (.bo-mk-ok / .bo-mk-warn); the HGV row may be absent (an out-of-date history is one row)
+const noTint = (host) => ["collisions", "goods"].every(k => { const el = row(host, k); return (el || k === "goods") && !(el && el.querySelector(".rs-ok,.rs-warn,.rs-bad,.bo-mk-ok,.bo-mk-warn,i")) && !/Better|safer|%/.test(el ? el.textContent : ""); });
 
 if (hasCard) {
   // 1. Suggested (R050)
@@ -200,23 +225,31 @@ if (hasCard) {
        // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Route options" (it read "Best option")
        t.includes("Route options · Tipper (44t)") && !t.includes("Best option") && t.includes("For the Tipper (44t), the lorry most approved loads use.")
        && t.includes("Not for: Flatbed (44t), Concrete mixer 6 m³ (26t), Concrete mixer 8 m³ (32t).") && !/Truck/.test(t), t);
-    ok("⭐ PEOPLE (Q1 A): a row for each part; the collision rows are the rule's sentences with a dash and no tint",
-       row(m.host, "collisions").textContent.includes("Alt 1 had 39 collisions on it against 39 on the route in use, 2021–2025.")
+    // REVERSED 25 Nov 2026 (the Routes page rethink, Q12; John: "Yes, as recommended"): the collision rows are the two counts with grey
+    // bars and the rule's word in plain text (they were the rule's sentence and a dash): still no tint, no shape, no percentage
+    ok("⭐ PEOPLE (Q1 A): the collision rows are their two counts, both bars grey, the rule's word plain, no tint; the HGV row a sub-row",
+       row(m.host, "collisions").textContent === COLL + "3939" && row(m.host, "collisions").querySelectorAll(".bo-bar.bo-bar-use").length === 2
+       && row(m.host, "goods").querySelector("th.bo-sub") && row(m.host, "goods").textContent.startsWith("involving an HGV")
+       && m.host.querySelector("table.bo-sch th[scope=row]") && m.host.querySelectorAll("table.bo-sch thead th[scope=col]").length === 4
+       && [...m.host.querySelectorAll(".bo-bar")].every(b => b.getAttribute("aria-hidden") === "true")
+       && !/Goods vehicle|goods vehicle|People/.test(t) && noTint(m.host), t);
+    ok("PEOPLE (before the schedule, NARROWED): the rule's collision sentence is no longer on the card; its counts are",
+       !t.includes("Alt 1 had 39 collisions on it against 39 on the route in use")
        // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the row reads "Involving an HGV" (it read "Goods vehicle"), no "People" heading
-       && row(m.host, "goods").textContent.includes("Alt 1 had 1 collision involving an HGV on it against 4")
-       && row(m.host, "goods").textContent.startsWith("Involving an HGV") && ![...m.host.querySelectorAll(".bo-grp")].some(g => g.textContent === "People")
-       && !/Goods vehicle|goods vehicle/.test(t)
-       && row(m.host, "collisions").querySelector(".bo-dash") && noTint(m.host));
-    ok("⭐ PEOPLE: cycle routes and places each a chip with their counts and percentages; no blended figure",
+       && row(m.host, "goods").textContent.includes("41") && ![...m.host.querySelectorAll(".bo-grp")].some(g => g.textContent === "People"));
+    // REVERSED 25 Nov 2026 (the schedule, Q13 A): a row a measure, the rule's words beside the status shape (it was one chip and a sentence a part)
+    ok("⭐ PEOPLE: cycle routes and places each a row with their counts and the rule's percentage; ok a dot and its words; no blended figure",
        // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Left-hand turns" (it read "Left turns"); the places row reads "Community" (it read "Places")
-       row(m.host, "cycle").textContent.includes("Left-hand turns 9 against 10 (10 % fewer) · met 4 against 6 (33 % fewer) · beside 0.17 km against 0.24")
-       && row(m.host, "cycle").querySelector(".rs-ok") && row(m.host, "places").textContent.includes("2 against 7 (71 % fewer)")
-       && row(m.host, "places").textContent.startsWith("Community")
-       && !/exposure/i.test(t), row(m.host, "cycle").textContent);
-    ok("HEADS: Time quicker with trips; Busy hours not counted said plainly; Carbon same; Limits none added",
-       row(m.host, "Time").textContent.includes("100.5 min a round trip · 104 now · 5 trips a day either way")
-       && row(m.host, "Busy hours").textContent.includes("No busy-hour times held for Alt 1.")
-       && row(m.host, "Carbon").textContent.includes("56 kg CO₂e a trip · 57.7 now") && row(m.host, "Limits").textContent.includes("None added"));
+       row(m.host, "cycle_meets").textContent === "Cycle routes met6433 % fewer" && row(m.host, "cycle_meets").querySelector(".bo-mk-ok i[aria-hidden]")
+       && row(m.host, "left_turns").textContent.endsWith("the same") && !row(m.host, "left_turns").querySelector(".bo-mk-ok,.bo-mk-warn")
+       && row(m.host, "places").textContent === "Community: schools, hospitals, health centres7271 % fewer" && row(m.host, "places").querySelector(".bo-mk-ok")
+       && row(m.host, "cycle_meets").querySelector("td.bo-pick") && !row(m.host, "cycle_meets").querySelector("[style*=background]")
+       && !/exposure/i.test(t), row(m.host, "cycle_meets") && row(m.host, "cycle_meets").textContent);
+    // REVERSED 25 Nov 2026 (the schedule): a row a measure with both figures (they were heads with a chip and a sentence)
+    ok("HEADS: the round trip, trips, busy hours not compared said plainly across the row, carbon, limits added none",
+       row(m.host, "round_trip").textContent === "Round trip, min104100.5the same" && row(m.host, "trips").textContent === "Trips a lorry fits a day55the same"
+       && row(m.host, "busy").querySelector("td.bo-none[colspan='3']").textContent === "Not compared: no busy-hour times held for Alt 1."
+       && row(m.host, "carbon").textContent === "Carbon, kg CO₂e a trip57.756the same" && row(m.host, "limits").textContent === "Limits addedNone");
     // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the button reads "Use Alt 1 as the main route" (it read "Make Alt 1 primary")
     const mp = btnText(m.host, "Use Alt 1 as the main route");
     ok("⭐ MAKE PRIMARY: an outline button on a Suggested card (btn-sec, never a filled action)", mp && mp.className === "btn-sec" && !mp.getAttribute("style"));
@@ -248,7 +281,9 @@ if (hasCard) {
                         pct: { left_turns: -22, cycle_meets: 0, cycle_beside_km: -28, places: 50 },
                         head_words: { people: "mixed", time: "same", busy: "not counted", carbon: "less" },
                         part_words: { collisions: "same", goods: "same", cycle: "fewer", community: "more" },
-                        sentences: ["Alt 2 had 26 collisions on it against 23 on the route in use, 2021–2025.", "Alt 2 had 0 collisions involving a goods vehicle over 3.5 t on it against 0 on the route in use, 2021–2025."] });
+                        sentences: ["Alt 2 had 26 collisions on it against 23 on the route in use, 2021–2025.", "Alt 2 had 0 collisions involving a goods vehicle over 3.5 t on it against 0 on the route in use, 2021–2025."],
+                        rows: withRows({ collisions: RW("collisions", COLL, 23, 26, "plain", "", { bars: "grey" }), places: RW("places", "Community: schools, hospitals, health centres", 6, 9, "warn", "50 % more"),
+                                         cycle_meets: RW("cycle_meets", "Cycle routes met", 7, 7, "none", "the same") }) });
     // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the rule's answer is "Planner to decide" (it read "A trade-off")
     const r = route({ route: "R003", answer: "Planner to decide", option: null, alt: null, why: LONG, trade: LONG, lorry: "Artic Flatbed (44t)",
                       other_lorries: ["Artic Tipper (44t)"], counts_in_use: CU({ cycle_min: 81.4, trips: 6, co2_kg: 9.6, collisions: 23, goods: 0, left_turns: 9, cycle_meets: 7, cycle_beside_km: 4.7, places: 6 }),
@@ -259,10 +294,11 @@ if (hasCard) {
     ok("⭐ TRADE-OFF: 'Planner to decide · Mixed', the traded option's heads, and NO Make primary (Q2)",
        /Planner to decide.?Mixed/.test(t) && !/A trade-off|Your call/.test(t) && m.host.querySelector('[data-bo-option="Alt 2"]') && ![...m.host.querySelectorAll("button")].some(b => /primary|main route/.test(b.textContent)), t);
     ok("⭐ TRADE-OFF: the rule's long trade line (over 25 words) is not on the card (Q7)", !t.includes(LONG) && !m.host.querySelector("[data-bo-why]"));
-    ok("TRADE-OFF: places more is a warn chip with its percentage; Time says 'a shorter road that takes longer'; collisions still untinted",
-       row(m.host, "places").querySelector(".rs-warn") && row(m.host, "places").textContent.includes("9 against 6 (50 % more)")
-       && row(m.host, "Time").textContent.includes("a shorter road that takes longer") && noTint(m.host)
-       && row(m.host, "cycle").textContent.includes("met 7 against 7 ·"), row(m.host, "cycle").textContent);
+    // REVERSED 25 Nov 2026 (the schedule): places more is the warning diamond and the rule's words; NARROWED: the rows carry no
+    // N5 words (a row a measure; the rule's short line says "a shorter road that takes longer", checked below)
+    ok("TRADE-OFF: places more is the warning diamond with its percentage; collisions still untinted; a row the rule calls the same says so",
+       row(m.host, "places").querySelector(".bo-mk-warn i") && row(m.host, "places").textContent === "Community: schools, hospitals, health centres6950 % more"
+       && noTint(m.host) && row(m.host, "cycle_meets").textContent.endsWith("77the same"), row(m.host, "places") && row(m.host, "places").textContent);
     m.done();
     // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the short line is said as facts (it read "Alt 2 is ahead on cycle routes and carbon, behind on places and time.")
     const SHORT = "Alt 2: fewer cycle routes, less carbon; more places; a shorter road that takes longer.";
@@ -307,32 +343,39 @@ if (hasCard) {
   }
   // 4. The not-counted states
   {
-    const a = opt(1, { part_words: { collisions: "same", goods: "same", cycle: "not counted", community: "not counted" } });
+    const off = (x) => ["left_turns", "cycle_meets", "cycle_beside_km", "places"].includes(x.key) ? Object.assign({}, x, { mark: "off", words: "Not counted yet" }) : x;
+    const a = opt(1, { part_words: { collisions: "same", goods: "same", cycle: "not counted", community: "not counted" }, rows: withRows({}, off) });
     const m = mount(B(route({ options: [Object.assign(a, { chosen: true })], checks: { limits_held: true, community_all_options: false, collision_history: "current" } })));
+    // REVERSED 25 Nov 2026 (the schedule): each cycle and community row reads the rule's 'Not counted yet' in grey words, no shape
     ok("⭐ NOT COUNTED YET: cycle routes and places read 'Not counted yet', greyed, with the rule's sentence",
-       row(m.host, "cycle").textContent.includes("Not counted yet") && row(m.host, "cycle").querySelector(".bo-grey")
-       && row(m.host, "places").textContent.includes("Not counted yet")
+       row(m.host, "left_turns").textContent.endsWith("Not counted yet") && row(m.host, "left_turns").querySelector(".bo-mk-plain.bo-mk-off")
+       && row(m.host, "places").textContent.endsWith("Not counted yet") && !row(m.host, "places").querySelector(".bo-mk-ok,.bo-mk-warn")
        && m.host.querySelector('[data-bo-not-counted="community"]').textContent === "Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.");
     m.done();
     const SENT = "A round trip makes 9 left turns against 10.";
-    const held = opt(1, { part_words: { collisions: "not counted", goods: "not counted", cycle: "fewer", community: "fewer" }, sentences: [SENT] });
+    const STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin.";
+    const held = opt(1, { part_words: { collisions: "not counted", goods: "not counted", cycle: "fewer", community: "fewer" }, sentences: [SENT],
+                          rows: withRows({ collisions: RN("collisions", COLL, STALE), goods: null }) });
     const r = route({ answer: "Keep the route in use", option: null, held_back: "Collision history out of date: …", sentences: [SENT], options: [held],
                       checks: { limits_held: true, community_all_options: true, collision_history: "out_of_date" } });
     const m2 = mount(B(r)); const t2 = m2.text();
-    ok("⭐ OUT OF DATE: 'Not suggested yet: the collision history is out of date.'; both collision rows a grey 'Not counted' chip and the short words (Q7)",
+    // REVERSED 25 Nov 2026 (the schedule): ONE collision row says the history is out of date, in the rule's words, with no counts
+    // and no HGV row (both rows were a grey 'Not counted' chip and the page's own short words)
+    ok("⭐ OUT OF DATE: 'Not suggested yet: the collision history is out of date.'; one collision row with the rule's short words across it, no counts (Q7)",
        m2.host.querySelector("[data-bo-why]").textContent === "Not suggested yet: the collision history is out of date."
-       && ["collisions", "goods"].every(k => row(m2.host, k).textContent.includes("Not counted") && row(m2.host, k).querySelector(".rs-none")
-                                              && row(m2.host, k).textContent.includes("Collision history out of date. Fetch it again on Config → Map and bulletin."))
+       && row(m2.host, "collisions").querySelector("td.bo-none").textContent === STALE && !row(m2.host, "goods")
+       && !row(m2.host, "collisions").querySelector(".bo-bar")
        && noTint(m2.host) && !t2.includes("Collision history out of date: …"), t2);
     m2.done();
-    const m3 = mount(B(route({ options: [Object.assign(opt(1), { chosen: true })], checks: { limits_held: true, community_all_options: true, collision_history: "not_fetched" } })));
+    const m3 = mount(B(route({ options: [Object.assign(opt(1, { rows: withRows({ collisions: RN("collisions", COLL, "Collisions are not compared: the collision history has not been fetched."), goods: null }) }), { chosen: true })], checks: { limits_held: true, community_all_options: true, collision_history: "not_fetched" } })));
     ok("NEVER FETCHED: the collision rows say the history has not been fetched",
        row(m3.host, "collisions").textContent.includes("Collisions are not compared: the collision history has not been fetched."));
     m3.done();
     const m4 = mount(B(route({ answer: "Keep the route in use", option: null, held_back: "No road limits are held, so no other option could be checked against them.",
-                              sentences: opt(1).sentences, options: [opt(1)], checks: { limits_held: false, community_all_options: true, collision_history: "current" } })));
-    ok("⭐ NO LIMITS HELD: 'Not checked · No road limits are held.' and the rule's held-back words",
-       row(m4.host, "Limits").textContent.includes("Not checked") && row(m4.host, "Limits").textContent.includes("No road limits are held.")
+                              sentences: opt(1).sentences, options: [opt(1, { rows: withRows({ limits: RN("limits", "Limits added", "Not checked: no road limits are held.") }) })], checks: { limits_held: false, community_all_options: true, collision_history: "current" } })));
+    // REVERSED 25 Nov 2026 (the schedule): the limits row is the rule's 'Not checked: no road limits are held.' (it was a chip and the page's words)
+    ok("⭐ NO LIMITS HELD: 'Not checked: no road limits are held.' and the rule's held-back words",
+       row(m4.host, "limits").textContent === "Limits addedNot checked: no road limits are held."
        && m4.host.querySelector("[data-bo-why]").textContent === "Not suggested yet: No road limits are held, so no other option could be checked against them.");
     m4.done();
   }
