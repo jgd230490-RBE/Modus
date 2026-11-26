@@ -424,7 +424,8 @@ ok("⭐ the legend and the last mile, the arriving and leaving blocks with the g
    f"Loaded, A to B: {S['loaded_words']}" in T and "Empty, back to A" in T and "The last mile: about 1.5 km in and out of B" in T
    and "Arriving at B, Mill Compound" in T and "Gate in: North gate" in T and "Open 07:00–18:00, closed on Saturdays and Sundays" in T
    and "No deliveries 07:00–09:00 and 15:00–16:00 (the scheme's no-delivery windows)" in T
-   and "Leaving B" in T and "Gate out: South gate" in T and f"Then follow the amber route back to A: {S['return_words']}." in T   # NARROWED 23 Oct 2026: amber, solid
+   and "Leaving B" in T and "Gate out: South gate" in T and f"Then follow the light blue route back to A: {S['return_words']}." in T   # REVERSED 26 Nov 2026: light blue (amber since 23 Oct)
+   and "the amber route" not in T
    and "Gate in" in T and "Gate out" in T, T)
 # two columns: the text comes out a row at a time (both headings, then both bodies), so each row is checked in that order
 ok("⭐ the typed words under their headings, two to a row; 'Not typed' nowhere here (nothing is missing); the gate note in metres",
@@ -611,8 +612,10 @@ ok("⭐ 23 Oct: the sheet carries the haul-road stretches of both legs (three po
    _r6(SH["haul_loaded"]) == [[LOADED[40], LOADED[41], LOADED[42]]] and _r6(SH["haul_return"]) == [[LOADED[42], LOADED[41], LOADED[40]]]
    and SH["haul_last_in"] == [] and SH["haul_last_out"] == [], str((SH["haul_loaded"], SH["haul_return"]))[:300])
 TH = flat(export.build_route_sheet_pdf(SH))
-ok("23 Oct: the legend names the loaded leg, the empty return and the haul road; the leaving words say the amber route, never a dashed one",
-   "Loaded, A to B" in TH and "Empty, back to A" in TH and "On a haul road" in TH and "Then follow the amber route back to A" in TH
+# REVERSED 26 Nov 2026 (card 3b, Q10): the leaving words name the light blue route (they named the amber one)
+ok("23 Oct: the legend names the loaded leg, the empty return and the haul road; the leaving words say the light blue route (REVERSED 26 Nov 2026, was amber), never a dashed one",
+   "Loaded, A to B" in TH and "Empty, back to A" in TH and "On a haul road" in TH and "Then follow the light blue route back to A" in TH
+   and "amber route" not in TH
    and "dashed" not in TH, TH[:400])
 # the legs go into the basemap request as path overlays under the road names, when the URL fits
 _calls = []
@@ -625,11 +628,13 @@ try:
 finally:
     basemap.fetch = _real_fetch
 _ov = [c_ for c_ in _calls if c_[1]]
+# REVERSED 26 Nov 2026 (card 3b, Q10): the two legs in the picture are dark blue and light blue (they were green and amber)
 ok("⭐ 23 Oct: both maps ask Mapbox for the picture WITH the legs under the road names: four path overlays each — two white edges, "
-   "then green and amber — before road-label-simple; the sheet records that the legs are in the picture",
+   "then dark blue and light blue (REVERSED 26 Nov 2026) — before road-label-simple; the sheet records that the legs are in the picture",
    len(_calls) == 2 and len(_ov) == 2 and SP.get("map_legs_in_basemap") is True
    and all(bl == "road-label-simple" and len(ov) == 4 and all(o.startswith("path-") for o in ov) and "+ffffff-" in ov[0] and "+ffffff-" in ov[1]
-           and "+059669-" in ov[2] and "+f59e0b-" in ov[3] for _, ov, bl in _ov),
+           and "+0051c4-" in ov[2].lower() and "+72a7ff-" in ov[3].lower()
+           and "+059669-" not in ov[2] and "+f59e0b-" not in ov[3] for _, ov, bl in _ov),
    str([(bl, [o[:24] for o in (ov or [])]) for _, ov, bl in _calls])[:400])
 ok("23 Oct: each request fits the API's URL limit, and the picture is drawn into the sheet",
    all(len(basemap.url(v, "", overlays=ov, before_layer=bl)) <= basemap.URL_MAX for v, ov, bl in _ov) and b"/Subtype /Image" in PDFP

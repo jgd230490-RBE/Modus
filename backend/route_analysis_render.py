@@ -32,7 +32,10 @@ except Exception:                       # the harness without reportlab stops at
     A4 = landscape = mm = ImageReader = rl_canvas = None
 
 RED = "#B91C1C"
-BUSY_BLUE = "#2563EB"
+# 26 Nov 2026 (the printed maps' route lines, card 3b; John, Q10 "Go with blue"): the legs are band blues now, so the
+# busy-hours road leaves the blues for ink, as route_map_export.BUSY_ROAD did (it was the stock blue #2563EB, which sat
+# beside the dark blue legs as a second near-identical blue). The name is kept: one constant, read in two places.
+BUSY_BLUE = "#3A3C41"
 ZONE_RED = "#DC2626"
 CYCLE_BLUE = "#0369A1"
 USUAL_GREY = "#71717A"
@@ -897,7 +900,7 @@ def page_hours(doc, R):
     for t in lines:
         y = doc.para(t, px, y, pw, 7.0) - 3
     if use and (y - 30 > top - mh or not Q):
-        y = _key(doc, px, y - 2, [(lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The usual road out (back in amber)"),
+        y = _key(doc, px, y - 2, [(lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The usual road out (back in light blue)"),
                                   (lambda cx, cy: _k_line(BUSY_BLUE)(c, cx, cy), f"Alt {use['alt']}, weekdays {use['from']}–{use['to']}")],
                  pw)
     # the chart, full width under the map (the collision evidence's own "Cycle by hour")
@@ -985,7 +988,7 @@ def page_diversions(doc, R):
             y -= 132
         if y - 46 > doc.bottom():
             _key(doc, px, y - 4, [(lambda cx, cy: _k_line(USUAL_GREY, 1.8, (4, 3))(c, cx, cy), "The usual road"),
-                                  (lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The way taken out (back in amber)"),
+                                  (lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The way taken out (back in light blue)"),
                                   (lambda cx, cy: _k_zone(c, cx, cy), "The zone")], pw)
         doc.end_page()
     return True

@@ -229,7 +229,9 @@ ok("1: a vowel takes 'An' ('An e-scooter …')", any(l.startswith("An e-scooter"
 # NARROWED 11 Nov 2026 (card A-F2b): the new Volume blues joined the set; the old five stay reserved too
 RESERVED = {"#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888", "#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B", "#DC2626", "#C8102E", "#FF8C14", "#E8590C", "#E8681E",
             "#FF8312", "#D97706", "#F59E0B", "#C2790B", "#059669", "#3B82F6", "#2563EB", "#0F766E", "#0D9488",
-            "#4C1D95", "#155E75", "#57534E", "#64748B", "#7C3AED", "#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95"}
+            "#4C1D95", "#155E75", "#57534E", "#64748B", "#7C3AED",
+            "#3A3C41", "#8E9197", "#A9ABB0", "#C6C8CC",   # NARROWED 26 Nov 2026: the route network's ink and greys
+            "#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95"}
 ok("1: the collision ink is one dark ink, no reserved colour, no community kind's colour (a hue would claim a meaning)",
    export.CE_INK.upper() not in RESERVED and export.CE_INK.upper() not in {k["colour"].upper() for k in community.KINDS}
    and "COLL_INK = '#27272A'" in read("map/index.html") and export.CE_INK == "#27272A")
