@@ -180,6 +180,11 @@ const cells = (el) => [...el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.
      [...blk].map(b => norm(b.textContent)).join("|"));
   ok("C1: lpSiteName: 'Melton Compound' → 'Melton', 'Harborough Rail Freight Terminal' → 'Harborough RFT', 'Stockpile North' kept",
      F.lpSiteName("Melton Compound") === "Melton" && F.lpSiteName("Harborough Rail Freight Terminal") === "Harborough RFT" && F.lpSiteName("Stockpile North") === "Stockpile North");
+  // a fault found in passing (26 Nov 2026, axe target-size at 820 px): under 780 px of the panel the free words go under the
+  // track, so a 42-minute trip is about 30 px wide and no block overlaps the next; nothing is hidden
+  ok("⭐ C1: a narrow panel (≤ 780 px) puts the free words under the track and the axis follows; the panel is the container",
+     html.includes(".lp-panel{container:lp-panel / inline-size}") && /@container lp-panel \(max-width:780px\)\{\s*\.lp-row\{grid-template-columns:140px 1fr\}\s*\.lp-row \.lp-free\{grid-column:2;/.test(html)
+     && html.includes(".lp-axis{grid-template-columns:140px 1fr}") && !/@container lp-panel[^{]*\{[^}]*(display:none)[^}]*\.lp-(blk|trip|name)/.test(html));
   ok("C1: a block too narrow for its name carries none: each name measured against its block (is-cut, hidden)",
      /\.lp-name\.is-cut\{[^}]*visibility:hidden/.test(html) && between("function LorryPlanRow(", "function LorryPlan(").includes('n.classList.add("is-cut")'));
   const colours = new Set([...m.el.querySelectorAll(".lp-blk:not(.is-break)")].map(b => b.style.background));

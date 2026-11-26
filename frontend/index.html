@@ -823,6 +823,16 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .lp-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--st-none);margin-left:8px;vertical-align:1px}
   .lp-free{font-size:13px;color:var(--muted);text-align:right}
   .lp-axis{display:grid;grid-template-columns:140px 1fr 150px;gap:10px;color:var(--muted);font-size:12px;padding:2px 0 6px}
+  /* 26 Nov 2026 (C1, a fault found in passing, axe target-size): under about 780 px of the PANEL (a tablet, a narrow window
+     with the rail open) the track was about 414 px and a 42-minute trip sat 22 px from the next while a block is at least
+     24 px wide, so the blocks overlapped. There the free words go under the track, which gains their 160 px; no trip hidden */
+  .lp-panel{container:lp-panel / inline-size}
+  @container lp-panel (max-width:780px){
+    .lp-row{grid-template-columns:140px 1fr}
+    .lp-row .lp-free{grid-column:2;text-align:left;margin-top:-2px}
+    .lp-axis{grid-template-columns:140px 1fr}
+    .lp-axis > span:last-child{display:none}
+  }
   @media (max-width:767px){.lp-axis{display:none}}
   .lp-ticks{position:relative;height:14px}
   .lp-ticks span{position:absolute;transform:translateX(-50%)}
