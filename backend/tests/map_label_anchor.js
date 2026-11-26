@@ -7,9 +7,12 @@
  * shared road sections (a shared road showed one route's band, not the road's total), a picked route, the busy-hours
  * road and the abnormal loads. The fix: the page's own map.addLayer wrapper stamps every layer it adds
  * (metadata 'wayscope:own'), and labelAnchor() never answers a stamped layer, whatever its id.
- * The real labelAnchor() and the real addLayer wrapper are run against a stand-in map; no browser (the real pictures
- * are to go in notes\route-lines-plan-1126\check\fix\). On main 3a3e592, 11 of the 16 checks fail (every one that reads
- * the anchor or the stamp; A4, A5, B3, B4 and B5 hold there too).
+ * Seen in Chrome after that fix: a basemap switch makes the pick, the abnormal loads and the traffic limits again BEFORE
+ * the forecast lines, which then come in over them. So the layers over the lines have ONE order (OVER_LINES,
+ * restackOverLines(), run by raiseMarks() on every forecast re-add and by selectRoute()): part C.
+ * The real labelAnchor(), restackOverLines() and addLayer wrapper are run against a stand-in map; no browser (the real
+ * pictures are in notes\route-lines-plan-1126\check\fix\). On main 3a3e592, 17 of the 22 checks fail (A4, A5, B3, B4 and
+ * B5 hold there too).
  */
 const fs = require("fs");
 const path = require("path");
@@ -159,6 +162,87 @@ ok("B5 the four layers that were taken for the anchor are text layers of the pag
    ["div-usual-x", "traffic-limit-badge", "holding-chevrons", "busy-hours-at"].every(textLayer));
 ok("B6 the anchor's comment names why: our text layers under the lines, found by the stamp",
    html.includes("a text layer of OURS is never the anchor, whatever its id"));
+
+// ---------------------------------------------------------------------------------------------------------------
+console.log("C. The one order over the lines (restackOverLines), after a basemap switch and on a pick");
+const olm = html.match(/    const OVER_LINES = \[[^\]]*\];/);
+const restackSrc = (olm ? olm[0] : "") + "\n" + fnSrc("restackOverLines");
+function sandbox2(base) {
+  const map = stubMap(base);
+  let moves = 0; const mv = map.moveLayer; map.moveLayer = (a, b) => { moves++; mv(a, b); };
+  const api = new Function("map", "styleHasSlots", "SLOT_TYPES", "EMISSIVE",
+    wrapperSrc + "\n" + fnSrc("labelAnchor") + "\n" + restackSrc + "\nreturn { labelAnchor, restackOverLines, OVER_LINES };")(
+      map, () => false, new Set(["line", "fill"]), { line: "line-emissive-strength" });
+  const ids = () => map.layers.map(l => l.id);
+  return { map, api, ids, at: id => ids().indexOf(id), moves: () => moves };
+}
+// the order the stack must read, bottom to top, between the forecast lines and the basemap's names
+const WANT = ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line", "diversion-edge", "busy-casing", "busy-core",
+  "sel-glow", "sel-casing", "sel-core", "abnormal-public-casing", "abnormal-public-lines",
+  "traffic-limit-fill", "traffic-limit-band", "traffic-limit-edge", "traffic-limit-badge"];
+const inOrder = (s, list, top) => list.every((id, i) => s.at(id) >= 0 && (i === 0 || s.at(id) > s.at(list[i - 1]))) && s.at(list[list.length - 1]) < s.at(top);
+{
+  // after a switch to Streets, as read in Chrome on 26 Nov 2026 (main 3a3e592): the pick, the abnormal loads and the
+  // traffic limits made again BEFORE the forecast lines, which then came in over them
+  let s = null, r = null;
+  try {
+    s = sandbox2(BASEMAP);
+    const add = (l) => s.map.addLayer(l, s.api.labelAnchor());
+    ["busy-casing", "busy-core", "sel-glow", "sel-casing", "sel-core"].forEach(id => add(LN(id, "selected-route")));
+    s.map.addLayer(T("busy-hours-at", "busy-hours-at"));               // no before: on top, then a pick moves it under the names
+    s.map.moveLayer("busy-hours-at", s.api.labelAnchor());
+    ["abnormal-public-casing", "abnormal-public-lines"].forEach(id => add(LN(id, "abnormal-public-source")));
+    add({ id: "traffic-limit-fill", type: "fill", source: "traffic-limit-source" });
+    ["traffic-limit-band", "traffic-limit-edge"].forEach(id => add(LN(id, "traffic-limit-source")));
+    add(T("traffic-limit-badge", "traffic-limit-badges"));
+    ["forecast-casing", "forecast-layer", "road-load-casing", "road-load-line", "diversion-edge"].forEach(id => add(LN(id, "routes-source")));
+    r = { before: inOrder(s, WANT, "road-label-simple") };
+    s.api.restackOverLines();
+    r.after = inOrder(s, WANT.concat(["busy-hours-at"]), "road-label-simple");
+  } catch (e) { r = "threw " + e; }
+  ok("⭐ C1 after a basemap switch the stack is put back: forecast lines, shared sections, rails, busy road, pick, abnormal, traffic limits, the pick's hours, then the basemap's names",
+     r && r.before === false && r.after === true, { r, ids: s && s.ids() });
+  let m2 = null;
+  try { const n = s.moves(); s.api.restackOverLines(); m2 = s.moves() - n; } catch (e) { m2 = "threw " + e; }
+  ok("C2 once the order holds it moves nothing (it runs on every forecast re-add)", m2 === 0, m2);
+}
+{
+  // a busy-hours pill nobody has put under the names (no pick) stays where it is, over them
+  let s = null, r = null;
+  try {
+    s = sandbox2(BASEMAP);
+    const add = (l) => s.map.addLayer(l, s.api.labelAnchor());
+    ["forecast-casing", "forecast-layer"].forEach(id => add(LN(id, "routes-source")));
+    ["busy-casing", "busy-core"].forEach(id => add(LN(id, "busy-route")));
+    s.map.addLayer(T("busy-hours-at", "busy-hours-at"));
+    ["road-load-casing", "road-load-line"].forEach(id => add(LN(id, "road-load-source")));
+    s.api.restackOverLines();
+    r = { pillOverNames: s.at("busy-hours-at") > s.at("road-label-simple"), order: inOrder(s, ["forecast-layer", "road-load-casing", "road-load-line", "busy-casing", "busy-core"], "road-label-simple") };
+  } catch (e) { r = "threw " + e; }
+  ok("C3 with no pick the busy-hours pill keeps its place over the names, and the shared sections still go under the busy road",
+     r && r.pillOverNames === true && r.order === true, { r, ids: s && s.ids() });
+}
+{
+  // Standard lists only our layers: no basemap name, so the order is kept just under the first text layer of ours above them
+  let s = null, r = null;
+  try {
+    s = sandbox2([{ id: "land", type: "background" }]);
+    const add = (l) => s.map.addLayer(l, s.api.labelAnchor());
+    ["sel-glow", "sel-casing", "sel-core"].forEach(id => add(LN(id, "selected-route")));
+    ["forecast-casing", "forecast-layer"].forEach(id => add(LN(id, "routes-source")));
+    s.map.addLayer(T("road-load-labels", "road-load-labels"));
+    s.map.addLayer({ id: "locations", type: "circle", source: "locations" });
+    s.api.restackOverLines();
+    r = { anchor: s.api.labelAnchor() === undefined, order: inOrder(s, ["forecast-layer", "sel-glow", "sel-casing", "sel-core"], "road-load-labels") };
+  } catch (e) { r = "threw " + e; }
+  ok("C4 on a style with no basemap names (Standard) the pick goes over the lines and under our own labels", r && r.anchor && r.order, { r, ids: s && s.ids() });
+}
+ok("⭐ C5 raiseMarks() (every forecast re-add) and selectRoute() both put the stack in the one order; selectRoute no longer moves the pick on its own",
+   fnSrc("raiseMarks").includes("restackOverLines();") && fnSrc("selectRoute").includes("restackOverLines();")
+   && !fnSrc("selectRoute").includes("['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach"));
+ok("C6 OVER_LINES lists the shared sections first and the traffic limits last, as the comment says",
+   !!olm && /'road-load-casing', 'road-load-line', 'diversion-edge', 'busy-casing', 'busy-core',\s+'sel-glow', 'sel-casing', 'sel-core', 'abnormal-public-casing', 'abnormal-public-lines',\s+'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'\]/.test(olm[0])
+   && html.includes("A NEW layer that must draw over the\n    // month's lines joins OVER_LINES here"));
 
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);

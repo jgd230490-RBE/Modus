@@ -3106,6 +3106,7 @@
         if (typeof placeDiversionEdge === 'function') placeDiversionEdge();
         if (typeof restyleUsualRoad === 'function') restyleUsualRoad();
         if (typeof placeBusyRoads === 'function') { placeBusyRoads(); restyleBusyRoads(); }
+        restackOverLines();                                               // 26 Nov 2026: the layers over the lines, in one order
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
         // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
@@ -3116,6 +3117,39 @@
         const tail = ids.slice(ids.length - present.length);
         if (tail.join('|') === present.join('|')) return;
         present.forEach(id => { try { map.moveLayer(id); } catch (e) {} });
+    }
+    // 26 Nov 2026 (claude/map-label-anchor; notes\route-lines-plan-1126): THE ONE ORDER over the month's lines. Each of these
+    // layers was put "before labelAnchor()" by its own adder at its own moment, so the stack was whatever order they came
+    // in: after a basemap switch the pick, the abnormal loads and the traffic limits were made BEFORE the forecast lines were
+    // made again, and ended UNDER them. Read bottom to top: the shared road sections, the amber rails, the busy-hours road,
+    // the pick, the abnormal loads, the traffic limits, then the basemap's names. raiseMarks() (on every forecast re-add)
+    // and selectRoute() call this; it moves nothing while the order already holds. A NEW layer that must draw over the
+    // month's lines joins OVER_LINES here, never a moveLayer of its own.
+    const OVER_LINES = ['road-load-casing', 'road-load-line', 'diversion-edge', 'busy-casing', 'busy-core',
+        'sel-glow', 'sel-casing', 'sel-core', 'abnormal-public-casing', 'abnormal-public-lines',
+        'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'];
+    function restackOverLines() {
+        if (!map || !map.getStyle) return;
+        let layers; try { layers = map.getStyle().layers || []; } catch (e) { return; }
+        const ids = layers.map(l => l.id);
+        const anchor = labelAnchor();
+        const top = anchor ? ids.indexOf(anchor) : -1;
+        const list = OVER_LINES.filter(id => ids.indexOf(id) >= 0);
+        // the busy-hours pill goes with them only where something has already put it under the names (a pick)
+        if (ids.indexOf('busy-hours-at') >= 0 && top >= 0 && ids.indexOf('busy-hours-at') < top) list.push('busy-hours-at');
+        if (!list.length) return;
+        const at = list.map(id => ids.indexOf(id));
+        const floor = ids.indexOf('forecast-layer');
+        const holds = at[0] > floor && at.every((v, i) => i === 0 || v > at[i - 1]) && (top < 0 || at[at.length - 1] < top);
+        if (holds) return;
+        // a style with no basemap name layer (Standard lists only ours): just under the first text or mark of ours above them
+        let before = anchor;
+        if (!before) {
+            const l = layers.find((x, i) => i > Math.max(floor, at[0]) && list.indexOf(x.id) < 0 && x.type === 'symbol'
+                && x.metadata && x.metadata['wayscope:own']);
+            before = l ? l.id : undefined;
+        }
+        list.forEach(id => { try { if (before) map.moveLayer(id, before); else map.moveLayer(id); } catch (e) {} });
     }
 
 
@@ -7094,7 +7128,10 @@
         ensureSelectionLayers();
         const src=map.getSource('selected-route'); if(src) src.setData({type:'FeatureCollection',features:feats});
         showBusyRoad(rl);
-        ['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach(l => { if(map.getLayer(l)) { try { map.moveLayer(l, labelAnchor()); } catch(e){} } });
+        // NARROWED 26 Nov 2026 (claude/map-label-anchor): the pick takes its place in the one order over the lines
+        // (restackOverLines: under the abnormal loads and the traffic limits, over the busy-hours road), the pill last
+        if(map.getLayer('busy-hours-at')) { try { map.moveLayer('busy-hours-at', labelAnchor()); } catch(e){} }
+        restackOverLines();
         setRouteDim(routeId);
         // 12 Nov 2026 (option A): the Forecast detail tab is on screen while a route is picked: its table follows the pick
         try { const dr = document.getElementById('route-drawer'); if (drawerTab === 'detail' && dr && dr.classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail(); } catch (e) {}
