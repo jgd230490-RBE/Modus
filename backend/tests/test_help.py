@@ -365,6 +365,14 @@ ok("Forecasts: the filter row, the Cost column, the ⋯ menu with Edit in Submit
    and "<strong>Mine only</strong>" in src and "the count chips are clickable" not in src
    and "<td>no team</td>" not in src)
 
+# 26 Nov 2026 (the Look-ahead rethink batch): the glossary's key column never wraps (td.k nowrap), so a long key widened the
+# table past a phone and the audit's axe found a sideways scroller with no keyboard access (help @390). A key line stays
+# within 33 characters (the longest on main ad152be, which fits at 390 px); a longer key is broken with <br>.
+_gk_lines = [re.sub(r"<[^>]+>", "", x) for k in re.findall(r'<td class="k">(.*?)</td>', src) for x in re.split(r"<br\s*/?>", k)]
+ok("the glossary: no key line over 33 characters (the key column does not wrap)",
+   len(_gk_lines) >= 40 and max(len(x) for x in _gk_lines) <= 33
+   and '<td class="k">Last week /<br>This week /<br>Next week /<br>Weeks ahead</td>' in src)
+
 # Look-ahead
 # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17 / Q18 / card 2): the four tabs Last week · This week · Next week · Weeks ahead;
 # the switch and "Commit · next week" are gone; the closures line's button reads Check again / Check now
