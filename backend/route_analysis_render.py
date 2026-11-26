@@ -897,7 +897,7 @@ def page_hours(doc, R):
     for t in lines:
         y = doc.para(t, px, y, pw, 7.0) - 3
     if use and (y - 30 > top - mh or not Q):
-        y = _key(doc, px, y - 2, [(lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The usual road out (back in amber)"),
+        y = _key(doc, px, y - 2, [(lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The usual road out (back in light blue)"),
                                   (lambda cx, cy: _k_line(BUSY_BLUE)(c, cx, cy), f"Alt {use['alt']}, weekdays {use['from']}–{use['to']}")],
                  pw)
     # the chart, full width under the map (the collision evidence's own "Cycle by hour")
@@ -985,7 +985,7 @@ def page_diversions(doc, R):
             y -= 132
         if y - 46 > doc.bottom():
             _key(doc, px, y - 4, [(lambda cx, cy: _k_line(USUAL_GREY, 1.8, (4, 3))(c, cx, cy), "The usual road"),
-                                  (lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The way taken out (back in amber)"),
+                                  (lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The way taken out (back in light blue)"),
                                   (lambda cx, cy: _k_zone(c, cx, cy), "The zone")], pw)
         doc.end_page()
     return True
