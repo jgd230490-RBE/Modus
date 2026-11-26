@@ -947,7 +947,8 @@ def build_pdf(data, view, day, yard=None, vehicle=None, lorry=None, sheet=None):
         if P.get("nothing"):
             out.append(Pp(E(P["nothing"]), st_s))
         cols = []
-        for L in P.get("legs") or []:
+        import route_points as rp
+        for L in rp.legs_shown(P):
             if not (L["limits"] or L["places"] or L.get("more_words") or L.get("shared_words")):
                 cols.append([Pp(E(f"{L['title']} · {L['length'] or ''}".rstrip(" ·")), st_h),
                              Pp(E("Nothing held this way."), st_g)])

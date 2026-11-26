@@ -3289,7 +3289,8 @@ def _rs_take_care(c, x, y, w, P, size, draw=True, cols=1, holding=False):
         used += para(cl["text"], B, size, NAVY_RGB, x, w, y - used) + 1.5
     if P.get("nothing"):
         used += para(P["nothing"], R, size, NAVY_RGB, x, w, y - used) + 1.5
-    legs = P.get("legs") or []
+    import route_points as _rpl
+    legs = _rpl.legs_shown(P)             # 26 Nov 2026: nothing stored = the one sentence, no way columns (card 4)
     gap = 6 * mm
     colw = (w - gap) / 2 if cols == 2 else w
     meas = c if c is not None else None

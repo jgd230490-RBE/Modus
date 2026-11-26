@@ -379,6 +379,10 @@ E = rp.points("R042", FLAT, DAY, ctx=CTX)
 ok("2: nothing stored: the one sentence, word for word",
    E["nothing"] == "Wayscope holds no record of a limit for this lorry, a closure, or a school, hospital or health centre "
    "within 250 m of this route." and E["sentences"] == [] and not any(L["limits"] or L["places"] for L in E["legs"]), str(E))
+ok("2: nothing stored: no way columns under the sentence (card 4's shortest route), on both sheets",
+   rp.legs_shown(E) == [] and rp.legs_shown(A) == A["legs"]
+   and "rp.legs_shown(P)" in open(os.path.join(BACKEND, "lorry_plan.py"), encoding="utf-8").read()
+   and "_rpl.legs_shown(P)" in open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read())
 U = rp.points("R043", FLAT, DAY, ctx=CTX)
 ok("2: a route with no line for this lorry: said so, nothing else claimed", not U["routed"] and U["sentences"] == [rp.NOT_ROUTED]
    and U["nothing"] is None and U["legs"] == [])

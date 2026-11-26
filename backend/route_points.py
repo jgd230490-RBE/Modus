@@ -617,6 +617,12 @@ def _rank(line):
             line["at_km"])
 
 
+def legs_shown(P):
+    """26 Nov 2026 (card 4, "the same block on the shortest route"): a route with nothing stored prints its one sentence
+    and no way columns; the Driver sheet and the Route sheet both draw the ways through this."""
+    return [] if P.get("nothing") else (P.get("legs") or [])
+
+
 def cut(P, places=CUT_PLACES):
     """The Driver sheet's cut, in place on a copy: at most `places` place lines each way, chosen by _rank and printed
     in the order a driver meets them; the rest counted in `more` (places, not lines) for "+n more on the route sheet".
