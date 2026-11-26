@@ -149,8 +149,10 @@ ok("C9 the shared sections: the same one width, at creation and on every repaint
 ok("C6 the band is still told by colour: Volume paints the routes by f_avg on the route stops",
    acm.includes("vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS)"));
 ok("C7 ...and Carbon by f_co2 on the carbon stops", acm.includes("co2 ? carbonColor('f_co2', stops)"));
-ok("C10 the amber diversion edge keeps the casing's place at the casing's width",
-   acm.includes("if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);"));
+// NARROWED 24 Nov 2026 (card 5, claude/map-lines-diversions): the edge is two amber rails OUTSIDE the line, their gap the
+// line's own width (one width since 25 Nov), set again at a mode change instead of taking the casing's width
+ok("C10 the amber diversion edge keeps clear of the line: a mode change sets the rails' gap to the line's width",
+   acm.includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());") && !acm.includes("'diversion-edge', 'line-width', caseW"));
 ok("C11 the edge under every forecast line: white on a light ground, the 12 Nov pale edge on a dark one, heat map on or Off",
    fnSrc("heatEdgeColour").includes("return typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing;")
    && html.includes("const HEAT_EDGE_DARK = '#E7E5E4';"));
