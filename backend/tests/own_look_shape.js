@@ -219,6 +219,12 @@ ok("4 strip: the first figure of every row takes the 2 px start, at every column
    css.includes(".dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}")
    && css.includes("@media (min-width:900px){.dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
    && css.includes("@media (min-width:1280px){.dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}}"));
+// 26 Nov 2026 (an independent read of the diff): the status shape has its own display, so no cell rule can turn it into a 0 px
+// inline box again (the tablet cards made it 0 x 17 px at 900 px), and a card cell keeps the chip a flex row (the 7 px gap)
+ok("2 status: the shape is an inline block of its own; a tablet card cell keeps the chip a flex row",
+   /\n  \.row-st i\{[^}]*display:inline-block;[^}]*width:10px;height:10px;/.test(css)
+   && css.includes(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}")
+   && css.indexOf(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}") > css.indexOf(".tab-cards>tbody>tr>td>span:not(.block){display:inline-block;"));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
