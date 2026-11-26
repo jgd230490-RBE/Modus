@@ -379,7 +379,7 @@ if TX:
        "Route analysis" in TX and "In this file" in TX and "not the assessment" in TX
        and "The route at a glance" in TX and "nothing was fetched for this file" in TX, TX[:600])
     ok("4: every ticked section's heading", all(h in TX for h in ("Restrictions and lorry limits", "Community places",
-       "C · Collisions", "Cycle routes and left turns", "Busy-hour times", "For the route risk assessment")), TX[:2000])
+       "C · Collisions", "Cycle routes and left-hand turns", "Busy-hour times", "For the route risk assessment")), TX[:2000])
     ok("4 A: the limits by name and the lorry's position against them", "Station Road" in TX and "Below this lorry" in TX
        and "Above this lorry" in TX and "Except for access" in TX.replace("except for access", "Except for access"))
     ok("4 A: the closures not held, in words; the other lorry's limits differ", "No road closures are set up" in TX
@@ -426,7 +426,7 @@ _names = WB.sheetnames
 # REVERSED 16 Nov 2026 (step 1c, John: "Yes, as recommended"): the Summary sheet is first, the contents second
 ok("5: a sheet per section, the Summary first, the contents second and About last", _names[0] == "Summary"
    and _names[1] == "Contents" and _names[-1] == "About"
-   and {"Routes side by side", "A Limits", "A Closures and zones", "B Community places", "D Cycle and left turns",
+   and {"Routes side by side", "A Limits", "A Closures and zones", "B Community places", "D Cycle and left-hand turns",
         "E Busy-hour times", "F Diversions"} <= set(_names) and any(n.startswith("C ") for n in _names), str(_names))
 ok("5: C is the evidence workbook merged, its cycle sheet left to D when D is ticked",
    "C Collisions" in _names and not any(n.startswith("C Cycle") for n in _names), str(_names))
@@ -462,7 +462,7 @@ if TX:
     # NARROWED 10 Nov 2026 (F12): section C's box says "(CLOCS Standard v5, 5.1a)"
     ok("6: ...its assessor page and cycle block left out when told", re.search(r"For the route risk assessment(?!\s+\(CLOCS)", _t6r) is None
        and "Questions drawn from CLOCS Standard v5 clauses" not in _t6r
-       and "Cycle routes and left turns" not in _t6 and "Page 5" in _t6, _t6[-400:])
+       and "Cycle routes and left-hand turns" not in _t6 and "Page 5" in _t6, _t6[-400:])
 
 # --------------------------------------------------------------------------- #
 #  7. The endpoints                                                            #
@@ -842,6 +842,11 @@ ok("⭐ 9 source: the summary page's step 3 reads as card 6 draws it, 'Involving
    and 'SUM_HGV = "Involving an HGV"' in _sumsrc and '"Left-hand turns"' in _sumsrc
    and not re.search(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode),
    re.findall(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode))
+_rend = chr(10).join(l.split("#")[0] for l in open("backend/route_analysis_render.py", encoding="utf-8").read().splitlines())
+ok("⭐ 9b C3 (Q9): every row, title, note and sheet of the Route analysis says 'left-hand turns'; 'Left turns' and 'Cycle, places' are gone from its code (the assessor question is a standard's wording and stays)",
+   "Left-hand turns of" in _rend and "D Cycle and left-hand turns" in _rend and "Cycle, community" in _rend
+   and not re.search(r"Left turns|Cycle and left turns|Cycle routes and left turns|Cycle, places|· left turns\"", _rend),
+   re.findall(r"Left turns|Cycle and left turns|Cycle routes and left turns|Cycle, places|· left turns\"", _rend))
 # REVERSED 25 Nov 2026 (Q11): "The figures" table is gone; the HGV row's words are the rule's own (route_best.HGV_WORDS,
 # "involving an HGV", in capitals), the page lowers nothing
 ok("9 source: the HGV row keeps HGV in capitals: the rule's label, never lowered by the page",

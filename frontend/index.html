@@ -2057,7 +2057,7 @@ const INFO = {
     how: "Balance = the opening balance + what came in − what went out. In: the week actuals delivered there, or the approved plan where nothing was recorded. Out: the figure typed on Look-ahead → Account, or the planned use (Plan → Stockpiles).", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "dash.chart.demand": { title: "Material demand over time", text: "The planned quantity in each month, stacked by material, for the lines in view." },
   "dash.rc.planned": { title: "Planned, not measured", text: "Planned from the approved loads, so far from recorded loads. A trip's figures are those saved on the day of the choice.", guide: "route-choices-record", tech: "t1-route-choices-record" },
-  "dash.rc.places": { title: "Places", text: "Places: schools, hospitals and health centres within 250 m. Both legs of a trip.", guide: "route-choices-record" },
+  "dash.rc.places": { title: "Community", text: "Community: schools, hospitals and health centres within 250 m. Both legs of a trip.", guide: "route-choices-record" },
   "dash.rc.collisions": { title: "Collisions", text: "Injury collisions the police recorded on each road. A record of the road, never multiplied by loads.", guide: "route-choices-record" },
   "dash.chart.top": { title: "Top routes by tonnage", text: "The ten route lines with the most planned tonnes. Click a bar to narrow the page to that line; click it again to show every line." },
   "dash.chart.progress": { title: "Delivered against plan", text: "Planned and reported tonnes, month by month. A month nobody has reported has no delivered bar: it is not counted as zero.", tech: "t1-delivered" },
@@ -9324,7 +9324,7 @@ function rcWord(v, kind, scale){
   return [`${t} ${x > 0 ? "more" : (kind === "count" ? "fewer" : "less")}`, x > 0];
 }
 const RC_COLS = [["kg", "kg", "Carbon"], ["min", "min", "Lorry time"], ["km", "km", "Distance"], ["eur", "eur", "Fair cost"],
-                 ["left_turns", "count", "Left turns"], ["cycle_meets", "count", "Cycle routes met"], ["places", "count", "Places"]];
+                 ["left_turns", "count", "Left-hand turns"], ["cycle_meets", "count", "Cycle routes met"], ["places", "count", "Community"]];
 function RcCell({ v, kind, scale, missing }){
   const [t, more] = missing ? ["—", false] : rcWord(v, kind, scale);
   return <td className={"num" + (more ? " rc-more" : "")} data-rc-more={more ? "1" : undefined}>{t}</td>;
@@ -9395,11 +9395,11 @@ function RouteChoicesRecord({ phone }){
             {tile("eur", "eur", phone ? "Fair cost" : "Fair cost (model)", phone ? null : "planned")}
           </div>
           {phone ? rows.map(r => { const p = r.planned;
-              const bits = [["kg", "kg", "", "carbon"], ["min", "min", "", "lorry time"], ["left_turns", "count", " left turns", "left turns"]].map(([k, kind, l, name]) => { const [t, more] = rcWord(p[k], kind); return { t: t === "the same" ? `${name} the same` : t + (t === "—" ? "" : l), more }; });
+              const bits = [["kg", "kg", "", "carbon"], ["min", "min", "", "lorry time"], ["left_turns", "count", " left-hand turns", "left-hand turns"]].map(([k, kind, l, name]) => { const [t, more] = rcWord(p[k], kind); return { t: t === "the same" ? `${name} the same` : t + (t === "—" ? "" : l), more }; });
               return <div key={r.id} className="rc-pcard" data-rc-pcard={r.id}><b>{rcChoice(r, true)}</b>{r.status === "ended" && <span className="rc-end">Ended: {r.ended_words}</span>}
                 <div>{grp(Math.round(p.trips))} loads planned: {bits.map((b, i) => <React.Fragment key={i}>{i ? ", " : ""}<span className={b.more ? "rc-more" : ""}>{b.t}</span></React.Fragment>)}</div></div>; })
           : <>
-          <p className="rc-pass" data-rc-passes="1">A lorry passes, planned: {pass("left_turns", "count", "left turns")} · {pass("cycle_meets", "count", "cycle routes met")} · {pass("places", "count", "places")}<InfoTip id="dash.rc.places" /></p>
+          <p className="rc-pass" data-rc-passes="1">A lorry passes, planned: {pass("left_turns", "count", "left-hand turns")} · {pass("cycle_meets", "count", "cycle routes met")} · {pass("places", "count", "community")}<InfoTip id="dash.rc.places" /></p>
           <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="Route choices">
             <table className="tbl rc-table" data-rc-table="1">
               <caption className="sr-only">Route choices: a trip, planned and so far, against the line before</caption>
@@ -16098,7 +16098,7 @@ function RoutingMenu({ busy, children }){
 // The collision evidence is its section C. A team login lists, and gets, its own team's routes only.
 const RA_MAX = 12;
 const RA_SECTIONS = [["limits", "A", "Restrictions and lorry limits"], ["community", "B", "Community places"],
-  ["collisions", "C", "Collisions"], ["cycle", "D", "Cycle routes and left turns"], ["hours", "E", "Busy-hour times"],
+  ["collisions", "C", "Collisions"], ["cycle", "D", "Cycle routes and left-hand turns"], ["hours", "E", "Busy-hour times"],
   ["diversions", "F", "Diversions"], ["assessor", "", "The page for the assessor"]];
 const RA_KEY = "wayscope.routeAnalysis.sections";
 // 11 Nov 2026 (CLOCS card B-F5, John's yes): sections A-F are remembered as ticked; the page for the assessor is ticked
