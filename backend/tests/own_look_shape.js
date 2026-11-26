@@ -65,8 +65,9 @@ ok("3 tags: a team, a workstream and a material are plain words in the second-te
 ok("3 tags: a tag in the warning or bad words carries the status shape (diamond / square), so it is never colour alone; 'Avoided' (a kind) does not",
    /\.tg:not\(\.tg-ns\)\[style\*="--warn-text"\]::before,\.tg:not\(\.tg-ns\)\[style\*="--bad-text"\]::before\{content:"";display:inline-block;width:9px;height:9px;/.test(css)
    && css.includes('.tg:not(.tg-ns)[style*="--warn-text"]::before{transform:rotate(45deg);}') && code.includes('className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided'));
-ok("3 tags: every former pill span carries .tg (24), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
-   count(code, /className=\{?"tg /g) === 24 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
+// NARROWED 24 Nov 2026: 24 -> 23, the Routes vehicle chips are the status chip (RowStatus), no longer a tag
+ok("3 tags: every former pill span carries .tg (23), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
+   count(code, /className=\{?"tg /g) === 23 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
    && /<label key=\{m\} className=\{"text-xs px-1\.5 py-0\.5 rounded border cursor-pointer/.test(code));
 ok("3 tags: the CSS pills are plain words: abnormal-load categories, the row details' chips (joined by a dot), the CLP organisation, the lorry plan's badge, the Simulation's chips, the record's end word",
    /\.al-chip\{display:inline-block;font-size:12px;font-weight:600;white-space:nowrap;margin-right:8px;\}/.test(css) && !/\.al-(so|vr1|stgo|cu|warn|bad|grey|okc)\{[^}]*background/.test(css)
@@ -124,7 +125,7 @@ ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) a
 // ---------------------------------------------------------------- stage 8: a chosen tab or day is an underline only
 ok("8 select: a chosen tab is sign blue words on a 2 px sign blue underline, no tint or outline; a chosen day the same with 3 px",
    css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}')
-   && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--line-2);box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}')
+   && css.includes('.ph-day[aria-pressed="true"]{box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}')
    && !/\.ws-tab\[aria-selected="true"\][^{]*\{[^}]*navy-soft/.test(css));
 ok("8 warning: a warning sentence carries the diamond (every amber block sentence and the road-closures line when not checked)",
    css.includes('p.text-amber-700::before,.warn-line>span:first-child::before{content:"";display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);')
@@ -172,6 +173,19 @@ ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.i
 ok("5 carbon target: the decisions fold's summary is as wide as its words", /\.ct-more>summary\{[^}]*width:fit-content/.test(css) && css.includes(".ct-more{margin-top:6px;"));
 // 24 Nov 2026: the Best option card's eyebrow in sentence case, as the third mockup draws it (".ey": 12 px, muted, no capitals)
 ok("5 best option: the card's eyebrow is not small capitals", /\n  \.bo-eye\{(?![^}]*(uppercase|letter-spacing))[^}]*\}/.test(css));
+// 24 Nov 2026, from the mother session's read of the real pictures:
+// the Dashboard strip's figures line up: the "i" stays beside its label's last word and does not make its line taller
+// (measured in Chrome at 1150, 1280 and 1366 px: every figure's top equal per row, each label 36 px; a jsdom harness
+// cannot lay out, so the measure itself is the session's Chrome probe and this pins its cause)
+ok("4 strip: a Dashboard label keeps its last word and its i together, and the i does not make the line taller",
+   code.includes('<div className="dash-card-l">{dashLabelHead(label)}<span className="dash-card-lw">{dashLabelLast(label)}{info && <InfoTip')
+   && css.includes(".dash-card-lw{white-space:nowrap;} .dash-card-l .ibtn{vertical-align:top;}"));
+ok("2 status: on the phone Look-ahead the chip stays a flex row, so its shape is drawn (the line's block-span rule made it 0 px)",
+   css.includes(".ph-line .ph-l>.row-st{display:flex;width:fit-content;}"));
+ok("8 day: the chosen day keeps the ordinary border; only the underline marks it",
+   /\.ph-day\[aria-pressed="true"\]\{(?![^}]*border-color)[^}]*box-shadow:inset 0 -3px 0 var\(--navy\)/.test(css));
+ok("2 status: the Routes vehicle chips are the one status chip, a shape and a word, the title on a wrapper",
+   code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);

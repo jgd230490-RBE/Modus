@@ -549,6 +549,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .dash-wall .ibtn{display:none;}
   .dash-wall .rd-chev{display:none;}   /* 13 Oct 2026 (W6): a wall display is not clicked, like its info boxes */
   .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;min-height:2.6em;}
+  .dash-card-lw{white-space:nowrap;} .dash-card-l .ibtn{vertical-align:top;}   /* 24 Nov 2026 (B1 item 4): the i beside the last word, the line not taller */
   .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
   .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
   .dash-more{background:none;border:0;border-top:1px solid var(--ink);border-radius:0;padding:0;}
@@ -1328,7 +1329,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ph-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 0 12px;}
   .ph-day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font:500 13px/1.2 var(--f-text);cursor:pointer;}
   .ph-day b{font-size:18px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
-  .ph-day[aria-pressed="true"]{border-color:var(--line-2);box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}   /* 24 Nov 2026 (own look, B1 item 8): a chosen day is an underline only (3 px), no outline */
+  .ph-day[aria-pressed="true"]{box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}   /* 24 Nov 2026 (own look, B1 item 8): a chosen day is an underline only (3 px), no outline */
   .ph-day[aria-pressed="true"] b{color:var(--navy);}
   .ph-day.is-today:not([aria-pressed="true"]){border-style:dashed;border-color:var(--muted);}
   .ph-card{padding:16px;}
@@ -1348,6 +1349,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ph-line .ph-r small{display:block;font-size:13px;font-weight:500;color:var(--muted);}
   .ph-line .rd-chips{margin-top:4px;}
   .ph-line .row-st{white-space:normal;margin-top:4px;}
+  .ph-line .ph-l>.row-st{display:flex;width:fit-content;}   /* 24 Nov 2026 (B1): the shape kept on a phone (the line's block span rule hid it) */
   .ph-line .rd-dl{padding:2px 0 12px;grid-template-columns:1fr 1fr;gap:6px 14px;position:static;max-width:none;}
   .ph-more{width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--action);font:600 15px var(--f-text);cursor:pointer;}
   .ph-actions{display:flex;gap:10px;margin-top:12px;}
@@ -2953,6 +2955,10 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
+// 24 Nov 2026 (own look B1, item 4): a figure's label keeps its last word and its "i" together, so the "i" never takes a
+// line of its own and two label lines are enough for every figure in the strip
+function dashLabelHead(l){ if(typeof l !== "string") return ""; const i = l.lastIndexOf(" "); return i < 0 ? "" : l.slice(0, i + 1); }
+function dashLabelLast(l){ if(typeof l !== "string") return l; const i = l.lastIndexOf(" "); return i < 0 ? l : l.slice(i + 1); }
 function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
@@ -3373,7 +3379,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const acct = (weekShown && weekShown.account) || null;
   const Card = ({ label, value, sub, info, tone }) => (
     <div className="card dash-card min-w-0">
-      <div className="dash-card-l">{label}{info && <InfoTip id={info.id} label={label} value={info.value} />}</div>
+      <div className="dash-card-l">{dashLabelHead(label)}<span className="dash-card-lw">{dashLabelLast(label)}{info && <InfoTip id={info.id} label={label} value={info.value} />}</span></div>
       <div className="dash-card-v kpi-num" style={tone ? { color: tone } : undefined}>{value}</div>
       {sub && <div className="dash-card-s">{sub}</div>}
     </div>
@@ -16247,24 +16253,20 @@ function VehChips({ profiles }){
   const keys = Object.keys(profiles || {}).sort();
   if(!keys.length) return <span className="text-xs text-slate-500">not routed</span>;
   return (
-    <span className="flex flex-wrap gap-1">
+    <span className="flex flex-wrap gap-x-4 gap-y-1">
       {keys.map(k => {
         const p = profiles[k] || {};
         const both = p.baked && p.return_baked;
-        const [bg, fg] = both    ? ["rgba(3,158,134,.12)", "var(--ok-text)"]
-                       : p.baked ? ["rgba(255,193,1,.16)", "var(--warn-text)"]
-                       : p.error ? ["rgba(191,46,85,.12)", "var(--bad-text)"]
-                                 : ["#edeeef", "var(--st-none)"];
+        // 24 Nov 2026 (own look B1): a lorry type's routing state is a status: the one chip, a shape and a word
+        const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";
         const alts = p.alt_count > 1 ? ` · ${p.alt_count} options` : "";
         const tip = p.error ? `${vehLabel(k)} — ${p.error}`
                   : !p.baked ? `${vehLabel(k)} · not routed`
                   : `${vehLabel(k)} · ${fmtDist(p.distance_km, 1)} ${DU()} out` +
                     (p.return_baked ? ", return routed" : ", return NOT routed") + alts;
         return (
-          <span key={k} title={tip}
-            className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
-            style={{ background: bg, color: fg }}>
-            {vehShort(k)}{p.baked && !p.return_baked ? " ↦" : ""}
+          <span key={k} title={tip} className="veh-st" data-veh-tone={tone}>
+            <RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />
           </span>
         );
       })}

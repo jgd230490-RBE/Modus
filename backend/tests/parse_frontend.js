@@ -4084,7 +4084,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
-     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#edeeef", "var(--st-none)"]') /* NARROWED 24 Nov 2026 (own look, B1 stage 3): a token, so the plain word reads in Dark too */   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
+     /* NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the one status chip (RowStatus: --ok-text / --bad-text
+        words through .row-st), no tint pairs left */
+     && code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />') && !code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') /* NARROWED 24 Nov 2026 (own look, B1 stage 3): a token, so the plain word reads in Dark too */   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
      && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
@@ -4105,7 +4107,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _ipt.includes('<span className="tg tg-plain text-xs font-semibold">{ws}</span>')
      && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
      && _cat.includes('<span key={c} className="tg tg-plain text-xs whitespace-nowrap">{c}</span>')
-     && code.includes('className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     // NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the status chip now (a shape and a word), its title kept
+     && code.includes('<span key={k} title={tip} className="veh-st" data-veh-tone={tone}>') && !code.includes('style={{ background: bg, color: fg }}>')
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
      && code.includes('className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
