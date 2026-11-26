@@ -19,14 +19,17 @@ const html = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").
 const at = html.indexOf("<button onClick={() => doSpread(r)}");
 const btn = at > 0 ? html.slice(at, html.indexOf("</button>", at) + 9) : "";
 
-ok("D-F4: one 'Add to this week' button on the page source, the doSpread one", btn.length > 0 && (html.match(/>Add to this week<\/button>/g) || []).length === 1);
+// NARROWED 26 Nov 2026 (the Look-ahead rethink, B1, John's additions to card 5): the one button reads "Add to next week"
+// in the running week's account ("This week so far"), "Add to this week" in Last week
+ok("D-F4: one 'Add to this week' button on the page source, the doSpread one", btn.length > 0
+   && (html.match(/\{tab === "sofar" \? "Add to next week" : "Add to this week"\}<\/button>/g) || []).length === 1);
 ok("🔴 D-F4: 'Add to this week' is an outline button (btn-sec btn-sm), never btn-pri",
    btn.includes('className="btn-sec btn-sm disabled:opacity-40"') && !btn.includes("btn-pri"), btn.slice(0, 160));
 ok("🔴 D-F4: ...with no accent fill and no white text of its own",
    btn.length > 0 && !btn.includes("var(--action)") && !btn.includes("text-white"));
 ok("D-F4: the same words, click, title and disabled rule",
-   btn.includes("disabled={!!busy}") && btn.includes(">Add to this week</button>")
-   && btn.includes("title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}"));
+   btn.includes("disabled={!!busy}") && btn.includes('{tab === "sofar" ? "Add to next week" : "Add to this week"}</button>')
+   && btn.includes('title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to ${tab === "sofar" ? "next" : "this"} week, divided over its remaining weekdays. Refused if that week is confirmed.`}'));
 ok("D-F4: the outline class is the app's own (a surface fill and a grey border), and btn-sm still sets the small size",
    /\.btn-sec\{[^}]*background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--grey\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));
 
