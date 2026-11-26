@@ -143,6 +143,7 @@ ok("8 warning: a warning sentence carries the diamond (every amber block sentenc
 // 3, and keeps those three tokens beside its rules, 3)
 // RAISED 26 Nov 2026 (taking main 4159b66 in), by exactly its count: cssBoxes 16 -> 17, the Simulation full screen's "Key"
 // list .sim-key-box (PR #324, a 1 px line and the 6 px corner over the map); counted, not restyled
+// LOWERED 26 Nov 2026: roundedLgBox 52 -> 49, the open route's Vehicles, Gates and haul roads are ruled sections
 const CEIL = {
   cornerSizes: 11,         // distinct border-radius values in the stylesheet (6px, 3px, 50%, 0, 0 !important, 9px count dot, three half-corners)
   css999: 1,               // border-radius:999px in the stylesheet (the count dots are 9 px on 18 px)
@@ -150,7 +151,7 @@ const CEIL = {
   tintedStatus: 6,         // --st-*-bg tints, and a .row-st rule with a fill
   boxedFigureTiles: 0,     // a figure tile with its own box ("card px-4 py-3 min-w-0", a strip cell with a 1 px border)
   roundedXlBox: 0,         // "rounded-xl border" section boxes in the markup
-  roundedLgBox: 52,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
+  roundedLgBox: 49,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
   cssBoxes: 17,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
   smallCaps: 18,  // capital labels left (the rail's groups and the demo bar, kept; menus' heads, notices' heads: listed for John)
 };
@@ -169,7 +170,7 @@ const now = {
 for (const k of Object.keys(CEIL)) ok(`9 ceiling: ${k} ${now[k]} ≤ ${CEIL[k]} (may only come down)`, now[k] <= CEIL[k], { now: now[k], ceiling: CEIL[k] });
 ok("9 ceiling: the ceilings themselves are at or under the branch's measured figures (a raised ceiling fails here first)",
    CEIL.cornerSizes <= 11 && CEIL.css999 <= 1 && CEIL.inline999 <= 1 && CEIL.tintedStatus <= 6 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
-   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 17 && CEIL.smallCaps <= 18);
+   && CEIL.roundedLgBox <= 49 && CEIL.cssBoxes <= 17 && CEIL.smallCaps <= 18);
 // 24 Nov 2026: with the carbon target flush to the column, its fold's summary (21 px) met the note's "i" at 390 px (the
 // UI audit's targets-24px): 2 px above and below make it 25 px
 ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.includes(".ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;padding:2px 0;width:fit-content;}"));
@@ -205,6 +206,13 @@ ok("2 status: the five amber words are the status shape and word, no tint left o
 // measured in Chrome at 1150 and 768 px (26 Nov): every one of them inside its cell, the long "Route again" word on two lines
 ok("2 status: a long status word wraps in the route notes and the Zones busy-hours line, its shape kept",
    css.includes("[data-route-notes] .row-st, [data-busy-in-use] .row-st{white-space:normal;}"));
+// 26 Nov 2026 (the mother session's read of the retaken Routes pictures): the open route's Vehicles, Gates and haul roads
+// are ruled sections (mockup 3 Q1, "ruled sections instead of boxes on every screen"), the haul head's capitals left for later
+ok("5 sections: the open route's Vehicles, Gates and Temporary haul roads are ruled sections, no rounded bordered box",
+   code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-vehicles={r.id}>')
+   && code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-gates-sec="1">')
+   && code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-haul-sec="1">')
+   && !code.includes('rounded-lg border border-slate-200 bg-white p-2.5'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
