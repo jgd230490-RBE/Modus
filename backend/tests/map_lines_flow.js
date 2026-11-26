@@ -225,7 +225,8 @@ if (F) {
   const before = n(); raf.forEach(fn => fn()); const after = n();
   ok("F7 a move asks for one placing a frame, and the next frame places them for the new view", raf.length === 1 && after > 0 && after < before, [raf.length, before, after]);
   ok("F8 the council views still hide the flow (COUNCIL_QUIET_LAYERS holds the marks' layer) and set them again on the way out",
-     html.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow-light', 'forecast-cap-badge'];")
+     // NARROWED 26 Nov 2026 (claude/map-lines-diversions, card 5): + the usual road's three layers
+     html.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow-light', 'forecast-cap-badge', 'div-usual-casing', 'div-usual', 'div-usual-x'];")
      && /COUNCIL_QUIET_LAYERS\.forEach\([^\n]*\n\s*if \(typeof setFlowMarks === 'function'\) setFlowMarks\(_flowClock\);/.test(html));
   ok("F9 a month step, a filter or a basemap switch sets them at once (drawFlow sets them), and a diversion change rebuilds the lanes (DIV.rev)",
      /FLOW\.count = feats\.length;\s*setFlowMarks\(_flowClock\);\s*renderFlowLegend\(\);/.test(fnSrc("drawFlow")) && /DIV\.rev/.test(fnSrc("flowLanes")));
@@ -258,9 +259,13 @@ if (F) {
 
 console.log("H. Kept: the diversion's row (the diversions session's)");
 const divSrc = fnSrc("divEdgeSample");
-ok("H1 kept: divEdgeSample is byte for byte as on b3bafdc", crypto.createHash("sha1").update(divSrc).digest("hex") === "c7807aa92b1b38f9520638892609b794da55ee14", divSrc.length);
-ok("H2 kept: the '#div-legend' row's markup and words as on b3bafdc, inside the same box",
-   html.includes(`? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '');`)
+// NARROWED 26 Nov 2026 (claude/map-lines-diversions, card 5, John's "Yes, as recommended"): the diversion's sample is the
+// line with its two amber rails, and its row is "The way round a closure" among the usual road's and the busy-hours rows
+// (divLegendRows), drawn after the arrowheads' row in the same box: the b3bafdc hash and words no longer hold
+ok("H1 kept: divEdgeSample draws the line with the two amber rails at the key's scale (NARROWED 26 Nov 2026, card 5)",
+   divSrc.includes("DIV_EDGE.colour") && divSrc.includes("FORECAST_LINE_WIDTH + 2 * DIV_EDGE.rail") && divSrc.includes("flowKeySvg("), divSrc.length);
+ok("H2 kept: the '#div-legend' row (now \"The way round a closure\") inside the same box, after the arrowheads' row (NARROWED 26 Nov 2026, card 5)",
+   html.includes(`(edge ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'The way round a closure</div>' : '')`)
    && html.includes('<div class="mode-legend" id="flow-legend" hidden></div>'));
 
 console.log("I. The guides");
