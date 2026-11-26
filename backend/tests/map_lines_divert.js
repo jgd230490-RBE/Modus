@@ -111,7 +111,8 @@ ok("A12 the crosses are marks, not names: not in LABEL_RULES (they stay under La
    !/LABEL_RULES[\s\S]{0,3000}div-usual-x/.test(html.slice(html.indexOf("const LABEL_RULES"), html.indexOf("const LABEL_RULES") + 3000))
    && /marks, not names/.test(block));
 ok("A13 a council view hides it; both removal lists drop it; no popup and no tip on it",
-   html.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge', 'div-usual-casing', 'div-usual', 'div-usual-x'];")
+   // NARROWED 26 Nov 2026 (after the arrowheads' PR #327): the lanes' 'forecast-flow' left the council list
+   html.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow-light', 'forecast-cap-badge', 'div-usual-casing', 'div-usual', 'div-usual-x'];")
    && (html.match(/'diversion-edge','div-usual-x','div-usual','div-usual-casing','forecast-layer'/g) || []).length === 2
    && !/map\.on\('(click|mouseenter|mousemove)',\s*'div-usual/.test(html));
 ok("A14 the filter or a pick redraws it (applyForecastFilter), and a look change repaints it (raiseMarks)",
@@ -154,11 +155,18 @@ ok("⭐ B2 gone: no band width in the diversion code (no dv_gap, no cut by width
      && (E.updateDiversionEdge({ features: [leg('R1', 'Inbound Highway', divL)] }), m.sent['diversion-edge-source'] === 1));
 }
 {
-  const m = stubMap(['forecast-casing', 'forecast-layer', 'diversion-edge', 'road-load-casing', 'road-load-line', 'forecast-flow', 'busy-core']);
+  // NARROWED 26 Nov 2026 (after the arrowheads' PR #327): the lanes' layer is gone; the rails go just over the forecast
+  // line and the shared sections and UNDER the arrowheads ('forecast-flow-light'), wherever a re-add has put them
+  const m = stubMap(['forecast-casing', 'forecast-layer', 'diversion-edge', 'road-load-casing', 'road-load-line', 'forecast-flow-light', 'busy-core']);
   const E = load(BASE(m)); E.placeDiversionEdge();
   const o = m.order;
-  ok("⭐ B7 the rails go just over the highest of the forecast line, the shared sections and the lanes (so a shared section never hides them), under a pick",
-     o.indexOf('diversion-edge') === o.indexOf('forecast-flow') + 1 && o.indexOf('diversion-edge') < o.indexOf('busy-core'), o);
+  const m2 = stubMap(['forecast-casing', 'forecast-layer', 'forecast-flow-light', 'road-load-casing', 'road-load-line', 'diversion-edge', 'busy-core']);
+  const E2 = load(BASE(m2)); E2.placeDiversionEdge();
+  const o2 = m2.order;
+  ok("⭐ B7 the rails go just over the forecast line and the shared sections (so a shared section never hides them), under the arrowheads and a pick",
+     o.indexOf('diversion-edge') === o.indexOf('road-load-line') + 1 && o.indexOf('diversion-edge') < o.indexOf('forecast-flow-light') && o.indexOf('diversion-edge') < o.indexOf('busy-core')
+     && o2.indexOf('diversion-edge') < o2.indexOf('forecast-flow-light') && o2.indexOf('diversion-edge') > o2.indexOf('forecast-layer')
+     && !/'forecast-flow'/.test(fnSrc("divEdgeAfter").replace(/\/\/[^\n]*/g, '')), [o, o2]);
 }
 ok("B8 a mode change (a council view) sets the gap again (applyCarbonMode)",
    fnSrc("applyCarbonMode").includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());"));
@@ -213,9 +221,12 @@ ok("D3 the key's samples are hidden from a screen reader (the row's words say it
 // 25 Nov 2026: static's 2f1bc34 hid the old white lanes and gave the key an early path with its own single "goes round"
 // row, so the usual road's and the busy-hours rows never showed (seen in the merged head's audit picture at 390 px)
 {
-  const rfl = fnSrc("renderFlowLegend"), early = (rfl.match(/if \(!FLOW_LANES_SHOWN\)[^\n]*/) || [''])[0];
-  ok("⭐ D4 with the lanes hidden the key still draws divLegendRows() (all three rows), none in a council view; no old \"goes round\" row is left",
+  // NARROWED 26 Nov 2026 (after the arrowheads' PR #327): the merged shape: the box is "Direction of travel" then my
+  // rows; my rows also when the arrowheads are not drawn; none in a council view
+  const rfl = fnSrc("renderFlowLegend"), early = (rfl.match(/if \(!on\)[^\n]*/) || [''])[0];
+  ok("⭐ D4 the key: the arrowheads' row, then divLegendRows() (all three rows), those rows also without the arrowheads, none in a council view; no old \"goes round\" row is left",
      /const divRows = councilFocus\(\) \? '' : divLegendRows\(\);/.test(rfl) && early.includes("box.innerHTML = divRows")
+     && rfl.indexOf('Direction of travel') > 0 && rfl.lastIndexOf('divRows;') > rfl.indexOf('Direction of travel') && !/FLOW_LANES_SHOWN/.test(rfl)
      && !html.includes("Where a route goes round a closure</div>"), early);
 }
 

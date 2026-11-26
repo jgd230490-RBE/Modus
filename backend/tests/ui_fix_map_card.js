@@ -158,9 +158,13 @@ ok("D9 25d: under 760 px the SVG's own tag is hidden and the pinned one shown (t
    (bdoc.match(/@media \(max-width:759px\)\{\{?\.maptag\{\{?display:block;position:absolute;left:7px;top:7px;/g) || []).length === 2
    && (bdoc.match(/\.mapwrap svg \.map-tag\{\{?display:none\}\}?/g) || []).length === 2
    && (bdoc.match(/\.maptag,\.maphint\{\{?display:none\}\}?/g) || []).length === 2);
-ok("D10 18c: the lanes' key draws its samples at twice the map's size (the same widths, scaled), the closure sample too",
+// NARROWED 24 Nov 2026 (claude/map-lines-flow, card 3): the band samples are the dots' key now, drawn at the map's own
+// size (the true gaps need the room); only the closure's sample still draws at twice the map's size
+// NARROWED again 24 Nov 2026, 22:46 UTC (Q14, card 3b: arrowheads drifting): the five band samples are gone; the key's
+// one arrowhead row draws at twice the map's size through flowKeySvg, as the closure's sample does
+ok("D10 18c: the arrowheads' key sample and the closure's draw at twice the map's size (the same widths, scaled); no band samples (NARROWED 24 Nov 2026)",
    html.includes("const FLOW_KEY_SCALE = 2;") && html.includes(`'<g transform="scale(' + FLOW_KEY_SCALE + ')">' + inner + '</g></svg>'`)
-   && fnSrc("flowSample").includes("return flowKeySvg(") && fnSrc("divEdgeSample").includes("return flowKeySvg(")
+   && !/function flowSample\(/.test(html) && fnSrc("flowMarkSample").includes("return flowKeySvg(") && fnSrc("divEdgeSample").includes("return flowKeySvg(")
    && !html.includes('<svg class="fl-sw" width="64" height="12" viewBox="0 0 64 12"'));
 
 for (const f of fail) console.log("  FAIL: " + f);
