@@ -2456,8 +2456,12 @@
     // every addLayer of the page goes through here (8d): the slot and the emissive strength, and a `before` that names a layer
     // the style does not list (a classic style's label layer, on Standard) is dropped rather than refused
     const _addLayerRaw = map.addLayer.bind(map);
+    // 26 Nov 2026: and every layer of the page is stamped as ours (OWN_LAYER_MARK in its metadata, which Mapbox keeps and
+    // getStyle() lists), so labelAnchor() can tell the basemap's names from a text layer of ours by the stamp, never by its id
+    const OWN_LAYER_MARK = 'wayscope:own';
     map.addLayer = function (layer, before) {
         if (layer && typeof layer === 'object') {
+            layer.metadata = Object.assign({}, layer.metadata || {}, { [OWN_LAYER_MARK]: true });
             if (styleHasSlots() && !layer.slot && SLOT_TYPES.has(layer.type)) layer.slot = 'middle';
             const em = EMISSIVE[layer.type];
             if (em) { layer.paint = Object.assign({}, layer.paint || {}); if (!(em in layer.paint)) layer.paint[em] = 1; }
@@ -2935,12 +2939,18 @@
     // basemap's first text layer; the page's own symbols (route labels, badges, the marks) are added without a before and
     // stay on top as before. Each basemap names that layer differently (road-label-simple on Light and Dark, road-label on
     // Streets), so it is found, never named. With no text layer (a bare style) the line simply goes on top, as it used to.
+    // 26 Nov 2026: a text layer of OURS is never the anchor, whatever its id: every layer the page adds carries the stamp
+    // 'wayscope:own' (map.addLayer above). The id list below found only the names it listed: the usual road's crosses
+    // (div-usual-x, PR #330), traffic-limit-badge, holding-chevrons and busy-hours-at were text layers of ours under the
+    // month's lines, so the shared sections, a pick, the busy road and the abnormal loads went in UNDER the forecast lines.
+    // The stamp is read by its literal name here, so the harnesses can run this function on its own.
     function labelAnchor(){
         try {
             // 28 Oct 2026: while a council view is on, the town names sit UNDER the council fill (placeTownNames); the
             // anchor is the first basemap name ABOVE the fill, so a layer added then still goes over the colours
             const layers = map.getStyle().layers, fill = layers.findIndex(x => x.id === 'area-fill');
             const l = layers.find((x, i) => i > fill && x.type === 'symbol' && x.layout && x.layout['text-field']
+                && !(x.metadata && x.metadata['wayscope:own'])
                 && !/^(forecast|road-load|temp-haul|site|restriction|limit|area|community|abnormal|collision|evr)/.test(x.id));
             return l ? l.id : undefined;
         } catch (e) { return undefined; }
