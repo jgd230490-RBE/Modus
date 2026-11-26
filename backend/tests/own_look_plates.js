@@ -116,9 +116,6 @@ ok("3 contrast: the plate's own line stands off the page (ink on white, light in
 
 // ---- 4 the places --------------------------------------------------------------------------------------------------------
 const PLATED = [
-  // 26 Nov 2026: main's Dashboard rethink (PR #333) made the gate list into dials; the dial's name, when it is the gate's own
-  // name (two gates at one place), carries the plate (narrowed from the list's <small> line, which is gone)
-  ["Dashboard Gate arrivals, a dial's gate name", '<div className="ga-d-name" title={gaFullName(r.g)}>{r.g.gate_name && name === r.g.gate_name ? roadPlates(name) : name}</div>'],
   ["Dashboard Gate arrivals table, gate line", '<div className="ga-gate">{roadPlates(g.gate_name)}{'],
   ["Gate arrivals row details, Gate", '<RdItem t="Gate">{roadPlates(g.gate_name)}</RdItem>'],
   ["Dashboard Traffic limits table", '<td>{roadPlates(L.name)}</td>'],
@@ -151,6 +148,10 @@ const PLAIN = [
   // name there is plain text through the same dialName (narrowed from the old axis line)
   ["a canvas picture stays plain (Gate arrivals dials)", 'x.fillText(cut(nameOf(r), CW - 12), mid, oy + DH + 4);'],
   ["the dial's picture takes the plain name", 'getPlot={async () => gaDialsPicture(shown, dialName)}'],
+  // 26 Nov 2026 (the mother session): main's Dashboard rethink (PR #333) made the gate list into dials; a dial's caption is
+  // neither a list nor a table, so it stays PLAIN (narrowed from the list's plated <small> line, which is gone); a plate
+  // there is John's to choose (pictures in notes/own-look-mockup3-1123/real/plates-1126/)
+  ["a dial's caption stays plain (Gate arrivals dials)", '<div className="ga-d-name" title={gaFullName(r.g)}>{name}</div>'],
   ["the dial's own accessible name stays a string", 'aria-label={r.pct == null ? `${gaFullName(r.g)}: no capacity` : `${gaFullName(r.g)}: ${r.pct} % of capacity`}'],
   ["the traffic limits chart title stays plain", '{L.name} <span className="text-slate-500 font-normal">({unitOf(L)} a day'],
   ["a road limit read from the road data stays plain", '{h.road_name || (h.road_nr ? `road ${h.road_nr}` : "")}'],

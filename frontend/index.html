@@ -2817,7 +2817,7 @@ function GaDial({ r, name }){
         {r.cap != null && <line className="ga-d-cap" {...gaDialTick(100)} />}
         <text className="ga-d-pct" x={GA_DIAL.cx} y="56" textAnchor="middle">{r.pct == null ? "—" : `${r.pct} %`}</text>
       </svg>
-      <div className="ga-d-name" title={gaFullName(r.g)}>{r.g.gate_name && name === r.g.gate_name ? roadPlates(name) : name}</div>
+      <div className="ga-d-name" title={gaFullName(r.g)}>{name}</div>
       <div className="ga-d-fig">{gaN1(r.g.arrivals_per_day)} a day{r.cap == null ? "" : ` of ${grp(r.cap)}`}</div>
       {word && <RowStatus word={word} tone={tone} />}
     </li>
