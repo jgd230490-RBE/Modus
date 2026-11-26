@@ -367,8 +367,11 @@ def _limit_item(h, line, see_map, unit=None):
 
 def _sentences(items, vehicle_values):
     """The sentence over the limits, one a kind (Q13): any limit this lorry is over -> OVER once; a kind where every
-    hit is at the limit -> 'This lorry is 4.0 m high: at the limit at every height limit below. Check its real height
-    before you set off.'"""
+    hit is at the limit -> 'This lorry is 13'1" (4.0 m) high: at the limit at every height limit below. Check its real
+    height before you set off.' 26 Nov 2026 (the mother session, on C1's picture): a height or width carries the lorry's
+    figure in feet and inches too, converted as a sign's headline is (limits.imperial_text), so the sentence reads in the
+    units of the signs under it."""
+    import limits
     out = []
     lims = [i for i in items if i["kind"] == "limit"]
     if any(i["state"] == "over" for i in lims):
@@ -385,7 +388,9 @@ def _sentences(items, vehicle_values):
         adj, noun = _DIM_WORDS[k]
         if len(vals) == 1:
             v = vals[0]
-            fig = f"{v:.1f} m {adj}" if k in ("height", "width") else f"{v:g} t"
+            # a lorry's own figure is never rounded DOWN to a tenth (2.55 m wide stays 2.55 m; 4.0 m stays 4.0 m)
+            met = f"{v:.1f}" if abs(v * 10 - round(v * 10)) < 1e-6 else f"{v:.2f}"
+            fig = (f"{limits.imperial_text(float(v))} ({met} m) {adj}" if k in ("height", "width") else f"{v:g} t")
             out.append(f"This lorry is {fig}: at the limit at every {noun} limit below. "
                        f"Check its real {noun} before you set off.")
         else:

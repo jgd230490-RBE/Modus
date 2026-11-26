@@ -301,8 +301,28 @@ ok("2: back: Kettering Road with its mile mark; the point limit 40 m off the lin
                                          "Height limit (13'1\") · no road name stored: see the map on the route sheet"],
    str([i["text"] for i in RE["limits"]]))
 ok("2: the sentence over the limits, one a kind: the height",
-   A["sentences"] == ["This lorry is 4.0 m high: at the limit at every height limit below. Check its real height before you set off."],
+   A["sentences"] == ["This lorry is 13'1\" (4.0 m) high: at the limit at every height limit below. Check its real height before you set off."],
    str(A["sentences"]))
+# 26 Nov 2026 (the mother session, on C1's picture of R012): the lorry's figure in the signs' own units, converted as a
+# sign's headline is; and the verdict is the METRIC figure's (the stored limit 4.0 m against the lorry's 4.0 m), even where
+# the sign's own feet-and-inches text reads 13'0" (3.96 m): read on live's copy, Melton Road B6047 is stored
+# limit 4.0, signed 13'0"; Kettering Road limit 4.0, no signed text (13'1" is limits.imperial_text(4.0))
+import limits as _lim  # noqa: E402
+ok("2 (26 Nov): the height sentence carries the lorry's feet and inches, converted as the headline's 13'1\" is",
+   _lim.imperial_text(4.0) == "13'1\"" and A["sentences"][0].startswith(f"This lorry is {_lim.imperial_text(4.0)} (4.0 m) high"),
+   A["sentences"][0])
+ok("2 (26 Nov): ...a width the same way, its own figure never rounded down (2.55 m); a weight stays in tonnes",
+   rp._sentences([{"kind": "limit", "state": "at", "limit_kind": "width"}], {"width": {2.55}})
+   == [f"This lorry is {_lim.imperial_text(2.55)} (2.55 m) wide: at the limit at every width limit below. Check its real width before you set off."]
+   and rp._sentences([{"kind": "limit", "state": "at", "limit_kind": "weight"}], {"weight": {44.0}})[0].startswith("This lorry is 44 t: "),
+   str(rp._sentences([{"kind": "limit", "state": "at", "limit_kind": "width"}], {"width": {2.55}})))
+_flat = next(iter(rp.points("R012", FLAT, DAY, ctx=CTX)["vehicle_values"].get("height", [])), None)
+ok("2 (26 Nov): the verdict compares METRES: a stored 4.0 m limit signed 13'0\" is 'at the limit' for the 4.0 m flatbed "
+   "(13'0\" alone would be 3.96 m, under it); the rule in limits.assess is unchanged",
+   _flat == 4.0 and _lim.assess({"kind": "height", "value": 4.0}, FLAT)["verdict"] == "at_limit"
+   and _lim.assess({"kind": "height", "value": 3.96}, FLAT)["verdict"] == "exceeds"
+   and LO["limits"][0]["text"].startswith("Height limit (13'0\")") and LO["limits"][0]["state"] == "at",
+   str((_flat, LO["limits"][0])))
 pl = [(i["w"], i["text"]) for i in LO["places"]]
 ok("2: places out: four schools in the first quarter mile as one line; the hospital by its name; an unnamed school; "
    "Tugby at 240 m; not the school at 260 m; the surgery; Langham; in travel order",
