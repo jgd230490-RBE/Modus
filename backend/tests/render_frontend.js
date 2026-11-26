@@ -1129,7 +1129,10 @@ if (loaded) {
     spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false, short_flag: true };
     const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account", initialAcctShow: "cost" }));   // NARROWED 11 Nov 2026 (C-F10)
-    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
+    // NARROWED 25 Nov 2026 (the Look-ahead rethink, task C2): the row sits under its site, so its class may carry la-xsite /
+    // la-xln (and a one-row site its data-la-site); the wash is the same inline style
+    const _spAt = spOut.search(/<tr class="border-t border-slate-100 align-middle( la-xsite| la-xln)?"( data-la-site="[^"]*")? style="background:rgba\(217,119,6,\.06\)">/);
+    const spRow = _spAt < 0 ? "" : spOut.slice(_spAt);
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
       spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-sec btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
       && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2); REVERSED 11 Nov 2026 (D-F4): btn-sec, an outline button

@@ -627,7 +627,8 @@ ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ah
   // NARROWED 24 Nov 2026 (own look, stage 3): of the eight, the seven column washes are the 6 % column tint, --navy-soft-col
   // (and the Horizon's stockpile cell's `bg` the same), and the eighth, the chosen week pill, keeps the 10 % --navy-soft
   // NARROWED 25 Nov 2026 (task A): + the site heading's today cell (eight column washes)
-  && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 8 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, task C2): + the weeks ahead's site heading's commit-week cell (nine)
+  && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 9 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
   && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
@@ -4283,11 +4284,14 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && /\n  \.la-acct-head th\.la-pin\{background:var\(--surface-2\);z-index:3;\}\n/.test(html)
      && _acct.includes('<th className="px-2 py-2 text-right font-semibold la-pin">Action<InfoTip id="la.spread" /></th>')
      && _acct.includes('<td className={"px-2 py-2 text-right whitespace-nowrap la-pin" + (short ? " la-pin-short" : "")}>')
-     && (_laBody.match(/la-pin/g) || []).length === 3);
+     // NARROWED 25 Nov 2026 (task C2): + a Last week site heading's own pinned (empty) Action cell, so the pin stays opaque
+     && (_laBody.match(/la-pin/g) || []).length === 4 && _acct.includes('<td className="la-pin"></td>'));
   ok("⭐ UI FIX 6 card 1: a short row's pinned cell paints the row's 5 % rose over the surface (no white stripe), and the row's own inline wash is unchanged (the captions rule matches it by [style*=])",
      // NARROWED 10 Nov 2026 (wave 3, finding 5): the wash is amber (6 %), and only on a line short past the organisation's share
      /\n  \.la-pin\.la-pin-short\{background:linear-gradient\(rgba\(217,119,6,\.06\),rgba\(217,119,6,\.06\)\),var\(--surface\);\}\n/.test(html)
-     && _acct.includes('<tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(217,119,6,.06)" } : {}}>')
+     // NARROWED 25 Nov 2026 (task C2): the row's class takes the site's la-xsite / la-xln; its inline wash is unchanged
+     && _acct.includes('<tr key={k} className={"border-t border-slate-100 align-middle" + (mode === "one" ? " la-xsite" : mode === "line" ? " la-xln" : "")}')
+     && _acct.includes('data-la-site={mode === "one" ? String(g.id ?? "") : undefined} style={short ? { background: "rgba(217,119,6,.06)" } : {}}>')
      && _acct.includes('const short = r.action === "spread" && !!r.short_flag;'));
   // card 2 (finding #11): the headings and the button in the app's standard styles
   ok("UI FIX 6 card 2: the Account headings take the .tbl th look — 13 px, ordinary capitals, muted on the second surface, one line, 40 px — and the 10 px capitals are gone from the Account — and, since UI fix 7 (22 Oct), from the Stockpiles table too",

@@ -1084,6 +1084,13 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .la-lm{display:block;font-size:12px;font-weight:400;color:var(--muted);line-height:1.35;}
   .la-site.la-one .la-site-h{padding-left:0;}
   .la-folds{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:13px;color:var(--muted);}
+  /* 25 Nov 2026 (task C2): Last week and the weeks ahead by site, in task A's parts: a ruled heading row, the lines under it */
+  tr.la-xsite>td{border-top:1px solid var(--ink) !important;padding-top:9px !important;}
+  tr.la-xsite>td.la-xsite-n{font-weight:600;color:var(--ink);}
+  tr.la-xln>td:first-child{padding-left:38px !important;}
+  .la-xbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-bottom:8px;}
+  .la-xbar>.unit-sw{margin-bottom:0;}
+  .la-acct-short{color:var(--warn-text);font-weight:600;}
   .la-flagline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;border-top:1px solid var(--ink);border-bottom:1px solid var(--line);padding:9px 0;margin:4px 0 12px;font-size:13px;}
   .la-flagline>b{font-weight:600;color:var(--ink);}
   .la-fl{display:inline-flex;align-items:center;flex-wrap:wrap;gap:0 5px;min-width:0;}
@@ -9141,6 +9148,78 @@ function LaFlagLine({ rail, siteOfLine, onSite }){
   );
 }
 
+// ---- 25 Nov 2026 (the Look-ahead rethink, task C2; Q6, John's "Yes, as recommended"): Last week and the weeks ahead by
+// SITE, as the week's list (task A). The site of every row is the server's (`row.site`, la_sites.site_of); the order is
+// Data → Locations (`page.site_order`, la_sites.places()). Nothing here works a site out a second way. A row with no site
+// goes last under "Other lines"; an older page with no `site_order` keeps the sites in the order their rows come.
+function laRowSites(rows, order){
+  const rank = {}; (order || []).forEach((id, i) => { rank[String(id)] = i; });
+  const g = {}, seen = [];
+  (rows || []).forEach(r => {
+    const s = r.site || null, k = s ? String(s.id) : "";
+    if(!g[k]){ g[k] = { id: s ? s.id : null, name: s ? s.name : "Other lines", type: s ? s.type : "", into: [], out: [] }; seen.push(k); }
+    g[k][s && s.dir === "out" ? "out" : "into"].push(r);
+  });
+  const at = (k) => k === "" ? 2e6 : (rank[k] ?? (1e6 + seen.indexOf(k)));
+  return seen.slice().sort((a, b) => at(a) - at(b)).map(k => ({ id: g[k].id, name: g[k].name, type: g[k].type, rows: [...g[k].into, ...g[k].out] }));
+}
+// the two ends of each route by name, for "From <origin>" and "Out, to <destination>"
+function laEndNames(meta){
+  const m = {};
+  ((meta && meta.routes) || []).forEach(r => { if(r && r.route_id) m[r.route_id] = { origin: r.origin || "", dest: r.dest || "" }; });
+  return m;
+}
+// a line's name under its site: where it comes from, or for an out line where it goes (task A's words)
+function LaFromWords({ row, endNames }){
+  const out = !!(row.site && row.site.dir === "out");
+  const e = endNames[row.route_id] || {};
+  return <span className="la-lf"><span className="la-dir">{out ? "Out, to " : "From "}</span>{(out ? e.dest : e.origin) || row.route_id}</span>;
+}
+// One site's fold, remembered for the session (task A's useRowOpen and its "Open all · Fold all"). `startOpen` picks a
+// table of its own for each start, so a site turned on a desk never reads as turned on a tablet (task A's rule).
+function useLaFolds(table, startOpen){
+  const [aTurned, aTurn, aMany] = useRowOpen(table);
+  const [bTurned, bTurn, bMany] = useRowOpen(table + "-shut");
+  const key = (g) => "s:" + ((g && g.id) ?? "");
+  return {
+    open: (g) => startOpen ? !aTurned(key(g)) : bTurned(key(g)),
+    toggle: (g) => (startOpen ? aTurn : bTurn)(key(g)),
+    all: (gs, on) => startOpen ? aMany(gs.map(key), !on) : bMany(gs.map(key), on),
+  };
+}
+function LaFoldAll({ groups, folds, what }){
+  if(!(groups || []).some(g => g.rows.length > 1)) return null;
+  return (
+    <span className="la-folds" data-la-folds={what}>
+      <button type="button" className="la-fl-site" onClick={() => folds.all(groups, true)}>Open all</button>
+      <span aria-hidden="true">·</span>
+      <button type="button" className="la-fl-site" onClick={() => folds.all(groups, false)}>Fold all</button>
+    </span>
+  );
+}
+function LaFoldBtn({ group, folds }){
+  const open = folds.open(group);
+  return <button type="button" className="la-fold" aria-expanded={open ? "true" : "false"} onClick={() => folds.toggle(group)}
+    aria-label={`${open ? "Fold" : "Open"} ${group.name}`}><i aria-hidden="true"></i></button>;
+}
+// the words under a site's name: its type, "n lines" and its team when every row is one team's
+function laSiteMeta(g, many){
+  const ipts = Array.from(new Set(g.rows.map(r => r.ipt || "")));
+  const team = ipts.length === 1 && iptKey(ipts[0]) ? teamName(iptKey(ipts[0])) : null;
+  return [g.type, many ? `${g.rows.length} lines` : null, team].filter(Boolean).join(" · ");
+}
+// Last week's words a site: "n of m delivered" and, when something is still short, "n t short" (amber only when a row
+// of the site is past the organisation's share: short_flag, the rows' own rule; grey otherwise)
+function LaAcctSiteWords({ g }){
+  const done = g.rows.filter(r => r.held).length;
+  const shortT = g.rows.reduce((x, r) => x + (+r.remaining_short_t || 0), 0);
+  const flagged = g.rows.some(r => r.short_flag);
+  return <span className="la-sm" data-la-acct-site={flagged ? "short" : shortT > 0 ? "quiet" : "ok"}>{done} of {g.rows.length} delivered
+    {shortT > 0.5 && <> · <span className={flagged ? "la-acct-short" : ""}>{grp(Math.round(shortT))} t short</span></>}</span>;
+}
+// the weeks ahead fold to start with on every width past this many lines (a value the C2 brief set: 40)
+const LA_HZ_FOLD_OVER = 40;
+
 // One empty state for every page, in three kinds (10 Oct 2026, ui-review-1009 mockup 5):
 // "none" (nothing yet), "nomatch" (the filters hide everything) and "error" (a read
 // failed). Same card, same type sizes; the action names the way out.
@@ -13191,6 +13270,14 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
   const carryBy = useMemo(() => { const g = {}; (account.rows || []).forEach(r => { g[laCarryKey(r)] = r; }); return g; }, [account]);
   const ends = useMemo(() => laEnds(meta), [meta]);
   const horizon = (page && page.horizon) || { rows: [] };
+  // 25 Nov 2026 (task C2): Last week's and the weeks ahead's sites; open at a desk, folded on a tablet; the weeks ahead
+  // folded on every width past LA_HZ_FOLD_OVER lines
+  const endNames = useMemo(() => laEndNames(meta), [meta]);
+  const siteOrder = (page && page.site_order) || null;
+  const acctSites = useMemo(() => laRowSites(account.rows || [], siteOrder), [account, siteOrder]);
+  const acctFolds = useLaFolds("lookahead-acct-sites", !laTab);
+  const hzLineN = useMemo(() => new Set((horizon.rows || []).map(r => `${r.route_id}|${r.discipline || ""}|${r.section_id || ""}`)).size, [horizon]);
+  const hzFolds = useLaFolds("lookahead-hz-sites", !laTab && hzLineN <= LA_HZ_FOLD_OVER);
   const rail = (page && page.clashes) || { flags: [], count: 0, sources: {} };
   const ttSrc = rail.sources || {};
   const ttRunning = ttPolling || !!(ttSrc.restrictions_refresh && ttSrc.restrictions_refresh.running);
@@ -13638,11 +13725,14 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             <EmptyState title="No approved line in last week." body="The Account view types what actually moved against last week's plan. There is nothing to account for yet." />
           ) : (
             <>
+            <div className="la-xbar">
             <div className="unit-sw mb-2" data-acct-show={acctShow}>
               <span>Show</span>
               <span className="unit-sw-seg" role="group" aria-label="Show the account as">
                 {[["tonnes", "Tonnes"], ["cost", "Cost"]].map(([k, l]) => <button key={k} type="button" aria-pressed={acctShow === k ? "true" : "false"} onClick={() => setAcctShow(k)}>{l}</button>)}
               </span>
+            </div>
+            <LaFoldAll groups={acctSites} folds={acctFolds} what="account" />
             </div>
             <div className="ruled overflow-hidden">
               {/* 22 Oct 2026 (UI fix 6, cards 1 and 2): the table keeps its 1,220 px; the Action column is pinned right (.la-pin),
@@ -13665,13 +13755,20 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                     </tr>
                   </thead>
                   <tbody>
-                    {account.rows.map(r => {
+                    {(() => {
+                    // 25 Nov 2026 (task C2): the rows under their site (laRowSites, Data → Locations), a ruled heading with
+                    // "n of m delivered" and its shortfall; a row named by where it comes from ("Out, to …" for an out row);
+                    // a site with one row is that one row. Everything a row did before is unchanged.
+                    const acctRow = (r, g, mode) => {
                       const k = wkKey(r);
                       const short = r.action === "spread" && !!r.short_flag;   // 10 Nov 2026 (finding 5): a small miss is not tinted
                       return (
-                        <tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(217,119,6,.06)" } : {}}>
+                        <tr key={k} className={"border-t border-slate-100 align-middle" + (mode === "one" ? " la-xsite" : mode === "line" ? " la-xln" : "")}
+                          data-la-site={mode === "one" ? String(g.id ?? "") : undefined} style={short ? { background: "rgba(217,119,6,.06)" } : {}}>
                           <td className="px-3 py-2 min-w-[260px]">
-                            <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{ends[r.route_id] || r.route_id}</div>
+                            {mode === "one" && <span className="la-site-h"><span className="la-sn">{g.name}</span>
+                              {laSiteMeta(g, false) && <span className="la-sm">{laSiteMeta(g, false)}</span>}<LaAcctSiteWords g={g} /></span>}
+                            <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{mode ? <LaFromWords row={r} endNames={endNames} /> : (ends[r.route_id] || r.route_id)}</div>
                             <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">
                               {ends[r.route_id] && <span>{r.route_id}</span>}<IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
                               <span>{r.material_type || "—"} · {vehLabel(r.vehicle_type) || "—"} · {r.status}</span>
@@ -13736,7 +13833,25 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                           </td>
                         </tr>
                       );
-                    })}
+                    };
+                    return acctSites.map(g => {
+                      if(g.rows.length === 1) return acctRow(g.rows[0], g, "one");
+                      const open = acctFolds.open(g);
+                      return (
+                        <React.Fragment key={"site-" + String(g.id ?? "")}>
+                          <tr className="la-xsite" data-la-site={String(g.id ?? "")}>
+                            <td className="px-3 py-2 min-w-[260px]">
+                              <div className="la-site-p"><LaFoldBtn group={g} folds={acctFolds} />
+                                <span className="la-site-h"><span className="la-sn">{g.name}</span><span className="la-sm">{laSiteMeta(g, true)}</span><LaAcctSiteWords g={g} /></span></div>
+                            </td>
+                            <td colSpan={acctCost ? 6 : 4}></td>
+                            <td className="la-pin"></td>
+                          </tr>
+                          {open && g.rows.map(r => acctRow(r, g, "line"))}
+                        </React.Fragment>
+                      );
+                    });
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -13839,21 +13954,25 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             horizon.rows.forEach(r => {
               const k = `${r.route_id}|${r.discipline || ""}|${r.section_id || ""}`;
               const e = (g[k] || (g[k] = { key: k, route_id: r.route_id, discipline: r.discipline || "", section_id: r.section_id || "",
-                                 unit: r.unit, material_type: r.material_type, vehicle_type: r.vehicle_type, ipt: r.ipt, weeks: {}, reopened: [] }));
+                                 unit: r.unit, material_type: r.material_type, vehicle_type: r.vehicle_type, ipt: r.ipt, weeks: {}, reopened: [],
+                                 site: r.site || null }));
               e.weeks[`${r.month_index}|${r.week_index}`] = r;
               // Reopening a month does NOT delete its weeks — a confirmed week with an
               // actual against it is a record of what happened. Shown as a note.
               if(r.parent_status && r.parent_status !== "Approved" && !e.reopened.includes(r.month_index)) e.reopened.push(r.month_index);
             });
             const hl = Object.values(g).sort((a, b) => a.route_id.localeCompare(b.route_id) || a.discipline.localeCompare(b.discipline));
+            const hzSites = laRowSites(hl, siteOrder);       // 25 Nov 2026 (task C2): the lines by site
             const cols = [];
             [horizon.from_month, horizon.to_month].forEach(m => weekNosOf(horizon, m).forEach(w => cols.push({ m, w })));
             const roleOf = (m, w) => { const rr = horizon.roles || {}; return Object.keys(rr).find(k => rr[k][0] === m && rr[k][1] === w) || null; };
             const roleLbl = { account: "ACCOUNT", commit: "COMMIT", "make-ready": "MAKE-READY", "early-warning": "EARLY WARNING" };
             return (
+              <>
+              <div className="la-xbar"><LaFoldAll groups={hzSites} folds={hzFolds} what="horizon" /></div>
               <div className="ruled overflow-hidden">
                 <div className="overflow-auto">
-                  <table className="text-sm" style={{ minWidth: 1300 }}>
+                  <table className="text-sm" style={{ minWidth: 1300 }} data-hz-sites={hzSites.length}>
                     <thead className="bg-slate-50 text-slate-500 text-xs">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold border-r border-slate-200 sticky left-0 bg-slate-50 z-10" style={{ minWidth: 240 }}>
@@ -13879,10 +13998,17 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                       </tr>
                     </thead>
                     <tbody>
-                      {hl.map(line => (
-                        <tr key={line.key} className="border-t border-slate-100 align-top">
+                      {(() => {
+                      // 25 Nov 2026 (task C2): the lines under their site (laRowSites, Data → Locations); a ruled heading with
+                      // each week's total in tonnes (the out part under it); a line named by where it comes from; a site
+                      // with one line is that one row. Each week's cell is unchanged.
+                      const hzRow = (line, g, mode) => (
+                        <tr key={line.key} className={"border-t border-slate-100 align-top" + (mode === "one" ? " la-xsite" : mode === "line" ? " la-xln" : "")}
+                          data-la-site={mode === "one" ? String(g.id ?? "") : undefined}>
                           <td className="px-3 py-2 border-r border-slate-100 sticky left-0 bg-white z-10">
-                            <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={line.route_id}>{ends[line.route_id] || line.route_id}</div>
+                            {mode === "one" && <span className="la-site-h"><span className="la-sn">{g.name}</span>
+                              {laSiteMeta(g, false) && <span className="la-sm">{laSiteMeta(g, false)}</span>}</span>}
+                            <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={line.route_id}>{mode ? <LaFromWords row={line} endNames={endNames} /> : (ends[line.route_id] || line.route_id)}</div>
                             <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">{ends[line.route_id] && <span>{line.route_id}</span>}<IptPill ipt={line.ipt} /><WsPill ws={line.section_id} /><span>{line.material_type || "—"} · {vehShort(line.vehicle_type) || "—"}</span></div>
                             {line.reopened.length > 0 && (
                               <div className="text-xs mt-0.5" style={{ color: "var(--red)" }}
@@ -13913,7 +14039,36 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                             );
                           })}
                         </tr>
-                      ))}
+                      );
+                      return hzSites.map(g => {
+                        if(g.rows.length === 1) return hzRow(g.rows[0], g, "one");
+                        const open = hzFolds.open(g);
+                        const outs = g.rows.some(l => l.site && l.site.dir === "out");
+                        return (
+                          <React.Fragment key={"site-" + String(g.id ?? "")}>
+                            <tr className="la-xsite align-top" data-la-site={String(g.id ?? "")}>
+                              <td className="px-3 py-2 border-r border-slate-100 sticky left-0 bg-white z-10">
+                                <div className="la-site-p"><LaFoldBtn group={g} folds={hzFolds} />
+                                  <span className="la-site-h"><span className="la-sn">{g.name}</span><span className="la-sm">{laSiteMeta(g, true)}</span></span></div>
+                              </td>
+                              {cols.map(({ m, w }) => {
+                                const k = `${m}|${w}`;
+                                const rs = g.rows.map(l => l.weeks[k]).filter(Boolean);
+                                const t = rs.reduce((x, r) => x + (+r.planned_t || 0), 0);
+                                const ot = g.rows.filter(l => l.site && l.site.dir === "out" && l.weeks[k]).reduce((x, l) => x + (+l.weeks[k].planned_t || 0), 0);
+                                return (
+                                  <td key={k} className="px-2 py-2 border-r border-slate-100 whitespace-nowrap tabular-nums la-xsite-n" data-hz-site-week={k}
+                                    style={roleOf(m, w) === "commit" ? { background: "var(--navy-soft-col)" } : {}}>
+                                    {rs.length ? `${grp(t)} t` : "—"}{outs && ot > 0 && <span className="la-sub">{grp(ot)} t out</span>}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                            {open && g.rows.map(l => hzRow(l, g, "line"))}
+                          </React.Fragment>
+                        );
+                      });
+                      })()}
                     </tbody>
                     {/* 27 Oct 2026 (stockpile forecast, card 4): one strip under the week rows — each stockpile's forecast %
                         at the week's end, amber from 90 %, red over, so the make-ready and early-warning weeks show it where
@@ -13953,6 +14108,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                   </table>
                 </div>
               </div>
+              </>
             );
           })()}
         </>
