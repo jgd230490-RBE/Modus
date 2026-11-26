@@ -187,6 +187,13 @@ const cells = (el) => [...el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.
      && html.includes(".lp-axis{grid-template-columns:140px 1fr}") && !/@container lp-panel[^{]*\{[^}]*(display:none)[^}]*\.lp-(blk|trip|name)/.test(html));
   ok("C1: a block too narrow for its name carries none: each name measured against its block (is-cut, hidden)",
      /\.lp-name\.is-cut\{[^}]*visibility:hidden/.test(html) && between("function LorryPlanRow(", "function LorryPlan(").includes('n.classList.add("is-cut")'));
+  // the batch's second look (26 Nov 2026): a break block too narrow for its word showed "breal" / "bre"; the word is now a
+  // measured name (hidden whole when it does not fit), the hatch and the row's accessible name stay
+  const brk = [...m.el.querySelectorAll(".lp-blk.is-break")];
+  ok("⭐ C1: a break block's word is a measured name (is-cut hides it whole, never clipped); the hatch and the row's name keep the break",
+     brk.length > 0 && brk.every(b => b.querySelector(".lp-name.lp-brk") && norm(b.textContent) === "break" && b.getAttribute("aria-hidden") === "true")
+     && /\.lp-blk\.is-break\{background:repeating-linear-gradient/.test(html) && /\.lp-name\.lp-brk\{font-weight:400\}/.test(html)
+     && between("function LorryPlanRow(", "function LorryPlan(").includes("break ${b.minutes} min"), brk.map(b => b.innerHTML).join(" | "));
   const colours = new Set([...m.el.querySelectorAll(".lp-blk:not(.is-break)")].map(b => b.style.background));
   ok("C1: one colour a site (three sites, three colours)", colours.size === 3, [...colours].join(" "));
   // a fault found in passing (25 Nov 2026): the key was always empty (the rows gave out the colours after it was drawn)

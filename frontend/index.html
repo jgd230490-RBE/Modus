@@ -747,6 +747,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .lp-open:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
   .lp-name{display:block;font-weight:600;overflow:hidden;white-space:nowrap}
   .lp-name.is-cut{visibility:hidden}
+  .lp-name.lp-brk{font-weight:400}
   /* a lorry's driver sheet under its row: the paper's own words (B2's read), ruled, no box */
   .lp-sheet{border-left:2px solid var(--navy);margin:0 0 10px;padding:10px 0 12px 14px;container-type:inline-size}
   .lp-sh-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:8px}
@@ -12687,6 +12688,7 @@ function LpTrip({ b, r, yard, style, colour, label, dnd }){
 function LorryPlanRow({ r, yard, colour, dnd, open, btnId, sheetId, onOpen }){
   const span = LP_DAY_TO - LP_DAY_FROM;
   // 25 Nov 2026 (card 3): a block too narrow for its site's name carries none: each name is measured against its block
+  // 26 Nov 2026 (the batch's second look): a break's word is measured the same way ("breal" was clipped); the hatch stays
   const trackRef = useRef(null);
   useEffect(() => {
     const el = trackRef.current; if(!el) return;
@@ -12717,7 +12719,7 @@ function LorryPlanRow({ r, yard, colour, dnd, open, btnId, sheetId, onOpen }){
           const style = { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` };
           if(can && b.kind === "trip") return <LpTrip key={i} b={b} r={r} yard={yard} style={style} colour={colour} dnd={dnd} label={`${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, lorry ${r.n}`} />;
           return <div key={i} className={"lp-blk" + (b.kind === "break" ? " is-break" : "")} aria-hidden="true" title={b.kind === "break" ? undefined : `${b.start} ${b.route_id} → ${lpShort(b.dest_name)}`}
-            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : <span className="lp-name">{lpSiteName(b.dest_name)}</span>}</div>;
+            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? <span className="lp-name lp-brk">break</span> : <span className="lp-name">{lpSiteName(b.dest_name)}</span>}</div>;
         })}
       </div>
       <div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>
