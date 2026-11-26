@@ -1270,6 +1270,14 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .bo-c{display:flex;align-items:center;gap:8px;} .bo-n{min-width:46px;text-align:right;flex:none;}
   .bo-bar{display:inline-block;flex:none;height:7px;border-radius:3px;background:var(--bo-bar);} .bo-bar.bo-bar-use{background:var(--bo-bar-use);}
   .bo-sch td.bo-none{color:var(--muted);}
+  /* 26 Nov 2026 (Routes rethink C4, John's "Yes, as recommended" to S1): in the "All figures" table the rule's own shape
+     (dot = better, diamond = worse) goes BEFORE a figure of the card's lorry: round trip (Cycle), trips a day, carbon, and
+     the busy-hour times. No words (the card has them; a hidden word names it for a screen reader), no bar, no tint. */
+  .bo-fm{display:inline-flex;align-items:center;gap:5px;position:relative;}
+  .bo-fm i{flex:none;width:9px;height:9px;border-radius:50%;}
+  .bo-fm-ok i{background:var(--ok-text);}
+  .bo-fm-warn i{background:var(--warn-text);border-radius:0;transform:rotate(45deg) scale(.82);}
+  .bo-fm-hr{color:var(--ink);}
   .bo-mk{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap;}
   .bo-mk i{flex:none;width:9px;height:9px;border-radius:50%;}
   .bo-mk-ok{color:var(--ok-text);} .bo-mk-ok i{background:var(--ok-text);}
@@ -17877,15 +17885,20 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
   // quicker option of each vehicle is green and bold (John: "highlighting which route is quicker")
   const ht = data && data.hour_times;
   const hourCols = ht ? ht.screen_hours : [];
-  const quickAlt = {};
-  if(ht) for(const r of data.rows) for(const h of hourCols){
-    const v = r.hours && r.hours[h];
-    if(v == null) continue;
-    const k = `${r.profile}|${h}`;
-    if(!(k in quickAlt) || v < quickAlt[k].v) quickAlt[k] = { v, alt: r.alt_index };
-  }
-  const isQuick = (r, h) => !!(r.hours && r.hours[h] != null && quickAlt[`${r.profile}|${h}`]
-    && quickAlt[`${r.profile}|${h}`].alt === r.alt_index && data.rows.filter(x => x.profile === r.profile && x.hours && x.hours[h] != null).length > 1);
+  // 26 Nov 2026 (Routes rethink C4, S1): a mark on a figure is the RULE's row for that option, never worked out here
+  // (route_best.option_rows, the `mark` of the row with the same key); only for the lorry the card answers for, and only
+  // the round trip (Cycle), trips a day, carbon and the busy-hour times. Collisions are never marked.
+  const figMarks = {};
+  if(best && best.route) for(const o of (best.route.options || [])) if(o.rows) figMarks[o.alt] = Object.fromEntries(o.rows.map(x => [x.key, x.mark]));
+  const figMark = (r, key) => {
+    if(!best || !best.route || r.profile !== best.route.lorry) return null;
+    const m = (figMarks[r.alt_index] || {})[key];
+    return m === "ok" || m === "warn" ? m : null;
+  };
+  const figShow = (mk, inner, hr) => mk ? (
+    <span className={"bo-fm bo-fm-" + mk + (hr ? " bo-fm-hr" : "")} data-fig-mark={mk}>
+      <i aria-hidden="true" /><span className="sr-only">{mk === "ok" ? "Better: " : "Worse: "}</span>{inner}
+    </span>) : inner;
   // 0d's busy-hours line gains the time difference: the Artic Tipper (the lorry the times are worked out for)
   const busyGap = (alt) => {
     if(!ht) return "";
@@ -18003,22 +18016,21 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
                       title={r.haul_speed_applied
                         ? `Includes an assigned haul speed over ${fmtDist(r.haul_km, 1)} ${DU()} (${(r.haul_zones || []).join(", ")}). Without it this cycle would be ${r.cycle_hr_here} h.`
                         : undefined}>
-                      {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: "var(--haul-text)" }}>†</span> : null}
+                      {figShow(figMark(r, "round_trip"), <>{r.cycle_hr} h</>)}{r.haul_speed_applied ? <span style={{ color: "var(--haul-text)" }}>†</span> : null}
                     </td>
                     {hourCols.map(h => {
                       const v = r.hours ? r.hours[h] : null;
-                      const q = isQuick(r, h);
+                      const q = figMark(r, "busy_" + h);
                       return (
-                        <td key={h} className={cell} data-hour={h} data-quick={q ? "1" : undefined}
-                          style={q ? { background: "rgba(4,120,87,.12)", color: "var(--ok-text)", fontWeight: 700 } : undefined}>
-                          {v == null ? <span className="text-slate-500">—</span> : `${v.toFixed(2)} h`}
+                        <td key={h} className={cell} data-hour={h} data-fig-mark={q || undefined}>
+                          {v == null ? <span className="text-slate-500">—</span> : figShow(q, `${v.toFixed(2)} h`, true)}
                         </td>
                       );
                     })}
-                    <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{r.trips_per_day || <span className="text-slate-500">0</span>}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
+                    <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{figShow(figMark(r, "trips"), <>{r.trips_per_day || <span className="text-slate-500">0</span>}</>)}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
                     <td className={cell}>{r.tonnes_per_day}</td>
                     <td className={cell}>{r.tonnes_per_month}</td>
-                    <td className={cell}>{r.co2_kg_per_trip}</td>
+                    <td className={cell}>{figShow(figMark(r, "carbon"), <>{r.co2_kg_per_trip}</>)}</td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
                       {r.alt_index !== 0 && onPromote && (
                         <button
@@ -18051,8 +18063,8 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
             )}
             {ht && (
               <p className="text-[13px] text-slate-400 mt-1" data-hour-note>
-                {hourCols.join(" · ")} = the cycle for a lorry setting off then on a weekday. Green, bold: the quicker option at
-                that hour.{data.rows.some(r => r.hours_scaled) ? " Other lorries scaled from the Artic Tipper." : ""}
+                {hourCols.join(" · ")} = the cycle for a lorry setting off then on a weekday. A dot: quicker than the route in use at that
+                hour, a diamond: slower (the card's lorry).{data.rows.some(r => r.hours_scaled) ? " Other lorries scaled from the Artic Tipper." : ""}
               </p>
             )}
             <p className="text-[13px] text-slate-400 mt-1">
