@@ -225,6 +225,12 @@ ok("2 status: the shape is an inline block of its own; a tablet card cell keeps 
    /\n  \.row-st i\{[^}]*display:inline-block;[^}]*width:10px;height:10px;/.test(css)
    && css.includes(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}")
    && css.indexOf(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}") > css.indexOf(".tab-cards>tbody>tr>td>span:not(.block){display:inline-block;"));
+// 26 Nov 2026 (an independent read of the diff): LaKpi has no box of its own, so every row of them must be a ruled strip
+// (the Account view's four figures had no rule at all)
+ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account view's too",
+   (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
+     return opens.length >= 11 && opens.every(t => /className="fig-strip /.test(t)); })()
+   && code.includes('<div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
