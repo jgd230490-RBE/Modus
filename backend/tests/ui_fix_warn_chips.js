@@ -31,35 +31,27 @@ const tok = (name, dark) => {
 
 ok("🔴 no amber word sits on a see-through amber tint any more",
    !/background: "rgba\(180,83,9,\.1[02]\)", color: "var\(--warn-text\)"/.test(html));
-// NARROWED 26 Nov 2026 (claude/own-look-shape, taking main bbf9c7e in): the own look's status has NO tint at all (design
-// language: a shape and a word), so the five amber words are the status chip (RowStatus, rs-warn) or, for the "no way round
-// yet" sentence, a status line with its diamond (.st-line.st-warn), each on the page's own surface. The tint's fault cannot
-// occur; the word is measured against the surfaces it now sits on (white and the second surface in ink, the dark surfaces).
+// REVERSED 26 Nov 2026 (the own look's shape branch taken in with main): the five amber words are no longer chips on a
+// solid tint. Each is a status, a shape and a word with no background (RowStatus, or the .st-line sentence), so the
+// pair that must pass is --warn-text on the surface itself, in ink and in Dark.
 const solid = (html.match(/background: "var\(--st-warn-bg\)", color: "var\(--warn-text\)"/g) || []).length;
-ok("🔴 the five amber words sit on the solid var(--st-warn-bg)  [NARROWED: on no background, the status shape and word]",
-   solid === 0 && html.includes(".row-st.rs-warn{color:var(--warn-text);}") && html.includes(".st-line.st-warn{color:var(--warn-text);}"), String(solid));
-
+ok("🔴 REVERSED: no amber word sits on a tint at all (the five are a shape and a word)", solid === 0, String(solid));
 const chip = html.slice(html.indexOf("<span data-route-diverted={r.id}"), html.indexOf("<span data-route-diverted={r.id}") + 500);
-ok("the Routes list's 'Diverted …' chip is one of them", /<RowStatus word=\{`\$\{used\.length \? "Diverted" : "Not diverted"\}/.test(chip) && /tone=\{used\.length \? "warn" : "bad"\}/.test(chip), chip.slice(0, 120));
-ok("...and its red 'Not diverted' side is unchanged (5.38:1 on white already)  [NARROWED: the red status, --bad-text through .row-st]",
-   /tone=\{used\.length \? "warn" : "bad"\}/.test(chip) && html.includes(".row-st.rs-bad{color:var(--bad-text);}") && !/style=\{used\.length/.test(chip));
-const busy = html.slice(html.indexOf("data-route-busy={r.id}"), html.indexOf("data-route-busy={r.id}") + 700);
-ok("the busy-hours chip in the Routes list is one of them", /<RowStatus word=\{`Busy hours: Alt \$\{u\.alt\}`\} tone="warn" \/>/.test(busy));
-const hold = html.slice(html.indexOf("if(hr.state === \"route_again\") return <span data-route-holding"), html.indexOf("if(hr.state === \"route_again\") return <span data-route-holding") + 400);
-ok("the holding-area 'Route again' chip is one of them", /<RowStatus word=\{words\} tone="warn" \/>/.test(hold));
-const stuck = html.slice(html.indexOf("no way round yet. Until you find one") - 300, html.indexOf("no way round yet. Until you find one"));
-ok("the 'no way round yet' box is one of them", /className="mt-2 text-\[13px\] st-line st-warn"/.test(stuck) && !/background/.test(stuck));
-const zones = html.slice(html.indexOf("data-busy-in-use={u.from}"), html.indexOf("data-busy-in-use={u.from}") + 700);
-ok("the Zones busy-hours line is one of them (added 26 Nov)", /<RowStatus word=\{`Busy hours: Alt \$\{u\.alt\} · paused`\} tone="warn" \/>/.test(zones));
+ok("the Routes list's 'Diverted …' word is a RowStatus, no tint", /<RowStatus /.test(chip) && !/st-warn-bg|rgba\(/.test(chip), chip.slice(0, 160));
+const busyI = html.indexOf("paused: the road changed");
+const busy = html.slice(busyI - 200, busyI + 200);
+ok("the paused busy-hours word in the Routes list is a RowStatus", busyI > 0 && /<RowStatus word=\{`Busy hours: Alt \$\{u\.alt\}`\} tone="warn" \/>/.test(busy));
+const hold = html.slice(html.indexOf('hr.state === "route_again") return <span data-route-holding'), html.indexOf('hr.state === "route_again") return <span data-route-holding') + 400);
+ok("the holding-area 'Route again' word is a RowStatus", /<RowStatus word=\{words\} tone="warn" \/>/.test(hold));
+const stuckI = html.indexOf("no way round yet. Until you find one");
+const stuck = html.slice(stuckI - 300, stuckI);
+ok("the 'no way round yet' line is a status sentence (.st-line), no box", stuckI > 0 && /st-line st-warn/.test(stuck) && !/st-warn-bg/.test(stuck));
 
-const warnInk = tok("warn-text", false), warnDk = tok("warn-text", true);
-const surfInk = tok("surface", false), surf2Ink = tok("surface-2", false), surfDk = tok("surface", true), surf2Dk = tok("surface-2", true);
-ok("ink: --warn-text on --st-warn-bg passes 4.5:1  [NARROWED: on --surface and --surface-2]",
-   warnInk && surfInk && surf2Ink && ratio(warnInk, surfInk) >= 4.5 && ratio(warnInk, surf2Ink) >= 4.5,
-   `${warnInk} on ${surfInk} ${warnInk && surfInk ? ratio(warnInk, surfInk).toFixed(2) : "?"}, on ${surf2Ink} ${warnInk && surf2Ink ? ratio(warnInk, surf2Ink).toFixed(2) : "?"}`);
-ok("Dark: --warn-text on --st-warn-bg passes 4.5:1  [NARROWED: on the dark --surface and --surface-2]",
-   warnDk && surfDk && surf2Dk && ratio(warnDk, surfDk) >= 4.5 && ratio(warnDk, surf2Dk) >= 4.5,
-   `${warnDk} on ${surfDk} ${warnDk && surfDk ? ratio(warnDk, surfDk).toFixed(2) : "?"}, on ${surf2Dk} ${warnDk && surf2Dk ? ratio(warnDk, surf2Dk).toFixed(2) : "?"}`);
+const tokv = (name, dark) => { const v = (html.match(new RegExp("--" + name + ":(#[0-9A-Fa-f]{6})", "g")) || []).map(m => m.split(":")[1]); return dark ? v[1] : v[0]; };
+const warnInk = tokv("warn-text", false), bgInk = tokv("surface", false);
+const warnDk = tokv("warn-text", true), bgDk = tokv("surface", true);
+ok("ink: --warn-text on the surface passes 4.5:1", warnInk && bgInk && ratio(warnInk, bgInk) >= 4.5, `${warnInk} on ${bgInk} ${warnInk && bgInk ? ratio(warnInk, bgInk).toFixed(2) : "?"}`);
+ok("Dark: --warn-text on the surface passes 4.5:1", warnDk && bgDk && ratio(warnDk, bgDk) >= 4.5, `${warnDk} on ${bgDk} ${warnDk && bgDk ? ratio(warnDk, bgDk).toFixed(2) : "?"}`);
 ok("the old pair really failed (the audit's 4.25:1)", Math.abs(ratio("#B45309", "#F6EAE1") - 4.25) < 0.01);
 
 console.log(`ui_fix_warn_chips.js: ${pass} passed, ${fail.length} failed`);
