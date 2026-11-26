@@ -17642,6 +17642,7 @@ function BoClosure({ cl }){
       <RowStatus word={cl.head} tone={cl.state === "in_force" ? "warn" : "none"} />
       <span>{[cl.name, cl.dates].filter(Boolean).join(" · ")}{cl.does ? <> · <span className="bo-g">{cl.does}</span></> : null}</span>
     </div>);
+}
 // 25 Nov 2026 (the Routes page rethink, cards 4 and 7; John: "Yes, as recommended", Q12 and Q13): the option's rows are
 // ONE schedule, read from the rule's own `rows` (route_best.option_rows): the measure, the route in use, the tab's option
 // in the selection tint, and the difference with the status shape and the rule's words. Each figure has a small bar on
