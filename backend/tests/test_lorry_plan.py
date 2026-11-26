@@ -498,16 +498,20 @@ ok("7: the three routes", all(x in MAIN for x in ('@app.get("/api/forecast-weeks
 ok("7: the plan is read from the Look-ahead's kept read and kept itself", '_staff_json("lorry-plan", {"bucket": b}' in MAIN and 'pg = _staff_json("lookahead", {"bucket": b, "route_id": None, "on": True}' in MAIN)
 ok("7: apply is planners and admins only", '_require_planner_or_admin("move a week\'s loads between its days")' in MAIN)
 panel = APP[APP.index("function LorryPlan({"):APP.index("function GatesWeek({")]
-ok("7: the panel: folded, the three views, the weekday chips, the sheets, Apply for planners / admins on an unconfirmed week",
-   'data-lorry-plan="1"' in panel and 'LP_VIEW_WORDS = { booked: "As booked", chained: "Chained by yard", compressed: "Week compressed" }' in APP
-   and 'data-lp-sheets="1"' in panel and 'data-lp-apply="1"' in panel and 'disabled={!!busy || weekConfirmed || !mv.length}' in panel
+# NARROWED 25 Nov 2026 (the Look-ahead rethink, C1, card 3): no fold (the week's "By lorry" view), "Chained by load point"
+ok("7: the panel: the week's By lorry view, the three views, the day tabs, the sheets, Apply for planners / admins on an unconfirmed week",
+   'data-lorry-plan="1"' in panel and 'LP_VIEW_WORDS = { booked: "As booked", chained: "Chained by load point", compressed: "Week compressed" }' in APP
+   and "Chained by yard" not in APP
+   # NARROWED 25 Nov 2026 (C1): the sheets menu is its own component, LpSheetsMenu
+   and 'data-lp-sheets="1"' in APP and "<LpSheetsMenu " in panel and 'data-lp-apply="1"' in panel  and 'disabled={!!busy || weekConfirmed || !mv.length}' in panel
    and 'const canApply = !!(access && (access.role === "planner" || access.role === "admin"));' in panel)
 # NARROWED 9 Nov 2026 (2.1-9b): the track is role=img for a reader of the plan and a named group for a planner, whose trips are controls
 ok("7: one row a lorry, its trips as blocks across the day, the break hatched, the free words at the end",
    'role={can ? "group" : "img"}' in APP and 'className={"lp-blk" + (b.kind === "break" ? " is-break" : "")}' in APP and 'data-lp-free={r.free_minutes}' in APP)
 ok("7: the panel sits under Gates this week; the KPI caption gains the chained figure; the phone reads it",
    # NARROWED 11 Nov 2026 (CLOCS card C-F7): the Look-ahead passes its today
-   "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} />" in APP
+   # NARROWED 25 Nov 2026 (C1): drawn only in the week's By lorry view, the view switch handed in
+   "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} show={laBy === \"lorry\"} viewSwitch={<LaViewSwitch value={laBy} onChange={setLaBy} />} />" in APP
    and "with each yard's lorries chained` : \"\")} />" in APP and 'data-ph-lorry-plan={shown}' in APP and 'data-ph-lorry-list="1"' in APP)
 ok("7: the Config rows: a day-hire rate per lorry type, optional, never seeded", 'function DayHireSection({ doc, upd })' in APP
    and 'data-day-hire-section="1"' in APP and "Blank = the saving in lorry-days only" in APP and "<DayHireSection doc={doc} upd={upd} />" in APP)

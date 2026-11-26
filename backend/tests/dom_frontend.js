@@ -3257,17 +3257,22 @@ async function lorryPlanDom(){
   const m = mount({});
   await settle();
   const sec = () => m.el.querySelector("[data-lorry-plan]");
-  ok("⭐ 2.1-9 DOM: the panel mounts folded with its head line: the week's lorry-days chained vs booked; one GET",
-     !!sec() && norm(m.el.querySelector("[data-lp-head]") && m.el.querySelector("[data-lp-head]").textContent) === "80 lorry-days this week with each yard's lorries chained, 135 as booked"
-     && gets === 1 && !m.el.querySelector(".lp-row"));
-  act(() => { m.el.querySelector("[data-lp-toggle]").click(); });
+  // REVERSED 25 Nov 2026 (the Look-ahead rethink, C1, Q10): the panel is the week's "By lorry" view: OPEN, no fold, no head
+  // line (its figures are in the three cells); one GET
+  ok("⭐ 2.1-9 DOM: the panel mounts OPEN with no fold and no head line; one GET",
+     !!sec() && !m.el.querySelector("[data-lp-head]") && !m.el.querySelector("[data-lp-toggle]")
+     && gets === 1 && m.el.querySelectorAll(".lp-row").length === 2);
   ok("⭐ 2.1-9 DOM: opened: Chained by yard, today's chip (Wed 4) pressed, the day's yard block with two lorry rows, no Apply in this view",
      // NARROWED 11 Nov 2026 (CLOCS card C-F7): today's chip says so ("Wed 4, today")
      sec().getAttribute("data-lp-view") === "chained" && [...m.el.querySelectorAll('[aria-label="Day"] button')].find(b => b.getAttribute("aria-pressed") === "true").textContent === "Wed 4, today"
      && m.el.querySelectorAll(".lp-row").length === 2 && !m.el.querySelector("[data-lp-apply]"));
   const kp = [...m.el.querySelectorAll(".lp-kpi")].map(e => norm(e.textContent));
-  ok("⭐ 2.1-9 DOM: the four figures: 16 lorries chained on Wed 4, 27 booked, 11 lorry-days saved this day · 55 this week, £ — with where to type a rate",
-     kp[0].startsWith("16 lorries") && kp[1].startsWith("27") && kp[2].startsWith("11 lorry-days saved") && kp[2].includes("55 this week") && kp[3].startsWith("£ —") && kp[3].includes("Config → Costing · fuel"), kp.join(" | "));
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1, card 3): THREE cells, a label over each figure
+  const kc = [...m.el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.querySelector(".lp-kl").firstChild.textContent), v: norm(e.querySelector("b").textContent), s: norm((e.querySelector(":scope > span") || {}).textContent) }));
+  ok("⭐ 2.1-9 DOM: the three figures: Lorries, Wed 4 16 (27 as booked · 80 against 135 this week); Lorry-days saved 11 (55 this week); Saved this week £ — and the link to type a rate",
+     kc.length === 3 && kc[0].l === "Lorries, Wed 4" && kc[0].v === "16" && kc[0].s === "27 as booked · 80 against 135 this week"
+     && kc[1].l === "Lorry-days saved" && kc[1].v === "11" && kc[1].s === "55 this week"
+     && kc[2].l === "Saved this week" && kc[2].v === "£ —" && kc[2].s === "Set a day rate" && !!m.el.querySelector('[data-lp-rate="1"]'), JSON.stringify(kc));
   const r1 = m.el.querySelector('[data-lp-lorry="1"]'), r2 = m.el.querySelector('[data-lp-lorry="2"]');
   ok("⭐ 2.1-9 DOM: lorry 1: six trip blocks and a hatched break, its free words 'Full day'; lorry 2: one trip, '8 h 29 free · room for 5 more trips'",
      r1.querySelectorAll(".lp-blk").length === 7 && r1.querySelectorAll(".lp-blk.is-break").length === 1 && norm(r1.querySelector(".lp-free").textContent) === "Full day"
@@ -3277,28 +3282,29 @@ async function lorryPlanDom(){
   ok("⭐ 2.1-9 DOM: a trip block sits at its start time across a 06:00–19:00 track (07:00 = 7.7 %, 91 min = 11.7 % wide) and the track carries the words for a screen reader",
      Math.abs(parseFloat(blk.style.left) - 7.69) < 0.1 && Math.abs(parseFloat(blk.style.width) - 11.67) < 0.1 && /Lorry 1: 07:00 R011 → Melton Compound, 29 t/.test(r1.querySelector(".lp-track").getAttribute("aria-label")));
   ok("2.1-9 DOM: the yard's line: loads, places, booked vs chained, saved; the key names the place, the break and free",
-     norm(m.el.querySelector(".lp-sub").textContent) === "7 loads to 1 place · the lines book 2 lorries · 2 chained" && norm(m.el.querySelector("[data-lp-key]").textContent).includes("required break"));
-  act(() => { [...m.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+     // NARROWED 25 Nov 2026 (C1, card 3): "sites", "n lorries as booked"
+     norm(m.el.querySelector(".lp-sub").textContent) === "7 loads to 1 site · 2 lorries as booked · 2 chained" && norm(m.el.querySelector("[data-lp-key]").textContent).includes("required break"));
+  act(() => { [...m.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "Week compressed").click(); });
   ok("⭐ 2.1-9 DOM (Q12): Week compressed: Apply drawn for a planner on an unconfirmed week with moves, the moves fold says 1 move · 1 would raise a flag",
      sec().getAttribute("data-lp-view") === "compressed" && !!m.el.querySelector("[data-lp-apply]") && !m.el.querySelector("[data-lp-apply]").disabled
      && norm(m.el.querySelector("[data-lp-moves] button").textContent).includes("1 move this week · 1 would raise a flag"));
   act(() => { m.el.querySelector("[data-lp-moves] button").click(); });
   ok("2.1-9 DOM: the move row: the day, the line, loads and quantity from → to, the CAP flag in amber words",
      /Mon 2 ?R018 Northfield Quarry → Stockpile North ?7 → 9 loads · 200(\.0)? → 257\.1 t ?CAP: 9 loads/.test(norm(m.el.querySelector("[data-lp-move]").textContent)), norm(m.el.querySelector("[data-lp-move]").textContent));
-  act(() => { [...m.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "As booked").click(); });
+  act(() => { [...m.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "As booked").click(); });
   ok("2.1-9 DOM: As booked: no rows, no sheets, the note that it is the grid's own figure",
      !m.el.querySelector(".lp-row") && !m.el.querySelector("[data-lp-sheets]") && norm(sec().textContent).includes("Each line's own whole lorries"));
   m.done();
   const t = mount({ access: { role: "team", ipt: "IPT1" }, weekConfirmed: true });
   await settle();
-  act(() => { t.el.querySelector("[data-lp-toggle]").click(); });
-  act(() => { [...t.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
+  act(() => { [...t.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "Week compressed").click(); });
   ok("⭐ 2.1-9 DOM (Q10, Q12): a team login never sees Apply", !t.el.querySelector("[data-lp-apply]"));
   t.done();
   const c = mount({ weekConfirmed: true });
   await settle();
-  act(() => { c.el.querySelector("[data-lp-toggle]").click(); });
-  act(() => { [...c.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
+  act(() => { [...c.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "Week compressed").click(); });
   ok("⭐ 2.1-9 DOM (Q12): on a confirmed week a planner's Apply is drawn but disabled, saying to re-open the week",
      c.el.querySelector("[data-lp-apply]") && c.el.querySelector("[data-lp-apply]").disabled && /re-open/.test(c.el.querySelector("[data-lp-apply]").title));
   c.done();
@@ -3315,7 +3321,7 @@ async function lorryPlanDom(){
   };
   const d = mount({});
   await settle();
-  act(() => { d.el.querySelector("[data-lp-toggle]").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
   // 11 Nov 2026 (CLOCS card C-F6): until "Move trips" no trip can be dragged (each keeps its menu) and the drag hint is hidden
   const trips0 = [...d.el.querySelectorAll(".lp-trip")];
   ok("⭐ C-F6 DOM: before 'Move trips' no trip is draggable, each keeps its menu; the toggle reads 'Move trips', not pressed; no drag hint",
@@ -3363,7 +3369,7 @@ async function lorryPlanDom(){
   let asked = 0; const realConfirm = w.confirm; w.confirm = () => { asked++; return true; };
   const a = mount({});
   await settle();
-  act(() => { a.el.querySelector("[data-lp-toggle]").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
   ok("⭐ 2.1-9b DOM (card 9): an arranged yard carries the badge 'your arrangement' and the panel's note says it is kept until the loads change; Reset is drawn",
      !!a.el.querySelector('[data-lp-arranged="1"] .lp-badge') && norm(a.el.querySelector('[data-lp-arranged="1"] .lp-badge').textContent) === "your arrangement"
      && norm(a.el.querySelector(".ct-note").textContent).includes("kept for this week until its loads change") && !!a.el.querySelector("[data-lp-reset]"));
@@ -3376,7 +3382,7 @@ async function lorryPlanDom(){
   // a team: the plain picture, nothing to drag, no menu, no Reset
   const tm = mount({ access: { role: "team", ipt: "IPT1" } });
   await settle();
-  act(() => { tm.el.querySelector("[data-lp-toggle]").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
   ok("⭐ 2.1-9b DOM (Q10): a team sees the plan as a picture — no draggable trip, no menu, no Reset, the track role=img",
      !tm.el.querySelector(".lp-trip") && !tm.el.querySelector("[data-lp-reset]") && tm.el.querySelector(".lp-track").getAttribute("role") === "img" && tm.el.querySelectorAll('[data-lp-lorry="1"] .lp-blk').length === 7);
   tm.done();
