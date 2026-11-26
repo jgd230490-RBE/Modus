@@ -480,7 +480,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
   .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;background:none;overflow:hidden;}
   .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;padding-left:12px !important;padding-right:12px !important;}
-  .dash-cards .dash-card:first-child{padding-left:2px !important;}   /* 24 Nov 2026 (own look, B1 item 5): a strip cell keeps its own padding inside a ruled section (the third mockup: 10 px, the first 2 px) */
+  .dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}   /* 24 Nov 2026 (own look, B1 item 5): a strip cell keeps its own padding inside a ruled section (the third mockup: 10 px, the first 2 px); 26 Nov: the first cell of EVERY row, so the rows start on one edge */
+  @media (min-width:900px){.dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}
+  @media (min-width:1280px){.dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}}
   @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
   @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
   .dash-card{padding:14px 16px;}

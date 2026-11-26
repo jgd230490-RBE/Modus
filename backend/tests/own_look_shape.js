@@ -213,6 +213,12 @@ ok("5 sections: the open route's Vehicles, Gates and Temporary haul roads are ru
    && code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-gates-sec="1">')
    && code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-haul-sec="1">')
    && !code.includes('rounded-lg border border-slate-200 bg-white p-2.5'));
+// 26 Nov 2026 (the mother session's read of dashboard-light-390): every row of the figures strip starts on one edge, at 2, 3 and 6
+// columns (measured in Chrome at 390, 1000 and 1280 px)
+ok("4 strip: the first figure of every row takes the 2 px start, at every column count",
+   css.includes(".dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}")
+   && css.includes("@media (min-width:900px){.dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
+   && css.includes("@media (min-width:1280px){.dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}}"));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
