@@ -1214,7 +1214,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      tinted pill: dot = ok, diamond = warning, square = bad, ring = none; the shapes 10 px, the ring a 2 px stroke in the
      second-text grey. A CLP draft (rs-draft, on no mockup) is the ring with its word. The word keeps its tone's text colour. */
   .row-st{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;line-height:1.35;color:var(--st-none);white-space:nowrap;}
-  .row-st i{flex:none;box-sizing:border-box;width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var(--st-none);}
+  .row-st i{flex:none;display:inline-block;vertical-align:middle;box-sizing:border-box;width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var(--st-none);}
   .row-st.rs-ok{color:var(--ok-text);} .row-st.rs-ok i{background:var(--green);border:0;}
   .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate(45deg);}
   .row-st.rs-bad{color:var(--bad-text);} .row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}
@@ -1341,6 +1341,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .tab-cards>tbody>tr.clp-kid td:first-child{padding-left:0;}
     .tab-cards .row-st{white-space:normal;text-align:left;}
     .tab-cards>tbody>tr>td>span:not(.block){display:inline-block;max-width:100%;white-space:normal;}   /* a chip in a card cell wraps inside its column (Zones' "Routed through @ 12 mph" ran into From) */
+    .tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}   /* 26 Nov 2026 (own look B1): the status chip keeps its row (shape, 7 px, word) in a card cell */
     .tab-cards>tbody>tr>td>span.block{display:block;max-width:100%;white-space:normal;}   /* 12 Nov 2026 (batch 5): a second line keeps its own line in a card, as at a desk ("2 Nov 2026Approver Name" ran together under Last issue) */
     .tab-cards .tc-only{display:inline-block !important;margin-left:10px;}
   }
@@ -13832,7 +13833,8 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
         <>
           {/* 10 Sep evening: the diesel index and the two fuel settings, top of the strip */}
           <FuelWidget mode="strip" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
+          {/* 26 Nov 2026 (own look B1): the Account view's four figures are a ruled strip like the commit week's (LaKpi has no box) */}
+          <div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">
             {/* 10 Nov 2026 (16 Oct item 24, mockup card 2): the cards in words: the band as "within 2 % of plan", one verb (add) */}
             <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week, within 2 % of plan" />
             <LaKpi value={`${grp(account.actual_t)} t`} caption={`moved · ${account.reported || 0} of ${account.lines || 0} lines reported`} />

@@ -225,6 +225,18 @@ ok("4 strip: the first figure of every row takes the 2 px start, at every column
    // NARROWED 26 Nov 2026 (the Dashboard rethink batch): the strip's columns follow its OWN width (a size container), three from 560 px, six from 1,000 px
    && css.includes("@container (min-width:560px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));} .dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
    && css.includes("@container (min-width:1000px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));} .dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}"));
+// 26 Nov 2026 (an independent read of the diff): the status shape has its own display, so no cell rule can turn it into a 0 px
+// inline box again (the tablet cards made it 0 x 17 px at 900 px), and a card cell keeps the chip a flex row (the 7 px gap)
+ok("2 status: the shape is an inline block of its own; a tablet card cell keeps the chip a flex row",
+   /\n  \.row-st i\{[^}]*display:inline-block;[^}]*width:10px;height:10px;/.test(css)
+   && css.includes(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}")
+   && css.indexOf(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}") > css.indexOf(".tab-cards>tbody>tr>td>span:not(.block){display:inline-block;"));
+// 26 Nov 2026 (an independent read of the diff): LaKpi has no box of its own, so every row of them must be a ruled strip
+// (the Account view's four figures had no rule at all)
+ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account view's too",
+   (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
+     return opens.length >= 11 && opens.every(t => /className="fig-strip /.test(t)); })()
+   && code.includes('<div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
