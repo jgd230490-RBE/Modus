@@ -442,8 +442,9 @@ ok("peak is the busiest single month per working day",
   code.includes("Math.max(...monthlyT) / wd") && code.includes("Math.max(...monthlyQ) / wd"));
 ok("vehicle loads convert through the payload", code.includes("avgT / p, peakVeh = peakT / p"));
 ok("trips are stated to equal vehicle loads on one line", code.includes("avgTrips: avgVeh, peakTrips: peakVeh"));
-ok("the cards sit in the navy strip with tabular numerals, no new fonts",
-  code.includes('style={{ background: "var(--navy)" }}') && code.includes("tabular-nums")
+// REVERSED 24 Nov 2026 (own look, B1 stage 4): the figures sit in the ruled strip (2 px ink line), not a navy fill
+ok("the cards sit in the ruled strip with tabular numerals, no new fonts",
+  code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes('style={{ background: "var(--navy)" }}') && code.includes("tabular-nums")
   && !/fontFamily/.test(code.slice(code.indexOf("Avg vehicles / day") - 2000, code.indexOf("Avg vehicles / day") + 2000)));
 
 // ---- 4d. Tasks C + D — the Look-ahead page ------------------------------------
@@ -625,14 +626,15 @@ ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ah
   && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
-  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
+  // NARROWED 24 Nov 2026 (own look, B1 stage 8): + warn-line, the not-checked line carries the warning's diamond
+  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700 warn-line")}>')
   && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}')
   // 24 Nov 2026 (own look, stage 3; the independent review of the second mockup): the line's link is the sign blue, never amber
   && _laBody.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
   _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
-  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}'));   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
+  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}'));   /* NARROWED 24 Nov 2026 (own look, B1 stage 8): the chosen tab is an underline only, no tint, no outline */   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
 ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
   (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
   && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2
@@ -2075,12 +2077,19 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("the rail search filters the pages in place, Enter opens the first match, Ctrl K focuses it",
     code.includes('placeholder="Find a page…"') && code.includes("g.items.filter(navMatch)") && code.includes("if(e.key === \"Enter\" && navFirst){ setPage(navFirst.id); setNavQ(\"\"); }")
     && code.includes('(e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")'));
-  ok("PageHeader takes a monospace kicker; the four rebuilt pages pass one",
-    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })") && code.includes('{kicker && <div className="kicker">{kicker}</div>}')
-    && /\.kicker\{font:600 12px ui-monospace,/.test(html)
+  // REVERSED 24 Nov 2026 (own look, B1 stage 6; John's yes to the mockups): the place line is the mark and the place in
+  // sentence case, the text face in the caption grey: no monospace, no capitals, no letter-spacing
+  ok("PageHeader takes a place line (the mark and the place in sentence case); the four rebuilt pages pass one",
+    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })")
+    && code.includes('{kicker && <div className="kicker"><img className="kicker-mark" src="/brand/mark.svg" alt="" aria-hidden="true" />{placeWords(kicker)}</div>}')
+    && /\.kicker\{display:flex;align-items:center;gap:7px;font:400 12px\/1\.4 var\(--f-text\);color:var\(--muted\);/.test(html) && !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(html)
     && ['<PageHeader title="Dashboard" kicker=', '<PageHeader title="Forecasts" kicker="Plan"', '<PageHeader title="Configuration" kicker="Data"', '<PageHeader title="Look-ahead" kicker='].every(t => code.includes(t)));
-  ok("the Dashboard's six figures sit in one strip card, and Big screen is the orange action button",
-    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled, not boxed: a 2 px ink line on top, a hairline under
+  // NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the ink line is each CELL's top edge (2 px, or 4 px in a
+  // status's colour), so the strip itself keeps only the hairline under it; still one ruled strip, no box
+  ok("the Dashboard's six figures sit in one ruled strip, and Big screen is the orange action button",
+    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:0;border-bottom:1px solid var\(--line\);/.test(html)
+    && /\.dash-cards \.dash-card\{[^}]*box-shadow:inset 1px 0 0 var\(--line\),inset 0 2px 0 var\(--ink\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
   ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
     _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
     && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
@@ -2359,7 +2368,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     !/\b(bake|baked|server|endpoint|token|cached|geometry)\b/i.test(_cfBody.slice(_cfBody.indexOf('{tab === "mapbulletin"'), _cfBody.indexOf('{tab === "costing"'))));
   // 1. the one-screen Dashboard
   ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
-    (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
+    // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): each card is named (k=…) and the strip sits in its size container
+    (_dbWork.match(/<Card k="[a-z]+" label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">')
     // NARROWED 5 Nov 2026 (group 6, PR 2): the Concerns section's own <details> lives in ConcernsDash, so still five here
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
@@ -2367,10 +2377,13 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
   // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default) (question E): the second card is the organisation's count, deliveries under it
-  ok("...the six cards: material, lorry movements a day (deliveries × the count; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
-    _dbWork.includes("<Card label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}")
-    && _dbWork.includes("`${grp(Math.round(loadsPerDay))} deliveries, each in and out`") && !_dbWork.includes('label="Deliveries a day"') &&
-    ['label="Material in view"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
+  // REVERSED 24 Nov 2026 (the Dashboard rethink, A1; John's Q4): the sixth card is the carbon target's answer, NOT Transport
+  // carbon (its figure moves to the carbon section, task B); "deliveries in and out" as drawn
+  ok("...the six cards: material, lorry movements a day (deliveries × the count; working days from Config), vehicles needed, planned this week, delivered against plan, the carbon target",
+    _dbWork.includes('<Card k="movements" label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}')
+    && _dbWork.includes("`${grp(Math.round(loadsPerDay))} deliveries in and out`") && !_dbWork.includes('label="Deliveries a day"') &&
+    ['label="Material in view"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Carbon target"'].every(t => _dbWork.includes(t))
+    && !_dbWork.includes('label="Transport carbon"')
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
   // 13 Oct 2026 (W5): narrowed — no onToggle handler any more; a chart in a collapsed section is built when its box
   // first has a size (ChartCanvas's ResizeObserver), so it is measured right on the first open
@@ -2425,7 +2438,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const mxCt = _mxc.slice(_mxc.indexOf("{cost && cost.carbon && (() => {"), _mxc.indexOf("{ctCellsTarget(ct)}</div>}") + 26);
   const GETS = /fetch\(`\$\{API\}\/carbon\/target`\)/g;
   ok("⭐ CARBON TARGET: one block of helpers before the Dashboard — the strip, the Forecasts line and the word helpers",
-    ctSrc.length > 3000 && ctc.includes("function CarbonTargetStrip({ ct, err, onOpen, scheme })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
+    ctSrc.length > 3000 && /* NARROWED 25 Nov 2026 (the Dashboard rethink, B): + transport, the fourth figure */ ctc.includes("function CarbonTargetStrip({ ct, err, onOpen, scheme, transport })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
     && ["ctGap", "ctTargetLine", "ctProgress", "ctScopeNote", "ctSetBy", "ctCellsTarget", "ctFig"].every(f => ctc.includes(`function ${f}(`)));
   ok("🔴 ...each of the three surfaces reads it in its OWN read, a GET with no method: nothing on them writes the target",
     [_dbc, _fcc, _mxc].every(b => (b.match(GETS) || []).length === 1 && !/carbon\/target`,/.test(b))
@@ -2438,9 +2451,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("🔴 ...the Dashboard's new hooks sit before its early returns (React #310 blanked the app on 5 Oct)",
     _dbc.indexOf("const [ct, setCt]") > 0 && _dbc.indexOf("const [ct, setCt]") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("fetch(`${API}/carbon/target`)") < _dbc.indexOf("if(err) return"));
-  ok("⭐ Dashboard: a strip under the six cards, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
-    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />") && (_dbW.match(/<Card label=/g) || []).length === 6
-    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
+  ok("⭐ Dashboard: the carbon target is a section after Gate arrivals, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
+    // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the named cards and the strip's size container (task B moves the strip)
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B); John's Q8 "as recommended"): the carbon target is no longer under the six cards (11 Oct): it
+    // follows the three key charts and Gate arrivals, and comes before Cost over time and Top routes and the folds
+    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} transport={{ t: K.totCo2, intensity: K.intensity, loaded: K.totCo2L, empty: K.totCo2E }} />") && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6
+    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">')
+    && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf("<GateArrivalsPanel") && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
+    && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<div className="dash-charts2" data-dash-charts="2">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
     // 14 Oct 2026 (narrowed, D9): the Portal tells the Dashboard it is on a phone (no big screen there)
@@ -2452,8 +2470,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
     // NARROWED 5 Nov 2026 (group 6, PR 2): + canApprove
     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove })")
-    && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
+    // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): + initialLimits
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, initialLimits, onWall, onOpen, phone, canApprove })")
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B): the button is made once (`btn`) and drawn in the title row of every state
+    && ctc.includes('const btn = onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>;'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
     (_dbWl.match(/<Fig value=\{ctW\.value\} label="tCO2e target, all-in" sub=\{ctW\.sub\} info=\{\{ id: "dash\.target", value: ctW\.title \}\} \/>/g) || []).length === 1
@@ -2496,25 +2516,34 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && ctc.includes("s.invalid ? (dash ? `With the agreed decisions: —` : s.invalid)")
     && ctc.includes('${gap > 0 ? "over" : "under"} the target') && ctc.includes("pct = `${(+t.pct_below).toFixed(1)}%`"));
   ok("⭐ the same three things on the Dashboard, Forecasts, Submit forecast and the big screen: the target line and both figures, from one pair of helpers",
-    (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4 && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 4
+    (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): the Dashboard's strip shows As forecast and With the agreed decisions as two FIGURES with the
+    // server's verdicts (ctFigStatus), not as ctProgress's sentences: three users left in this block, a fourth is the top strip's "i"
+    && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 3 && ctc.includes("function ctFigStatus(on, gap){")
     && ctc.includes("return `${ctTargetLine(ct)} · ${p1} · ${p2}`;") && ctc.includes("<div className=\"ct-line\">{p1} · {p2}</div>")
     && !ctc.includes("approved plan now") && !ctc.includes("the scheme's cut") && ctc.includes("with the agreed decisions: \" + g2"));
   ok("...Submit forecast prints the server's sentence under its line when the decisions no longer apply",
     _mxc.includes("{ct && ctOk(ct) && ct.status.invalid && <div className=\"w-full ct-note\">{ct.status.invalid}</div>}"));
   ok("...the Dashboard's strip offers the Carbon planner whether a target is set or not",
-    (ctc.match(/\{onOpen && <button type="button" className="btn-sec" onClick=\{\(\) => onOpen\("carbon"\)\}>Open the Carbon planner<\/button>\}/g) || []).length === 2);
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): ONE button, in the title row the strip draws in every state (none set, not loaded, set)
+    ctc.includes('const btn = onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>;')
+    && (ctc.match(/\{btn\}/g) || []).length === 1 && (ctc.match(/\{head\(/g) || []).length === 2);
   ok("🔴 the Dashboard's subtitle names a team, never its id (it printed the raw id; on main too)",
     code.includes('(ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt))') && !code.includes('(ipt === "none" ? "no " + TEAM().toLowerCase() : ipt)'));
   ok("...all-in said once where transport-only figures sit: the strip names the Transport carbon card, the big-screen figure the group it joins",
     ctc.includes('const CT_ALLIN = "All-in: making the material, transport and waste disposal";')
     // NARROWED 11 Oct 2026 (the review: a team code read "your team's lines only" and "on the whole approved plan" about the same figures)
-    && ctc.includes("{CT_ALLIN}, on {ctTeam(ct) ? `the approved plan on ${ctYour()}` : \"the whole approved plan\"}. The Transport carbon card above counts transport only.")
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B); Q10): the all-in sentence moved into the strip's "i" (with the target line); the Transport
+    // carbon card left the top strip (A1) and is the strip's fourth figure, "Transport carbon, in view", so nothing says "card above"
+    && ctc.includes("const allIn = `${CT_ALLIN}, on ${team ? `the approved plan on ${ctYour()}` : \"the whole approved plan\"}. ${ctTargetLine(ct)}.`;")
+    && ctc.includes('<InfoTip id="dash.target" value={allIn} />') && !ctc.includes("The Transport carbon card above counts transport only.")
     && ctc.includes('CT_ALLIN + ". The other carbon figures here are transport only"') && ctc.includes("s.approved_transport_t"));
   ok("...no target says who sets it; a team code reads its own lines in the tenant's word (a cap is not compared), never a team id",
     // NARROWED 11 Oct 2026 (one "no target" sentence, CT_NONE + CT_WHO, on all four pages; a team code's figures are never compared
     // with the scheme's target in either mode, so "with the scheme's cut applied to them" is REVERSED)
     ctc.includes('const CT_NONE = "No carbon target set yet.";') && ctc.includes('const CT_WHO = "A planner sets it in the Carbon planner.";')
-    && (ctc.match(/\{CT_NONE\} \{CT_WHO\}/g) || []).length === 2 && (ctc.match(/`\$\{CT_NONE\} \$\{CT_WHO\}`/g) || []).length === 2
+    // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): the Dashboard's strip writes the sentence as a template (it picks one of three states' words)
+    && (ctc.match(/\{CT_NONE\} \{CT_WHO\}/g) || []).length === 1 && (ctc.match(/`\$\{CT_NONE\} \$\{CT_WHO\}`/g) || []).length === 3
     && !/No carbon target set yet\. A planner|No scheme carbon target|No carbon target is set yet/.test(code)
     && ctc.includes("const ctYour = () => `your ${TEAM().toLowerCase()}'s lines`;") && ctc.includes('ct.status.scope === "team"')
     // REVERSED 13 Oct 2026 (each team its share): "The target is for the whole scheme, so they are not compared with it." and
@@ -2529,7 +2558,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?)\b/i.test(ctc + mxCt)
     && !/\bAI\b/.test(ctc + mxCt) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(ctc + mxCt) && !/style=\{\{ ?color/.test(ctc + mxCt));
   ok("...its colours and sizes are tokens in <style>: 14 px lines, 13 px notes, no new Tailwind colour utility to remap for the dark look",
-    /\.ct-strip\{background:var\(--surface\);border:1px solid var\(--line\);/.test(html) && /\.ct-line\{font-size:14px;[^}]*color:var\(--ink\)/.test(html)
+    // NARROWED 24 Nov 2026 (own look, B1 stage 5): the strip is a ruled section (1 px ink line), not a box
+    /\.ct-strip\{background:none;border:0;border-top:1px solid var\(--ink\);/.test(html) && /\.ct-line\{font-size:14px;[^}]*color:var\(--ink\)/.test(html)
     && /\.ct-note\{font-size:13px;[^}]*color:var\(--muted\)/.test(html)
     && !/\b(?:bg|text|border)-(?:white|black|slate|gray|red|amber|green|emerald|blue)\b/.test(ctc + mxCt) && !/\b(?:bg|text|border)-\[/.test(ctc + mxCt));
 }
@@ -2565,13 +2595,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (_dbc.match(/fetch\(`\$\{API\}\/gates\/arrivals/g) || []).length === 1);
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
-  ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
+  ok("⭐ the panel sits under the three key charts, before the carbon target and the first collapsed section; the six cards, five sections, eight charts are untouched",
     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + the months with a queue and the sites picked
     _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")
-    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
-    && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
+    // REVERSED 25 Nov 2026 (the Dashboard rethink, B); Q8): Gate arrivals follows the three key charts and comes BEFORE the carbon target, and
+    // Cost over time (with Top routes) comes after both
+    && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
+    && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf("<ChartCanvas config={costCfg} title=")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
-    && (_dbW.match(/<Card label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5
+    && (_dbW.match(/<Card k="[a-z]+" label=/g) || []).length === 6 && (_dbW.match(/<details className="dash-more"/g) || []).length === 5   // NARROWED 24 Nov 2026 (A1): named cards
     // 13 Oct 2026 (W5): narrowed — the five sections no longer carry onToggle={onMore} (see the W5 block)
     && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);
   ok("the hooks sit before the early returns (React #310)",
@@ -2585,16 +2617,22 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && gac.includes('g.gap_minutes == null ? "No approved arrivals" : (g.gate_minutes == null ? "No check-in time typed" : "Spacing holds")')
     // 13 Oct 2026 (W6, narrowed): the cell reads "2.6 min"; the full sentence is in the details
     && gac.includes('{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}') && gac.includes('{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}')
-    && gac.includes("all {TEAMS().toLowerCase()} together") && !/every \{TEAMS\(\)/.test(code)
+    // REVERSED 24 Nov 2026 (Dashboard rethink A2, gate dials): the sentence "{ga.label}: lorries a day at each gate, all … together, …" left the screen; its sense is in the "i"
+    && !gac.includes("all {TEAMS().toLowerCase()} together") && !gac.includes("{ga.label}: lorries a day at each gate") && !/every \{TEAMS\(\)/.test(code)
+    && code.includes('text: "Each gate\'s lorries a day, every team together, spread evenly over its open hours, against what it can check in. Queue likely from 85 %; over capacity past 100 %."')
     // REVERSED 10 Nov 2026 (UI critique 17): the empty panel says "Pick another month, or approve a line." with an Open Forecasts button
     && gac.includes("Pick another month, or approve a line.") && !gac.includes("Pending lines appear as a note until they are approved")
-    && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
+    && gac.includes("a day{r.cap == null ? \"\" : ` of ${grp(r.cap)}`}") && gac.includes("The gate arrivals did not load.")   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the dial's line "164.0 a day of 150"
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
     && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
   // REVERSED 14 Oct 2026 (bundle G, W17, the user's D42 follow-up): two steps, each always with a word — red "Over gate
   // capacity" (the 11 Oct red rule, renamed) and amber "Queue likely" at 85 % (the gold token, RowStatus "warn"); no green tick
   ok("🔴 always with a word: red 'Over gate capacity' ('bad'), amber 'Queue likely' ('warn', the gold token) and grey otherwise; no tick",
-    gac.includes('<RowStatus word={gaFlagWord(g)} tone={gaTone(g)} />') && !/"ok"/.test(gac)
+    gac.includes('<RowStatus word={gaFlagWord(g)} tone={gaTone(g)} />')
+    // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): "ok" is the verdict's dot and a fine dial's arc colour (CSS); a dial's WORD is never "ok" (gaDialWord: null when fine)
+    && (gac.match(/"ok"/g) || []).length === 2 && gac.includes('const vTone = nOverG ? "bad" : nNearG ? "warn" : "ok";')
+    && gac.includes('const gaDialTone = (r) => r.cap == null ? "none" : r.over ? "bad" : r.near ? "warn" : "ok";')
+    && gac.includes(': r.over ? "Over capacity" : r.near ? "Queue likely" : null;')
     && code.includes('const gaTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";')
     && gac.includes('<RdItem t="Status" wide bad={g.flag === "red"}>{g.reason}</RdItem>') && !gac.includes("title={g.reason}")
     && code.includes('g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely"') && gac.includes('"data-ga-flag": g.flag || "none"'));
@@ -2605,7 +2643,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && !gac.includes("unbaked"));
   ok("teams reach the screen through teamText only; no id is rendered",
     gac.includes("teamText(t)") && gac.includes("teamText(t.team)") && !/g\.gate_id\}|location_id\}|scope\}|fallthrough_routes/.test(gaIdsStripped)
-    && !/IPT ?[1-6]/.test(gac) && gac.includes("{TEAMS().toLowerCase()}"));
+    && !/IPT ?[1-6]/.test(gac) && gac.includes("each {TEAM().toLowerCase()}'s lorries"));   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the TEAMS() sentence left; the fold names the tenant's team word
   ok("the month select uses the Dashboard's month words (monthLabelAbs) and defaults to today's month clamped to the horizon",
     gac.includes("monthLabelAbs(i, startYear)") && gac.includes("Math.max(1, Math.min(n,") && gac.includes('aria-label="Month"')
     && gac.includes("onChange={e => onMonth(+e.target.value)}"));
@@ -2638,7 +2676,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && src.includes("Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter; the full rule is in t1-gates
     && !src.includes("peak bands, else the shift)")
     && _tg.includes("<code>backend/gate_hours.py</code>") && _tg.includes("<strong>Queue likely</strong> (amber)")
-    && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" /></h3>') && !_dbBody.includes("every {TEAMS()"));
+    && src.includes('<h3 className="ct-h">Gate arrivals<InfoTip id="dash.gates" value={anyDefault ? `${ga.label}. Where no hours are typed, a gate is open ${ga.default_hours}.` : ga.label} /></h3>') && !_dbBody.includes("every {TEAMS()"));   // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the "i" carries the month and the default hours
   ok("the big screen is unchanged: still four sections, and the panel is not on it",
     // 14 Oct 2026 (narrowed): five sections now (More charts); the panel is still not on it
     // 17 Oct 2026 (narrowed): six sections (the Simulation); the Gate arrivals panel is still not on it
@@ -3086,9 +3124,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/useUnits\("gates"\)/.test(src));
   ok("W6: the status is a word and an icon whose shape says the tone (✓ circle, ! square, ! circle, – circle), never colour alone",
      // NARROWED 9 Nov 2026 (UI critique card 11): + draft, a hollow ring with no glyph (a CLP draft; the – circle read "blocked")
-     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
-     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--chart-none\);/.test(html)
-     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}'));
+     // REVERSED 24 Nov 2026 (own look, B1 stage 2; John's yes to the second and third mockups): no glyph; the <i> IS the shape,
+     // drawn in CSS: dot = ok, diamond = warning, square = bad, ring = none; draft the ring with its word
+     src.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !src.includes("RS_ICON")
+     && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(html) && /\.row-st\.rs-warn i\{[^}]*border-radius:0;[^}]*transform:rotate\(45deg\);/.test(html)
+     && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(html)
+     && /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true"></i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
      ["lookahead", "gates", "today", "dashboard", "forecasts"].every(n => src.includes(`data-rd-table="${n}"`))
      && (src.match(/<RowDetails key=/g) || []).length === 5);
@@ -3247,9 +3290,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // (or removed) must leave the list, and INFO_PINNED_MAX comes down with it; never raise either. A box not on the list fails
   // at 31 words. The guide link (a new or changed box links to its user-guide section) is not checked yet: FR7.
   const INFO_PINNED_30 = { "dash.carbon": 40, "dash.today_veh": 40, "fc.cost": 39, "dash.delivered": 38, "dash.sim": 38, "clp.holding_areas": 38,
-    "la.lorryplan": 37, "la.commit": 37, "dash.deliveries": 36, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
+    "la.lorryplan": 37, "la.commit": 37, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34,
     "map.commit.today": 33, "map.commit.week": 33, "dash.stock": 33, "dash.vehicles": 32, "la.cost_quote": 32, "clp.euro_class": 31, "clp.carbon_rate": 31 };
-  const INFO_PINNED_MAX = 21;
+  const INFO_PINNED_MAX = 19;   // 24 Nov 2026 (the Dashboard rethink): 21 -> 19, dash.deliveries (A1) and dash.gates (A2) each brought within 30 words and left the list
   const over30 = (dict) => Object.keys(dict).filter(k => words(dict[k].text) > 30);
   const unpinnedOver = (dict) => over30(dict).filter(k => !(k in INFO_PINNED_30));
   ok(`⭐ FR1 A2: every "i" box shows at most 30 words, but the pinned (${over30(INFOS).length} over 30 today, ${Object.keys(INFO_PINNED_30).length} pinned)`,
@@ -3297,7 +3340,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // what W3 removed from the screens (source-level, so a revert is caught)
   ok("🔴 W3 removed: no cursor:help and no hover title on a Dashboard card, figure or Today figure",
      !/cursor-help/.test(src) && !/cursor:help/.test(html)
-     && ["const Card = ({ label, value, sub, info, tone })", "const Fig = ({ value, label, sub, info, tone })", "const Big = ({ value, label, sub, info, tone })"].every(x => src.includes(x))
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the strip's Card takes a status, no tone and no title
+     && ["const Card = ({ k, label, value, info, bar, st, st2, lines, edge })", "const Fig = ({ value, label, sub, info, tone })", "const Big = ({ value, label, sub, info, tone })"].every(x => src.includes(x))
      && !/<Card [^>]*\btitle=/.test(src) && !/<Fig [^>]*\btitle=/.test(src) && !/<Big [^>]*\btitle=/.test(src));
   ok("🔴 ...the Dashboard shows the date range once (the kicker): the subtitle that repeated it and the scope is gone",
      !_dbBody.includes("Strategic planning view") && !_dbBody.includes("subtitle={`") && _dbBody.includes('<PageHeader title="Dashboard" kicker={firstRun ? undefined : `${rangeLabel} ·'));
@@ -3328,16 +3372,20 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
      // NARROWED 10 Nov 2026 (wave 3, finding 5): the buttons are drawn in the box unless the chart has its own title row (`head`)
-     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>')
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B): a fourth size, "key", for the working view's three key charts (one
+     // fixed height, never stretched by their row, so the three plots sit level); the box is the same box
+     && /\.chart-box\.is-key\{height:clamp\(200px,28vh,420px\);\}/.test(html) && /\.chart-card>\.chart-box\.is-key\{flex:none;\}/.test(html)
+     && _cc.includes('const box0 = <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : size === "key" ? " is-key" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>;')
      && _cc.includes('const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;'));   // NARROWED 2 Nov 2026: + the Copy / Download buttons, drawn after the canvas
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
   // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too
   // NARROWED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile chart is a line chart now and takes the box's own height
   // (as the Stockpiles page's does), so four row charts are left: the gate chart and the CLP section's three
   ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the gate and CLP row charts, whose height follows their rows)",
-     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 4
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the gate chart became dials (no canvas), so three row charts are left
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 3 && !src.includes('<ChartCanvas config={gaCfg}')
      && src.includes('height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />') && src.includes('height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />')
-     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes('<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate"') && !/<ChartCanvas config=\{cfg\} height=/.test(src)
+     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && !/<ChartCanvas config=\{cfg\} height=/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -3354,10 +3402,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _db.includes('const fill = wall && wallLayout !== "all";') && _db.includes('(fill ? " dash-fill" : "")')
      && /\.dash-wall\.dash-fill\{height:100%;display:flex;flex-direction:column;\}/.test(html)
      && /\.dash-wall\.dash-fill \.wall-charts\{height:100%;grid-auto-rows:minmax\(0,1fr\);\}/.test(html));
-  ok("W5: the four charts: one column, 3 + 2 from 1024 px, three columns from 1600 px (top routes down the right); More charts 1 / 2 / 4",
-     /@media \(min-width:1600px\)\{\n\s*\.dash-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-areas:"demand progress top" "cost cost top";\}/.test(html)
-     && ["c-demand", "c-top", "c-progress", "c-cost"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
-     && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="pt-3 dash-more-charts">')
+  // REVERSED 25 Nov 2026 (the Dashboard rethink, B); Q8, Q9): two rows by their OWN width: the three key charts on one line from 1,000 px (two and one
+  // from 640, one under another below), Cost and Top routes 3 : 2 from 640; More charts 1 / 2 / 3 (Vehicles needed moved up)
+  ok("W5: the charts: the three key charts on one line, Cost and Top routes a row after the carbon target, by their own width; More charts 1 / 2 / 3",
+     /\.dash-charts-box\{container-type:inline-size;\}/.test(html)
+     && /@container \(min-width:1000px\)\{\.dash-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);\}/.test(html)
+     && /\.dash-charts2\{grid-template-columns:3fr 2fr;\}/.test(html) && !/grid-template-areas:"demand progress top"/.test(html)
+     && /@media \(min-width:1280px\)\{\.dash-more-charts\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);\}\}/.test(html)
+     && ["c-demand", "c-top", "c-progress", "c-cost", "c-fleet"].every(c => _db.includes(`<div className="card p-4 chart-card ${c}">`))
+     && _db.includes('<div className="dash-charts" data-dash-charts="1">') && _db.includes('<div className="dash-charts2" data-dash-charts="2">') && _db.includes('<div className="pt-3 dash-more-charts">')
      && _db.includes('<div className="wall-charts">') && (_db.match(/className="card p-4 chart-card/g) || []).length === 16);
   // NARROWED 16 Oct 2026 (S7): two more observers, the Simulation's map (it opens folded at 0 × 0, like the Today map)
   // and its timeline (it redraws to its own width)
@@ -3451,12 +3504,18 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W16 (D39): every multi-series Dashboard chart names its series on the chart from 768 px; stacked segments have a 2 px surface gap",
      /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
      && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
-     && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): the three key charts share one line on the working view, a third too narrow for names at
+     // the right (the key under each names every series): `keyNamed` gives them the names on the big screen only; Cost keeps them
+     && (src.match(/\.\.\.named \}/g) || []).length === 1 && (src.match(/\.\.\.keyNamed, \.\.\.keyMark \}/g) || []).length === 2
+     && src.includes("const keyNamed = wall ? named : {};") && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
      // NARROWED 23 Nov 2026 (own look, stage 2): the fallback ink is #1F2024
      && /ctx\.fillStyle = tok\("--ink", "#1F2024"\);/.test(src));
-  ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
-     /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
-     && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
+  // REVERSED 24 Nov 2026 (own look, B1 stage 2): the four shapes of the one status rule (design language §2): amber a DIAMOND
+  // (was a triangle), red a SQUARE (was a diamond), green a dot; still matched on the token the shape is painted with
+  ok("W16 (D39): an amber status is a diamond and a red one a square beside its word — every .chip-st dot, by the token it is painted with",
+     /\.chip-st i\[style\*="--gold"\]\{width:9px;height:9px;border-radius:0;margin:0 1px;transform:rotate\(45deg\);\}/.test(html)
+     && /\.chip-st i\[style\*="--red"\]\{border-radius:0;\}/.test(html) && !/clip-path:polygon\(50% 0,100% 100%,0 100%\)/.test(html)
+     && /\.chip-st i\{width:10px;height:10px;border-radius:50%;/.test(html));
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
      // NARROWED 16 Oct 2026 (S7): the Simulation's lorry dots read their token --sim-lorry, with #2563EB as the fallback
@@ -3528,7 +3587,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && ["demandCfg", "progressCfg", "costCfg", "topCfg", "tripsCfg", "fleetCfg", "co2Cfg", "splitCfg"].every(k => new RegExp("<ChartHead [^\\n]*\\n\\s*<ChartCanvas config=\\{" + k + "\\}").test(_wall))
      && !_db.slice(0, _db.indexOf('<div className="wall-charts">')).includes("<ChartHead "));
   ok("DESIGN: the headlines say what the number is measured against (delivered of plan, planned vs the model, share of tonnes, per tonne)",
-     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.plannedToDate)} t planned to date`')
+     // NARROWED 25 Nov 2026 (the Dashboard rethink A1; John: "Yes, complete week"): both sides to the cut week, named
+     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualToCut)} t reported of ${bigNum(K.plannedToDate)} t planned to ${K.cutWords}`')
      && _wall.includes('"the fair-price model"') && _wall.includes("% of the tonnes in view`") && _wall.includes("kg for each tonne moved`"));
   // REVERSED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile screen opens with the first one to go over in the next 8
   // weeks (red) or run out (amber), else "None over in the next 8 weeks", and how many more; the places with no capacity by name
@@ -3551,32 +3611,36 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
 // (capacity_per_day, capacity_pct; test_gate_arrivals pins the arithmetic and that it agrees with the red flag).
 {
   const _ga = (src.match(/function GateArrivalsPanel\([\s\S]*?\n\}\n/) || [""])[0];
-  ok("GATE CHART: the panel opens with a chart, one row a gate (fullest first), above the table, which folds under 'Gate by gate'",
-     _ga.includes('<div className="ga-chart" data-ga-chart="1">') && _ga.includes('<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate"')
-     && _ga.indexOf('data-ga-chart="1"') < _ga.indexOf('data-rd-table="gates"') && _ga.includes('<details className="ga-more" data-ga-table="1"><summary>Gate by gate:')
+  // REVERSED 24 Nov 2026 (the Dashboard rethink, A2; John: "a gauge for each gate", version c): the bullet chart became a dial
+  // a gate. Each of the five checks below is the old one turned round: what it held, and what holds now.
+  ok("GATE CHART: REVERSED 24 Nov 2026 — dials, not a chart: one a gate (fullest first, the same order), above the table, which folds under 'All N gates' / 'Gate by gate'",
+     !_ga.includes('data-ga-chart="1"') && !_ga.includes("<ChartCanvas config={gaCfg}") && !src.includes("const gaCfg =")
+     && _ga.includes('<div className="ga-chart" data-ga-dials="1">') && _ga.includes("{shown.map(r => <GaDial key={r.g.gate_id} r={r} name={dialName(r)} />)}")
+     && _ga.indexOf('data-ga-dials="1"') < _ga.indexOf('data-rd-table="gates"')
+     && _ga.includes("<details className=\"ga-more\" data-ga-table=\"1\"><summary>{shown.length < gates.length ? `All ${gates.length} gates` : \"Gate by gate\"}: the gap, the check-in time, each {TEAM().toLowerCase()}'s lorries</summary>")
      && _ga.includes("((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day)"));
-  ok("GATE CHART: a bullet chart — a pale track to the gate's capacity, the planned arrivals inside it, a marker with an arrow at capacity",
-     _ga.includes('{ label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap)') && _ga.includes('{ label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day)')
-     && _ga.includes('const capMarks = { id: "gaCapMarks", afterDatasetsDraw: (chart) => {') && _ga.includes("plugins: [capMarks] };")
-     && (_ga.match(/grouped: false/g) || []).length === 2);
-  ok("GATE CHART: 🔴 the browser draws the server's capacity and flag — it divides nothing; red only where the server's flag is red",
-     // NARROWED 14 Oct 2026 (W17): + near (the server's amber flag) in gold; the 85 % tick is the server's near_per_day
+  ok("GATE CHART: REVERSED 24 Nov 2026 — a half ring to 125 % of the gate's OWN capacity, a dashed mark at GA_NEAR and a solid one at capacity; no track to a shared scale",
+     !src.includes('const capMarks = { id: "gaCapMarks"') && !src.includes('{ label: "Capacity a day"')
+     && src.includes("const GA_DIAL_TOP = 125;") && src.includes("const GA_DIALS = 6;")
+     && src.includes('{r.cap != null && <line className="ga-d-near" {...gaDialTick(GA_NEAR)} />}') && src.includes('{r.cap != null && <line className="ga-d-cap" {...gaDialTick(100)} />}')
+     && src.includes('<path className="ga-d-track" d={gaDialArc(GA_DIAL_TOP)} />') && src.includes('{r.pct != null && <path className="ga-d-arc" d={gaDialArc(r.pct)} />}'));
+  ok("GATE CHART: 🔴 the browser draws the server's share and flag — the panel divides nothing; the arc's tone is the server's flag; no gate shows past the server's own",
      _ga.includes(".map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === \"red\", near: g.flag === \"amber\" }))")
-     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60|GA_NEAR *\/|\/ *100/.test(_ga) && _ga.includes("r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)")
-     && _ga.includes("x.getPixelForValue(r.g.near_per_day)"));
-  ok("GATE CHART: every row says its figure in words (no hover on a TV or a print): 'N a day · P % of C', 'over capacity', 'no check-in time typed'",
-     // NARROWED 14 Oct 2026 (W17): + "queue likely" on an amber row, and a headline for gates near capacity
-     _ga.includes('const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");')
-     && _ga.includes('{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}'));
-  ok("GATE CHART: a key names the bar, the track, the marker, red and grey; the tooltip names the gate and how capacity is worked out",
-     // NARROWED 14 Oct 2026 (W17): capacity is the gate's open hours (the shift where none are typed), and the key names the 85 % step
-     _ga.includes('<i className="ga-key-bar"></i>planned arrivals a day') && _ga.includes("capacity: the open hours ÷ the check-in time a lorry")
-     && _ga.includes('<i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely')
-     && _ga.includes("more than it can check in") && _ga.includes("no check-in time typed</span>")
-     // REVERSED 17 Oct 2026: no gate rests on the lorry shift; the tooltip names the hours (the default said so) and the shut minutes
+     && !/gaCapacity|shift_hours \* 60|\* *60|\/ *60|GA_NEAR *\/|\/ *100/.test(_ga)
+     && src.includes('const gaDialTone = (r) => r.cap == null ? "none" : r.over ? "bad" : r.near ? "warn" : "ok";')
+     && _ga.includes("const shown = rowsC.filter((r, i) => i < GA_DIALS || r.over || r.near);"));
+  ok("GATE CHART: every dial says its figure in words (no hover on a TV or a print): the share, 'N a day of C', and a word only where a gate is not fine",
+     src.includes('{r.pct == null ? "—" : `${r.pct} %`}') && src.includes('{gaN1(r.g.arrivals_per_day)} a day{r.cap == null ? "" : ` of ${grp(r.cap)}`}')
+     && src.includes("{word && <RowStatus word={word} tone={tone} />}")
+     && _ga.includes('const verdict = nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity";')
+     && _ga.includes('<span className="ga-head-v" data-ga-verdict={vTone}><RowStatus word={verdict} tone={vTone} /></span>'));
+  ok("GATE CHART: REVERSED 24 Nov 2026 — the five-part key went; ONE key line names the two marks; how capacity is worked out stays in the \"i\" and the fold",
+     !src.includes('<i className="ga-key-bar"></i>planned arrivals a day') && !src.includes("capacity: the open hours ÷ the check-in time a lorry")
+     && !src.includes('<i className="ga-key-gold"></i>') && !src.includes("more than it can check in <i") && !/\.ga-key-(bar|track|red|gold|none)\{/.test(html)
+     && _ga.includes('<div className="ga-key"><span><i className="ga-key-near" aria-hidden="true"></i>{GA_NEAR} %: queue likely</span><span><i className="ga-key-cap" aria-hidden="true"></i>capacity</span></div>')
+     && src.includes("Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.")
      && !_ga.includes("h shift") && !_ga.includes("ga.shift_hours")
-     && _ga.includes('a day (open ${r.g.open_hours}${r.g.open_basis === "default" ? " by default" : ""}')
-     && _ga.includes('${r.g.shut_minutes ? `, less ${r.g.shut_minutes} min shut` : ""} ÷ ${+r.g.gate_minutes} min a lorry)`'));
+     && _ga.includes('<RdItem t="Open">') && _ga.includes('<RdItem t="Check-in" >'));
 }
 
 // ---- 14 Oct 2026 (bundle G, W7 + W8): CLP monitoring and the CLP data fields, source level ---------------
@@ -3735,7 +3799,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('<button type="button" className="row-x" aria-label={`Remove shut time ${i + 1}`} title="Remove"')   // NARROWED 27 Oct 2026: a named 26 px "×"
      && src.includes('<div role="group" aria-labelledby="gate-shut-h">') && src.includes('id="gate-shut-h">Shut during the day (optional)</div>'));
   ok("⭐ the review: a gate left no open time says so on the chart's tooltip and the week's card, never 'no check-in time typed'",
-     src.includes('r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null')
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the chart's tooltip went with the chart; the dial's word says it
+     src.includes('const gaDialWord = (r) => r.cap == null ? (r.g.no_open_time ? "No open time" : "No check-in time typed")')
+     && !src.includes('"No open time: the bands and shut times cover its hours"')
      && src.includes(`g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."`));
   ok("the Config hint is a sentence and says a change that strands a gate is refused, naming it",
      src.includes(_h1 + ". Take them from the noise consent or planning conditions.</div>")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the refusal names the gate on Save; the hint no longer says so
@@ -4067,32 +4133,38 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/\btext-slate-300\b/.test(code) && !html.includes(".text-slate-300{") && !html.includes(".text-emerald-600{")
      && (code.match(/<span className="text-slate-500">rate not set<\/span>/g) || []).length === 3);
   ok("decision 3: the Submit strip's peak values carry no colour of their own (the label says Peak)",
-     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums">{value}</div>') && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
+     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums text-[color:var(--navy-deep)]">{value}</div>') /* NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip's figure colour, no longer the fill's white */ && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
   ok("decision 2: the green status WORDS read --ok-text, never --green — In force, Delivered %, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, the simulation's checks; the red chip words read --bad-text; the stale chip --warn-text",
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
-     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#edeeef", "#44464B"]')   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
+     /* NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the one status chip (RowStatus: --ok-text / --bad-text
+        words through .row-st), no tint pairs left */
+     && code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />') && !code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') /* NARROWED 24 Nov 2026 (own look, B1 stage 3): a token, so the plain word reads in Dark too */   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
      && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
      && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
   // NARROWED 22 Oct 2026 (UI fix 6, card 3; finding #11): the one text-[9px] that was left, the Horizon's role word, is 12 px
   // too (text-xs), slate-600 on the commit week's shade — so no text-[9px] is left anywhere
+  // NARROWED 24 Nov 2026 (own look, B1 stage 1): every rounded-full chip is "rounded", the one 6 px corner (the Tailwind config maps it)
+  // NARROWED 24 Nov 2026 (own look, B1 stage 3): every chip carries the tag class .tg (a plain word, its tint and padding
+  // undone in CSS); the team, workstream and material tags are plain words in the second-text grey (.tg-plain), no colour
   ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; no text-[9px] is left (22 Oct: the horizon's role word is 12 px, UI fix 6)",
-     code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>')
-     && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span>')
-     && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)"')
-     && code.includes('className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route')
+     code.includes('const srcChip = (s) => s === "target" ? <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">target</span>')
+     && code.includes('<span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">quote</span>')
+     && _fw.includes('<span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)"')
+     && code.includes('className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route')
      && code.includes('<span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>')
      && code.includes('<span className="ml-1 text-xs text-amber-700" title="Spring load restrictions')
-     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"')
-     && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"\n    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>')
+     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="tg tg-plain text-xs font-semibold">{teamName(k)}</span>')
+     && _ipt.includes('<span className="tg tg-plain text-xs font-semibold">{ws}</span>')
      && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
-     && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"')
-     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     && _cat.includes('<span key={c} className="tg tg-plain text-xs whitespace-nowrap">{c}</span>')
+     // NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the status chip now (a shape and a word), its title kept
+     && code.includes('<span key={k} title={tip} className="veh-st" data-veh-tone={tone}>') && !code.includes('style={{ background: bg, color: fg }}>')
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
-     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
+     && code.includes('className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
      // RE-PINNED 29 Oct 2026 (task 3c): + the Routes row's holding-area chip, the same house chip (four)
      // RE-PINNED 5 Nov 2026 (task 0d-2): + the Routes row's "Busy hours: Alt N" chip, the same house chip (five)
@@ -4100,8 +4172,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
      // NARROWED 10 Nov 2026 (UI critique 23): the five chips moved under "From → to" (a flex row with a gap, data-route-notes), so they lose ml-1.5
      && (() => { const _rn = code.slice(code.indexOf("data-route-notes={r.id}"), code.indexOf("data-route-near-cell={r.id}"));
-        return (_rn.match(/className="text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
-     && code.includes('className={"text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
+        // NARROWED 26 Nov 2026 (own look B1): 5 -> 4, the "Diverted" chip is the one status chip (RowStatus, no tint); the
+        // holding area's "Route again" and a paused busy hours chip are too, their other states keep the house chip
+        return (_rn.match(/className="tg text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 4 && !/ml-1\.5/.test(_rn)
+          && _rn.includes('tone={used.length ? "warn" : "bad"} />') && !/rgba\(180,83,9,\.12\)/.test(_rn); })()
+     && code.includes('className={"tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
@@ -4117,15 +4192,17 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && html.includes('.sim-hold-row{flex-wrap:wrap;') && !code.includes('className="sim-lbl" data-sim-holding='));   // the CSS is in html, not in the script's code
   ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
-     && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')
-     && _fw.includes('<div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     && code.includes('<span className="tg text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>') /* NARROWED 24 Nov 2026 (own look): + the tag class */
+     // NARROWED 24 Nov 2026 (own look, B1 stage 4): the caption in sentence case (no small capitals), the words unchanged
+     && _fw.includes('<div className="text-xs text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
      && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
   ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
      !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
      && !_fw.includes("hover:bg-slate-50 disabled:opacity-40") && _fw.includes('<span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>') && _fw.includes('<span className="w-full text-xs text-slate-500">The base is locked')
-     && (code.match(/className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
+     // NARROWED 24 Nov 2026 (own look, B1 stage 4): the figure labels and group titles in sentence case (no small capitals)
+     && (code.match(/className="text-xs font-semibold text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
      && (code.match(/className="text-xs text-slate-500 fig-sub"/g) || []).length === 2 && !code.includes("text-slate-400 fig-sub")
-     && (code.match(/className="text-xs font-semibold uppercase tracking-wide(?: mb-2)? fig-group"/g) || []).length === 2 && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
+     && (code.match(/className="text-xs font-semibold(?: mb-2)? fig-group"/g) || []).length === 2 && !/uppercase tracking-wide(?: mb-2)? fig-(group|label)/.test(code) && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
      && code.includes('<div className="text-xs text-slate-500">{cw.from ? `week ') && code.includes('<div className="text-xs text-slate-500 mt-1">{bigNum(T.wkPlanT)}') && code.includes('<div className="text-xs text-slate-500 mt-1">{acct && acct.week ? `${acct.reported}')
      && !code.includes("function Kpi(") && !/\bKpi\b/.test(code));
 }
@@ -4317,12 +4394,14 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tdF.includes("const moreT = T.rows.slice(nShown).reduce((s, r) => s + (r.tonnes || 0), 0);")
      && /\n  \.today-more\{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var\(--line\);font-weight:600;color:var\(--muted\);\}\n/.test(html)
      && _tdF.indexOf("today-more") > _tdF.indexOf("</table>)}"));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 1): the bars take the small 3 px corner (rounded-sm), not rounded-full
   ok("⭐ UI FIX 6 card 5 (the user: keep the progress bars): the four figures and BOTH bars, 'This week to date' and 'Last week', are where they were and as they were",
-     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />')
+     // NARROWED 24 Nov 2026 (own look, B1 stage 7): both bars kept, now ink (a small bar beside a status), no tone
+     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} />')
      && _tdF.includes('<span className="font-semibold text-slate-700">This week to date<InfoTip id="dash.week_to_date"')
      && _tdF.includes('<span className="font-semibold text-slate-700">Last week{acct && acct.week ?')
      && (_tdF.match(/<Big value=/g) || []).length === 4 && _tdF.indexOf("This week to date") < _tdF.indexOf("today-lines")
-     && _tdF.includes('<div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
+     && _tdF.includes('<div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: "var(--ink)" }} /></div>'));
   // REVERSED 22 Oct 2026 (card 4, the user: "yes, build card 4 ... keeping the progress bars"): All sections now fits whole rows
   // like the filled layouts; the working Dashboard is still unchanged (wall false). The fill switch stays the Dashboard's.
   ok("UI FIX 6 card 4: 'All sections' fits whole rows too (tvList = wall, not fill); the working Dashboard keeps its scrolling list; the fill switch is the Dashboard's",
@@ -4345,8 +4424,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && html.includes('html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}')
      && !html.includes("(finding 7, open)"));
   ok("⭐ UI FIX 6 card 6 (the user's extra): the 'Avoided' chip is #B91C1C on its pink #FDE8EE (5.53:1, was #DC2626 at 4.13:1) — a fixed pair, not var(--bad-text) (#F87171 in the dark look would fail on the pink)",
-     code.includes('<span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>')
-     && !code.includes('color: ZONE_ROUTING }}>Avoided') && !/var\(--bad-text\)[^\n]{0,40}Avoided/.test(code));
+     // REVERSED 24 Nov 2026 (own look, B1 stage 3): no pink tint, so no fixed pair: the plain word in --bad-text, which reads on the
+     // surface in every look (light #B91C1C on white 6.47, Dark #F87171 on #1F2024 5.88); .tg-ns: no status shape, "Avoided" is a kind, not a fault
+     code.includes('<span className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided</span>') && !code.includes("#FDE8EE")
+     && !code.includes('color: ZONE_ROUTING }}>Avoided'));
 }
 
 // ---- 22 Oct 2026 (UI fix 7, claude/ui-fix-type): the 13 px floor file-wide (decision 4, finding #21) and fewer words ----
@@ -4359,8 +4440,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _css = [...html.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].filter(m => +m[1] < 12).map(m => html.slice(Math.max(0, html.lastIndexOf("\n", m.index)), m.index + 20).trim());
   const _font = [...html.matchAll(/font:\s*(?:\d{3}\s+)?(\d+(?:\.\d+)?)px/g)].filter(m => +m[1] < 12).map(m => html.slice(Math.max(0, html.lastIndexOf("\n", m.index)), m.index + 12).trim());
   const _jsx = [...src.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)\b/g)].filter(m => +m[1] < 12).map(m => src.slice(m.index, m.index + 24));
-  ok("⭐ UI FIX 7: under 12 px only the three glyphs: the status dot's mark (.row-st i), the info button's 'i' (.ibtn) and the Routes chevron (▶)",
-     _css.length === 1 && _css[0].startsWith(".row-st i{") && _font.length === 1 && _font[0].startsWith(".ibtn{")
+  // NARROWED 24 Nov 2026 (own look, B1 stage 2): the status shape carries no glyph now, so the stylesheet has no small text left
+  ok("⭐ UI FIX 7: under 12 px only the two glyphs: the info button's 'i' (.ibtn) and the Routes chevron (▶) (the status shape has no mark)",
+     _css.length === 0 && _font.length === 1 && _font[0].startsWith(".ibtn{")
      && _jsx.length === 1 && _jsx[0].startsWith("fontSize: 10 }}>▶"), JSON.stringify([_css, _font, _jsx]));
   ok("UI FIX 7: the stylesheet's small words lifted to 12 px — the Appearance menu headings, the big screen bar's labels and code tag, the rail's 'Ctrl K' (on one line) and, the user's choice (card 9), the rail's group names and count",
      html.includes(".appearance-menu h6{margin:0;font-size:12px;") && html.includes(".dash-wallbar-lbl{font-size:12px;")
@@ -4791,7 +4873,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // the link is named by its visible words: an aria-label that said something else failed axe (label-content-name-mismatch)
      && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
-     src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
+     // NARROWED 26 Nov 2026 (own look B1): the chip is the one status chip (amber Diverted, red Not diverted), the same words
+     src.includes("data-route-diverted={r.id}") && src.includes('<RowStatus word={`${used.length ? "Diverted" : "Not diverted"} ${divMonths(p.starts_on, p.ends_on)}${more > 0 ? ` +${more}` : ""}`} tone={used.length ? "warn" : "bad"} />'));
   // NARROWED 17 Nov 2026 (routes-card-room, Option B): the open route is a panel under the list, not rows of its table;
   // its Diversions are one block (routeDiversions) handed to RouteAnalysis, on the page and in full screen
   ok("0c: the opened route lists its Diversions (DivRows)", src.includes("<div data-route-diversions={id} className=\"mt-3\">")
@@ -5240,11 +5323,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && dash.includes("<GateArrivalsPanel ga={gaShown}") && dash.includes("<SimDashLine ga={gaShown}") && (dash.match(/<DashboardToday meta=\{meta\} week=\{weekShown\}/g) || []).length === 2
      && dash.includes("const wkTot = (weekShown && weekShown.commit") && dash.includes('<AbnormalStrip onOpen={onOpen} sites={sites} />')
      && code.includes('const siteQ = (sites && sites.length) ? "?sites=" + sites.map(encodeURIComponent).join(",") : "";')
-     && code.includes('Carbon target{scheme ? " · scheme-wide" : ""}') && !/<BulletinMenu[^>]*sites/.test(dash)
+     && code.includes('Carbon target · all-in{scheme ? " · scheme-wide" : ""}')   // NARROWED 25 Nov 2026 (the Dashboard rethink, B)): "· all-in" (the drawing) && !/<BulletinMenu[^>]*sites/.test(dash)
      && dash.includes("{sites.length ? ` · ${sitesWords(sites, locList)}` : \"\"}"));
   ok("CHART BUTTONS: ONE component (ChartTools) drawn by ChartCanvas; Copy writes a PNG to the clipboard and falls back to a download that says 'Saved instead'; Download saves the same PNG",
      code.includes("function ChartTools({ title, scope, getPlot, inline }){") && code.includes('new ClipboardItem({ "image/png": make() })') && code.includes('await download("Saved instead")')
-     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 3 /* NARROWED 17 Nov 2026 (best option step 3): + the Route choices record, in its own head */
+     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 4 /* NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): + the gate dials' own, in their title row */ /* NARROWED 17 Nov 2026 (best option step 3): + the Route choices record, in its own head */
      // NARROWED 10 Nov 2026 (wave 3, finding 5): drawn once as `tools`, in the box or in the chart's own title row (`head`)
      && code.includes("const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;"));
   ok("CHART BUTTONS: the picture is drawn at 2x on WHITE, redrawn light off screen, the title above and ONE scope line below (scheme, the page's parts, 'Wayscope, <date>', the demo notice)",
@@ -5257,7 +5340,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes('aria-label={`Copy chart: ${t}`}') && src.includes('aria-label={`Download chart: ${t}`}'));
   ok("CHART BUTTONS: the Dashboard's eight working charts, Gate arrivals, the stockpile charts, the CLP carbon pair and the Simulation's timeline each carry a title; the page's own scope rides on the Dashboard's",
      (dash.match(/<ChartCanvas config=\{\w+\}[^\n]*title=\{[^\n]*scope=\{dashScope\} \/>/g) || []).length === 8
-     && code.includes('title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]}') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the dials carry their own ChartTools with the same scope
+     && code.includes('<ChartTools inline title={picTitle} scope={[ga.label, sited || null]} getPlot={async () => gaDialsPicture(shown, dialName)} />')
+     && code.includes('const picTitle = "Gate arrivals: each gate against its capacity";') && !code.includes('title="Gate arrivals: lorries a day at each gate"') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
      && code.includes("const dashScope = [rangeLabel,"));
   // 5 Nov 2026 (task 0d-2, the user: "Yes, as recommended" to notes\busy-hours-apply-mockup-1105 Q1-Q20)
   // REVERSED 17 Nov 2026 (ui-best-option-1117, Q6; the user: "Yes, as recommended"; it bends the 5 Nov line): the offer no
@@ -5283,7 +5368,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("{sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan"));
   ok("BUSY HOURS: the Routes row's chip 'Busy hours: Alt N' (hover: the hours; amber while paused) from the diversions read; the Look-ahead's chip from the line context",
      code.includes("setBusyUses(dv.busy || [])") && code.includes('data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}')
-     && code.includes("Busy hours: Alt {u.alt}</span>))}") && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
+     // NARROWED 26 Nov 2026 (own look B1): paused is the one status chip (amber, a shape and the same words), in use the house chip
+     && code.includes("Busy hours: Alt {u.alt}</span>") && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" /></span>))}') && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
   ok("BUSY HOURS: the Carbon planner's 'Route choices' block reads /api/busy-hours, shows nothing with no use, sums them, and says it is already in the total (Q17)",
      code.includes("function CarbonRouteChoices(){") && code.includes("fetch(`${API}/busy-hours`)") && code.includes("if(!uses.length) return null;")
      && code.includes("All route choices") && code.includes("Planned, to the end of the approved plan. Already inside the carbon total and the target.")
@@ -5316,7 +5402,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      code.includes("{canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
      && code.includes('<Dashboard meta={meta} phone={narrow} canApprove={canApprove}')
      // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue (the render harness's months with a queue)
-     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){"));
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): + initialLimits (the traffic limits read once at load)
+     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, initialLimits, onWall, onOpen, phone, canApprove }){"));
   ok("CONCERNS DASH: the five figures, the monthly chart with a title and scope (Copy / Download), by kind, busiest routes",
      ['label="received"', 'label="open now"', 'label="working days to first reply (median)"', 'label="working days to close (median)"',
       "replied within ${data.reply_days} working days"].every(w => cd.includes(w))
@@ -5628,9 +5715,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && (code.match(/loadLimitUse\(\)/g) || []).length >= 2);
   const td = code.slice(code.indexOf("function TrafficDash("), code.indexOf("function DashboardStockChart("));
   ok("TRAFFIC DASH: a fold for planners and admins under Gate arrivals, read on first open, following the months and Sites",
-     td.includes("<summary>Traffic limits</summary>") && td.includes("if(!open) return;")
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the Dashboard reads the limits ONCE at load (its Lorry movements
+     // figure's status) and hands the read to the fold (`shared`); the fold's own read on first open stays for a caller with none
+     td.includes("<summary>Traffic limits</summary>") && td.includes("if(!open || shared) return;")
      && td.includes("fetch(`${API}/traffic-limits?${q}`)") && td.includes('"&sites=" + sites.map(encodeURIComponent).join(",")')
      && code.includes("{canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
+     && code.includes("shared={{ data: tl, err: tlErr }} />")
      && code.indexOf("<TrafficDash ") > code.indexOf("<GateArrivalsPanel ") && code.indexOf("<TrafficDash ") < code.indexOf("<ConcernsDash "));
   ok("TRAFFIC DASH: a table (road, this month, limit, months over) and a chart a limit with Copy / Download (title and scope)",
      td.includes('data-traffic-table="1"') && td.includes(">Months over</th>") && td.includes("data-traffic-chart={L.id}")
