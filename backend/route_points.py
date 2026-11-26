@@ -343,8 +343,10 @@ def _limit_item(h, line, see_map, unit=None):
     except (TypeError, ValueError):
         val = str(h.get("limit") or "")
     if kind in ("height", "width") and h.get("limit") is not None:
+        # 26 Nov 2026 (John: "Keep, fix the words"): the metric figure first, then the sign's feet in brackets, as
+        # limits.headline words it ("Height limit 4.0 m (13'0")"); the stored sign text where there is one
         try:
-            lab += f" ({h.get('signed') or limits.imperial_text(float(h['limit']))})"
+            lab += f" {val} ({h.get('signed') or limits.imperial_text(float(h['limit']))})"
         except (TypeError, ValueError):
             pass
     where = ", ".join(x for x in (h.get("name"), h.get("ref")) if x)
@@ -367,11 +369,9 @@ def _limit_item(h, line, see_map, unit=None):
 
 def _sentences(items, vehicle_values):
     """The sentence over the limits, one a kind (Q13): any limit this lorry is over -> OVER once; a kind where every
-    hit is at the limit -> 'This lorry is 13'1" (4.0 m) high: at the limit at every height limit below. Check its real
-    height before you set off.' 26 Nov 2026 (the mother session, on C1's picture): a height or width carries the lorry's
-    figure in feet and inches too, converted as a sign's headline is (limits.imperial_text), so the sentence reads in the
-    units of the signs under it."""
-    import limits
+    hit is at the limit -> 'This lorry is 4.0 m high: at the limit at every height limit below. Check its real
+    height before you set off.' 26 Nov 2026 (John: "Keep, fix the words"): METRES ONLY, no feet: a lorry's 13'1" beside
+    a dual sign's 13'0" read as over where the sign (4.0 m and 13'0") says level; the rows carry the sign's feet."""
     out = []
     lims = [i for i in items if i["kind"] == "limit"]
     if any(i["state"] == "over" for i in lims):
@@ -390,7 +390,7 @@ def _sentences(items, vehicle_values):
             v = vals[0]
             # a lorry's own figure is never rounded DOWN to a tenth (2.55 m wide stays 2.55 m; 4.0 m stays 4.0 m)
             met = f"{v:.1f}" if abs(v * 10 - round(v * 10)) < 1e-6 else f"{v:.2f}"
-            fig = (f"{limits.imperial_text(float(v))} ({met} m) {adj}" if k in ("height", "width") else f"{v:g} t")
+            fig = (f"{met} m {adj}" if k in ("height", "width") else f"{v:g} t")
             out.append(f"This lorry is {fig}: at the limit at every {noun} limit below. "
                        f"Check its real {noun} before you set off.")
         else:

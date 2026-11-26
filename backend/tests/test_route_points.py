@@ -292,28 +292,39 @@ ok("2: the block: its heading and foot, both ways, routed, limits checked on the
 ok("2: the legs' headings: 'Going loaded' and 'Coming back', the length in miles",
    (LO["title"], RE["title"], LO["length"], RE["length"]) == ("Going loaded", "Coming back", "21 miles", "21 miles"),
    str((LO["length"], RE["length"])))
+# 26 Nov 2026 (John: "Keep, fix the words"): REVERSED from "Height limit (13'0")": the row carries the metric first and the
+# sign's feet in brackets, as limits.headline does
 ok("2: limits: the at-limit height out only; never 'allowed', 'within', 'unknown' or another lorry's hit",
-   [i["text"] for i in LO["limits"]] == ["Height limit (13'0\") · Melton Road, B6047 · 3 mi"], str([i["text"] for i in LO["limits"]]))
+   [i["text"] for i in LO["limits"]] == ["Height limit 4.0 m (13'0\") · Melton Road, B6047 · 3 mi"], str([i["text"] for i in LO["limits"]]))
 ok("2: ...a limit's value is its own column", LO["limits"][0]["w"] == "4.0 m" and LO["limits"][0]["state"] == "at")
 ok("2: back: Kettering Road with its mile mark; the point limit 40 m off the line: no road name stored, NO mile mark; "
    "the diversion's limit (alt 1) not on today's line",
-   [i["text"] for i in RE["limits"]] == ["Height limit (13'1\") · Kettering Road · 2 mi",
-                                         "Height limit (13'1\") · no road name stored: see the map on the route sheet"],
+   [i["text"] for i in RE["limits"]] == ["Height limit 4.0 m (13'1\") · Kettering Road · 2 mi",
+                                         "Height limit 4.0 m (13'1\") · no road name stored: see the map on the route sheet"],
    str([i["text"] for i in RE["limits"]]))
 ok("2: the sentence over the limits, one a kind: the height",
-   A["sentences"] == ["This lorry is 13'1\" (4.0 m) high: at the limit at every height limit below. Check its real height before you set off."],
+   A["sentences"] == ["This lorry is 4.0 m high: at the limit at every height limit below. Check its real height before you set off."],
    str(A["sentences"]))
 # 26 Nov 2026 (the mother session, on C1's picture of R012): the lorry's figure in the signs' own units, converted as a
 # sign's headline is; and the verdict is the METRIC figure's (the stored limit 4.0 m against the lorry's 4.0 m), even where
 # the sign's own feet-and-inches text reads 13'0" (3.96 m): read on live's copy, Melton Road B6047 is stored
 # limit 4.0, signed 13'0"; Kettering Road limit 4.0, no signed text (13'1" is limits.imperial_text(4.0))
 import limits as _lim  # noqa: E402
-ok("2 (26 Nov): the height sentence carries the lorry's feet and inches, converted as the headline's 13'1\" is",
-   _lim.imperial_text(4.0) == "13'1\"" and A["sentences"][0].startswith(f"This lorry is {_lim.imperial_text(4.0)} (4.0 m) high"),
-   A["sentences"][0])
-ok("2 (26 Nov): ...a width the same way, its own figure never rounded down (2.55 m); a weight stays in tonnes",
+# 26 Nov 2026, later (John: "Keep, fix the words"): REVERSED. The sentence is metres only (a lorry's 13'1" beside a dual
+# sign's 13'0" read as over); the rows carry the metric AND the sign's own feet, as limits.headline does
+ok("2 (26 Nov, John): the height sentence carries NO feet: 'This lorry is 4.0 m high'",
+   A["sentences"][0].startswith("This lorry is 4.0 m high: ") and "'" not in A["sentences"][0].split(":")[0]
+   and _lim.imperial_text(4.0) not in A["sentences"][0], A["sentences"][0])
+ok("2 (26 Nov, John): every height row carries the metric and the sign's feet, worded as limits.headline is "
+   "(the stored sign text where there is one, imperial_text where not)",
+   all(re.match(r"Height limit \d+\.\d m \(\d+'\d+\"\) · ", i["text"]) for L in A["legs"] for i in L["limits"])
+   and LO["limits"][0]["text"].startswith(_lim.headline({"kind": "height", "value": 4.0, "signed": "13'0\"", "name": None}))
+   and RE["limits"][0]["text"].startswith(_lim.headline({"kind": "height", "value": 4.0, "name": None})),
+   str([i["text"] for L in A["legs"] for i in L["limits"]]))
+# 26 Nov 2026, later (John): NARROWED to metres only; the lorry's own figure is still never rounded down
+ok("2 (26 Nov): ...a width the same way (metres only), its own figure never rounded down (2.55 m); a weight stays in tonnes",
    rp._sentences([{"kind": "limit", "state": "at", "limit_kind": "width"}], {"width": {2.55}})
-   == [f"This lorry is {_lim.imperial_text(2.55)} (2.55 m) wide: at the limit at every width limit below. Check its real width before you set off."]
+   == ["This lorry is 2.55 m wide: at the limit at every width limit below. Check its real width before you set off."]
    and rp._sentences([{"kind": "limit", "state": "at", "limit_kind": "weight"}], {"weight": {44.0}})[0].startswith("This lorry is 44 t: "),
    str(rp._sentences([{"kind": "limit", "state": "at", "limit_kind": "width"}], {"width": {2.55}})))
 _flat = next(iter(rp.points("R012", FLAT, DAY, ctx=CTX)["vehicle_values"].get("height", [])), None)
@@ -321,7 +332,7 @@ ok("2 (26 Nov): the verdict compares METRES: a stored 4.0 m limit signed 13'0\" 
    "(13'0\" alone would be 3.96 m, under it); the rule in limits.assess is unchanged",
    _flat == 4.0 and _lim.assess({"kind": "height", "value": 4.0}, FLAT)["verdict"] == "at_limit"
    and _lim.assess({"kind": "height", "value": 3.96}, FLAT)["verdict"] == "exceeds"
-   and LO["limits"][0]["text"].startswith("Height limit (13'0\")") and LO["limits"][0]["state"] == "at",
+   and LO["limits"][0]["text"].startswith("Height limit 4.0 m (13'0\")") and LO["limits"][0]["state"] == "at",
    str((_flat, LO["limits"][0])))
 pl = [(i["w"], i["text"]) for i in LO["places"]]
 ok("2: places out: four schools in the first quarter mile as one line; the hospital by its name; an unnamed school; "
