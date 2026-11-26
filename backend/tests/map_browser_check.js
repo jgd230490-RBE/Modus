@@ -368,7 +368,7 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
     iLoc >= 0 && over.length === 0, "above locations: " + JSON.stringify(over));
   // the specific layers that DID cover them, named, so a future reorder says which
   ok("⭐ ...in particular the three forecast layers are all below them",
-    ["forecast-casing", "forecast-layer", "forecast-flow"].every(id => {
+    ["forecast-casing", "forecast-layer", "forecast-flow-light"].every(id => {   // NARROWED 24 Nov 2026 (card 3): the dots, the lanes' layer is gone
       const i = stack.indexOf(id); return i >= 0 && i < iLoc; }),
     JSON.stringify(stack));
   ok("⭐ ...and so is the whole rail-alignment stack",

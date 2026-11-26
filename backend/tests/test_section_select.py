@@ -210,13 +210,15 @@ def rows(ans):
 #  1. A road under a click                                                     #
 # =========================================================================== #
 a = SS.road_at(-0.95, LAT, M)
-ok("⭐ 1. a click on MAIN: R1 (loaded in, back another way) and R2 (both ways), In / Out / A day a day",
-   rows(a) == {"R1": (11.5, 0.0, 11.5), "R2": (5.0, 5.0, 10.0)}, str(rows(a)))
-ok("1. the totals: In 16.5, Out 5, A day 21.5 (movements: In + Out)",
-   (a["in"], a["out"], a["a_day"]) == (16.5, 5.0, 21.5), str((a["in"], a["out"], a["a_day"])))
+# REVERSED 24 Nov 2026 (public map lines rethink, card 7, John's Q11 = (a)): the answer is in WHOLE numbers that add up
+# (was the true figures 11.5 / 16.5 / 21.5 here, then tenths from 10 Nov); the true figure is still through()'s
+ok("⭐ 1. a click on MAIN: R1 (loaded in, back another way) and R2 (both ways), In / Out / A day a day (11.5 reads 12)",
+   rows(a) == {"R1": (12, 0, 12), "R2": (5, 5, 10)}, str(rows(a)))
+ok("1. the totals: In 17, Out 5, A day 22 (movements: In + Out; 16.5 + 5 = 21.5 reads 22)",
+   (a["in"], a["out"], a["a_day"]) == (17, 5, 22), str((a["in"], a["out"], a["a_day"])))
 ok("1. busiest first", [r["route_id"] for r in a["routes"]] == ["R1", "R2"])
-ok("⭐ 1. the same figure 2.1-1's through() gives for that piece of road (one count)",
-   TL.through({"type": "LineString", "coordinates": a["piece"]}, M, ctx=SS._ctx())["movements_per_day"] == a["a_day"])
+ok("⭐ 1. the same figure 2.1-1's through() gives for that piece of road, read whole (one count: 21.5 reads 22)",
+   SS._whole(TL.through({"type": "LineString", "coordinates": a["piece"]}, M, ctx=SS._ctx())["movements_per_day"]) == a["a_day"] == 22)
 ok("1. the piece asked about is ~150 m of the clicked road", 145 <= plen(a["piece"]) <= 155, str(plen(a["piece"])))
 ok("1. ...and lies on it", all(abs(p[1] - LAT) < 1e-6 for p in a["piece"]), str(a["piece"][:3]))
 ok("1. the answer says its kind, month and the count's words", a["kind"] == "road" and a["month"] == M
@@ -228,11 +230,11 @@ ok("🔴 1. a click 200 m from any road: no piece, no routes", far["piece"] is N
 ok("1. the reach is clamped (a 1 km reach still asks within 120 m)",
    SS.road_at(-0.95, LAT + 200 / 110540.0, M, r_m=1000)["piece"] is None)
 north = SS.road_at(-0.95, LAT + 0.01, M)
-ok("⭐ 1. Q2: the northern road carries only R1's way back: In 0, Out 11.5",
-   rows(north) == {"R1": (0.0, 11.5, 11.5)}, str(rows(north)))
+ok("⭐ 1. Q2: the northern road carries only R1's way back: In 0, Out 12 (11.5 read whole)",
+   rows(north) == {"R1": (0, 12, 12)}, str(rows(north)))
 spur = SS.road_at(-0.95, LAT - 0.015, M)
 ok("⭐ 1. Q1: a road ONE route uses answers too (no shared section needed)",
-   rows(spur) == {"R3": (2.0, 2.0, 4.0)}, str(rows(spur)))
+   rows(spur) == {"R3": (2, 2, 4)}, str(rows(spur)))
 end = SS.road_at(-0.9999, LAT, M)
 ok("1. a click near a leg's end still asks about ~150 m (lengthened the other way)",
    145 <= plen(end["piece"]) <= 155, str(plen(end["piece"])))
@@ -243,8 +245,8 @@ _pv = counting.per_visit
 counting.per_visit = lambda *x, **k: 1
 v1 = SS.road_at(-0.95, LAT, M)
 counting.per_visit = _pv
-ok("1. an organisation that counts visits: A day = each route's lorries once (R2 5, not 10)",
-   rows(v1) == {"R1": (11.5, 0.0, 11.5), "R2": (5.0, 5.0, 5.0)} and v1["a_day"] == 16.5
+ok("1. an organisation that counts visits: A day = each route's lorries once (R2 5, not 10; 16.5 reads 17)",
+   rows(v1) == {"R1": (12, 0, 12), "R2": (5, 5, 5)} and v1["a_day"] == 17
    and v1["counting"]["unit"] == "visits", str((rows(v1), v1["a_day"])))
 # where two roads meet under a click, the clicked route's road is the one asked about
 JUNC = (-1.0, LAT + 0.0002)        # 22 m from MAIN's west end and from the northern road's first stretch alike
@@ -262,12 +264,12 @@ ok("1. a month with nothing approved: the road answers with no routes",
 #  2. A box                                                                    #
 # =========================================================================== #
 b = SS.in_box(-0.96, LAT - 0.002, -0.94, LAT + 0.002, M)
-ok("⭐ 2. a box on MAIN: R1 in only (its way back is north), R2 both",
-   rows(b) == {"R1": (11.5, 0.0, 11.5), "R2": (5.0, 5.0, 10.0)}, str(rows(b)))
+ok("⭐ 2. a box on MAIN: R1 in only (its way back is north), R2 both (whole numbers, 24 Nov 2026)",
+   rows(b) == {"R1": (12, 0, 12), "R2": (5, 5, 10)}, str(rows(b)))
 ok("2. the answer carries its box", b["kind"] == "area" and b["box"] == [-0.96, LAT - 0.002, -0.94, LAT + 0.002])
 big = SS.in_box(-1.01, LAT - 0.03, -0.89, LAT + 0.02, M)
-ok("⭐ 2. Q5: a box over both roads counts R1 ONCE, In and Out (not once per road)",
-   rows(big) == {"R1": (11.5, 11.5, 23.0), "R2": (5.0, 5.0, 10.0), "R3": (2.0, 2.0, 4.0)} and big["a_day"] == 37.0,
+ok("⭐ 2. Q5: a box over both roads counts R1 ONCE, In and Out (not once per road); 11.5 each way reads 12 in, 11 out, 23",
+   rows(big) == {"R1": (12, 11, 23), "R2": (5, 5, 10), "R3": (2, 2, 4)} and big["a_day"] == 37,
    str((rows(big), big["a_day"])))
 corner = [-0.95, LAT - 0.002, -0.95 + 30 / DEG_M, LAT + 0.002]
 cb = SS.in_box(*corner, M)
@@ -336,24 +338,32 @@ ok("3. one count: section_select calls traffic_limits.through, and counts nothin
 LIVE = [(59.56, 59.56), (9.82, 9.82), (4.08, 4.08), (3.64, 3.64), (2.98, 2.98), (2.04, 2.04), (1.45, 1.45),
         (0.81, 0.81), (0.32, 0.32), (0.32, 0.32), (0.32, 0.32), (0.49, 0.0), (0.16, 0.16), (0.32, 0.0)]
 cells = [v for pair in LIVE for v in pair]
-t = SS.share_tenths(cells, 171.83)
-ok("⭐ 4. live's fourteen routes as tenths: they add to 171.8, which reads 172 — the limit's and the bar's figure",
-   sum(t) == 1718 and SS._whole(sum(t) / 10.0) == SS._whole(171.83) == 172, str(sum(t)))
-ok("⭐ 4. a route that is the same each way reads the same each way (59.6 and 59.6, never 60 and 59)",
-   t[0] == t[1] == 596 and all(t[2 * i] == t[2 * i + 1] for i, (a_, b_) in enumerate(LIVE) if a_ == b_), str(t))
-ok("4. no figure is more than a tenth from its value", all(abs(x / 10.0 - v) <= 0.1 + 1e-9 for x, v in zip(t, cells)))
-ok("4. In 86.3 and Out 85.5 (live's 86.32 and 85.51)", sum(t[0::2]) == 863 and sum(t[1::2]) == 855,
+# REVERSED 24 Nov 2026 (public map lines rethink, card 7, John's Q11 = (a), "Yes, as recommended"): whole numbers that add
+# up (share_whole) replace 10 Nov's tenths (share_tenths, Q1 = A); the card is back under the 12 Oct whole-movements rule
+ok("🔴 4. share_tenths is gone: the card's rule is share_whole", not hasattr(SS, "share_tenths") and "def share_whole(" in read("backend/section_select.py"))
+t = SS.share_whole(cells, 171.83)
+ok("⭐ 4. live's fourteen routes as whole numbers: they add to 172 — the limit's and the bar's figure (was 171.8 in tenths)",
+   sum(t) == 172 == SS._whole(171.83) and all(isinstance(x, int) for x in t), str(sum(t)))
+ok("⭐ 4. a route that is 59.56 each way reads 60 in, 59 out, 119 a day alone: In keeps the unit, never '60 · 60 · 119' (was 59.6 and 59.6)",
+   SS.share_whole([59.56, 59.56], 119.12) == [60, 59], str(SS.share_whole([59.56, 59.56], 119.12)))
+ok("4. ...and among live's fourteen it keeps 60 and 60 (its row 120): the unit the total needs is taken from rows rounded further",
+   t[0] == t[1] == 60 and t[0] + t[1] == 120, str(t))
+ok("4. no figure is a whole one or more from its value", all(abs(x - v) < 1 for x, v in zip(t, cells)))
+ok("4. In 87 and Out 85 (live's 86.32 and 85.51; was 86.3 and 85.5)", sum(t[0::2]) == 87 and sum(t[1::2]) == 85,
    str((sum(t[0::2]), sum(t[1::2]))))
 ok("🔴 4. the rule that was rejected: whole numbers rounded apart add to 170, not the limit's 172",
    sum(SS._whole(v) for v in cells) == 170)
 # rounding apart would put the sum on the other side of a half: the cells give way, the headline does not
-edge = SS.share_tenths([85.73, 85.73], 171.46)
-ok("⭐ 4. 85.73 + 85.73 = 171.46 reads 171: the cells add to 171.4, never 171.5 under a headline of 171",
-   sum(edge) == 1714 and SS._whole(sum(edge) / 10.0) == SS._whole(171.46) == 171 and max(edge) - min(edge) <= 1, str(edge))
-up = SS.share_tenths([0.24, 0.24, 0.04], 0.52)
-ok("4. ...and the other way: 0.24 + 0.24 + 0.04 = 0.52 reads 1, so the cells add to at least 0.5",
-   SS._whole(sum(up) / 10.0) == 1 and all(abs(x / 10.0 - v) <= 0.1 + 1e-9 for x, v in zip(up, [0.24, 0.24, 0.04])), str(up))
-ok("4. nothing in, nothing out", SS.share_tenths([], 0.0) == [] and SS.share_tenths([0.0, 0.0], 0.0) == [0, 0])
+edge = SS.share_whole([85.73, 85.73], 171.46)
+ok("⭐ 4. 85.73 + 85.73 = 171.46 reads 171: the cells add to 171 (86 in, 85 out), never 172 under a headline of 171",
+   sum(edge) == 171 == SS._whole(171.46) and edge == [86, 85], str(edge))
+up = SS.share_whole([0.24, 0.24, 0.04], 0.52)
+ok("4. ...and the other way: 0.24 + 0.24 + 0.04 = 0.52 reads 1, so the cells add to 1 (the first takes it)",
+   sum(up) == 1 and up == [1, 0, 0], str(up))
+mock = SS.share_whole([1.8, 0.0, 0.0, 0.3, 0.0, 0.3], 2.4)
+ok("⭐ 4. card 7's own example: 1.8 in on one route, 0.3 out on two: '2 · 0 · 2', '0 · under 1 · under 1', total 2",
+   mock == [2, 0, 0, 0, 0, 0], str(mock))
+ok("4. nothing in, nothing out", SS.share_whole([], 0.0) == [] and SS.share_whole([0.0, 0.0], 0.0) == [0, 0])
 import random
 _rng = random.Random(1110)
 _bad = []
@@ -361,10 +371,10 @@ for _ in range(400):
     n = _rng.randint(1, 20)
     cs = [round(_rng.choice([0.0, _rng.uniform(0, 3), _rng.uniform(0, 120)]), 2) for _i in range(2 * n)]
     tot = round(sum(cs), 2)
-    tt = SS.share_tenths(cs, tot)
-    if SS._whole(sum(tt) / 10.0) != SS._whole(tot) or any(abs(x / 10.0 - v) > 0.1 + 1e-9 for x, v in zip(tt, cs)) or min(tt) < 0:
+    tt = SS.share_whole(cs, tot)
+    if sum(tt) != SS._whole(tot) or any(abs(x - v) >= 1 for x, v in zip(tt, cs)) or min(tt) < 0:
         _bad.append((cs, tot, tt))
-ok("⭐ 4. 400 random cards: the rows' sum reads the total's whole number, every figure within a tenth, none negative",
+ok("⭐ 4. 400 random cards: the rows add to the total's whole number, every figure under one from its value, none negative",
    not _bad, str(_bad[:1]))
 
 # awkward loads on the fixture's roads: R1 251 loads, R2 109, R3 31 over 20 days = 12.55, 5.45, 1.55 a day
@@ -373,25 +383,26 @@ LINES[M] = [{"route_id": "R1", "vehicle_loads": 251.0, "co2_t": 1.0, "ipt": "IPT
             {"route_id": "R3", "vehicle_loads": 31.0, "co2_t": 1.0, "ipt": "IPT1"}]
 SS.forget()
 big2 = SS.in_box(-1.01, LAT - 0.03, -0.89, LAT + 0.02, M)
-T10 = lambda x: int(round(x * 10))
-ok("⭐ 4. the card's rows: each A day is its In + Out, in whole tenths",
-   all(T10(r["in"]) + T10(r["out"]) == T10(r["a_day"]) and abs(r["a_day"] * 10 - T10(r["a_day"])) < 1e-6 for r in big2["routes"]),
+T10 = lambda x: x
+_ints = lambda d: all(isinstance(d[k], int) for k in ("in", "out", "a_day"))
+ok("⭐ 4. the card's rows: each A day is its In + Out, in WHOLE numbers (REVERSED 24 Nov 2026, card 7: was whole tenths)",
+   all(_ints(r) and r["in"] + r["out"] == r["a_day"] for r in big2["routes"]),
    str(big2["routes"]))
-ok("⭐ 4. the totals are the rows added, and In + Out is A day",
-   T10(big2["in"]) == sum(T10(r["in"]) for r in big2["routes"]) and T10(big2["out"]) == sum(T10(r["out"]) for r in big2["routes"])
-   and T10(big2["a_day"]) == sum(T10(r["a_day"]) for r in big2["routes"]) == T10(big2["in"]) + T10(big2["out"]),
+ok("⭐ 4. the totals are the rows added, whole, and In + Out is A day",
+   _ints(big2) and big2["in"] == sum(r["in"] for r in big2["routes"]) and big2["out"] == sum(r["out"] for r in big2["routes"])
+   and big2["a_day"] == sum(r["a_day"] for r in big2["routes"]) == big2["in"] + big2["out"],
    str((big2["in"], big2["out"], big2["a_day"])))
 _true = TL.through({"type": "Polygon", "coordinates": [[[-1.01, LAT - 0.03], [-0.89, LAT - 0.03], [-0.89, LAT + 0.02],
                                                         [-1.01, LAT + 0.02], [-1.01, LAT - 0.03]]]}, M, ctx=SS._ctx(),
                    enter_km=SS.BOX_ENTER_KM)["movements_per_day"]
-ok("⭐ 4. the card's total reads the same whole number as 2.1-1's through() for that ground (39.1 -> 39)",
-   SS._whole(big2["a_day"]) == SS._whole(_true) == 39, str((big2["a_day"], _true)))
+ok("⭐ 4. the card's total IS the whole number 2.1-1's through() reads for that ground (39.1 -> 39)",
+   big2["a_day"] == SS._whole(_true) == 39, str((big2["a_day"], _true)))
 _pv = counting.per_visit
 counting.per_visit = lambda *x, **k: 1
 v2 = SS.in_box(-1.01, LAT - 0.03, -0.89, LAT + 0.02, M)
 counting.per_visit = _pv
-ok("4. an organisation that counts visits: the A day column adds to its total, in tenths",
-   T10(v2["a_day"]) == sum(T10(r["a_day"]) for r in v2["routes"]) and v2["counting"]["unit"] == "visits", str(v2["a_day"]))
+ok("4. an organisation that counts visits: the A day column adds to its total, in whole numbers (was tenths)",
+   v2["a_day"] == sum(r["a_day"] for r in v2["routes"]) and isinstance(v2["a_day"], int) and v2["counting"]["unit"] == "visits", str(v2["a_day"]))
 # Q2 / Q3: the routes on the ground with nothing approved that month
 LINES[M] = [{"route_id": "R2", "vehicle_loads": 1.0, "co2_t": 1.0, "ipt": "IPT1"}]
 SS.forget()
@@ -401,9 +412,38 @@ ok("⭐ 4. Q2 / Q3: a road two routes use, one with loads: the other is named as
 _tiny, _ti, _to, _td = SS._rows({"routes": [{"route_id": "R9", "in_per_day": 0.04, "out_per_day": 0.04, "visits_per_day": 0.04},
                                            {"route_id": "R8", "in_per_day": 2.0, "out_per_day": 0.0, "visits_per_day": 2.0}],
                                 "movements_per_day": 2.08, "visits_per_day": 2.04}, 2)
-ok("⭐ 4. a route that runs under a tenth a day is marked small (the card says 'under 0.1'), a true nought is not",
+ok("⭐ 4. a route that runs under a tenth a day is marked small (the card says 'under 1'), a true nought is not",
    _tiny[1]["route_id"] == "R9" and set(_tiny[1]["small"]) == {"in", "out", "a_day"} and "small" not in _tiny[0]
-   and (_ti, _to, _td) == (2.0, 0.0, 2.0), str(_tiny))
+   and (_ti, _to, _td) == (2, 0, 2), str(_tiny))
+# 24 Nov 2026 (card 7): a route under ONE a day each way reads 0 and is marked small too; the other carries the unit
+_lt1 = SS._rows({"routes": [{"route_id": "R034", "in_per_day": 1.8, "out_per_day": 0.0, "visits_per_day": 1.8},
+                            {"route_id": "R012", "in_per_day": 0.0, "out_per_day": 0.3, "visits_per_day": 0.3},
+                            {"route_id": "R040", "in_per_day": 0.0, "out_per_day": 0.3, "visits_per_day": 0.3}],
+                 "movements_per_day": 2.4, "visits_per_day": 2.4}, 2)
+ok("⭐ 4. card 7: '2 · 0 · 2' then two rows '0 · under 1 · under 1'; totals 2 in, 0 out (the card: 'under 1'), 2 a day",
+   [(r["route_id"], r["in"], r["out"], r["a_day"], sorted(r.get("small", []))) for r in _lt1[0]]
+   == [("R034", 2, 0, 2, []), ("R012", 0, 0, 0, ["a_day", "out"]), ("R040", 0, 0, 0, ["a_day", "out"])]
+   and _lt1[1:] == (2, 0, 2), str(_lt1))
+# 24 Nov 2026 (card 7: "the card, Copy and the limit band's card stay one sum"): the traffic limit's own card on the public
+# map reads its rows by the same rule (seen on the local copy of live, Apr 2027: rows 1 + 4 + 1 + 2 + 20 + 132 = 160 under 159)
+_LIM = [{"route_id": "R009", "in_per_day": 0.3, "out_per_day": 0.3, "visits_per_day": 0.3},
+        {"route_id": "R023", "in_per_day": 4.1, "out_per_day": 0.0, "visits_per_day": 4.1},
+        {"route_id": "R046", "in_per_day": 0.3, "out_per_day": 0.3, "visits_per_day": 0.3},
+        {"route_id": "R048", "in_per_day": 1.0, "out_per_day": 1.0, "visits_per_day": 1.0},
+        {"route_id": "R049", "in_per_day": 9.8, "out_per_day": 9.8, "visits_per_day": 9.8},
+        {"route_id": "R050", "in_per_day": 65.8, "out_per_day": 65.8, "visits_per_day": 65.8}]
+_lr = SS.limit_rows(_LIM)
+ok("⭐ 4. card 7: the limit card's rows add to its whole figure (159), in the order given; R046 'under 1' as on the road card, R009 1",
+   [(r["route_id"], r["a_day"], r.get("small", False)) for r in _lr]
+   == [("R009", 1, False), ("R023", 4, False), ("R046", 0, True), ("R048", 2, False), ("R049", 20, False), ("R050", 132, False)]
+   and sum(r["a_day"] for r in _lr) == 159, str(_lr))
+_lv = SS.limit_rows(_LIM, movements=False)
+ok("4. card 7: a visits limit shares the visits the same way (81.3 reads 81)", sum(r["a_day"] for r in _lv) == 81
+   and all(isinstance(r["a_day"], int) for r in _lv), str(_lv))
+ok("4. card 7: the public limits read takes its rows from limit_rows (no row rounded apart to one decimal)",
+   'v["routes"] = section_select.limit_rows(v.get("routes") or [], movements=mv)' in MS
+   and '"a_day": round(r["in_per_day"] + r["out_per_day"] if mv else r["visits_per_day"], 1)' not in MS
+   and "${x.small ? 'under 1' : tlimN(x.a_day)}" in read("map/index.html"))
 ok("4. no month: no idle list (every route is named already)", "idle" not in SS.road_at(-0.95, LAT, None))
 ok("🔴 4. still no team in the answer", "IPT1" not in json.dumps(idle) and "team" not in json.dumps(idle).lower())
 ok("4. one read of the legs per answer: through() is handed the routes already found",

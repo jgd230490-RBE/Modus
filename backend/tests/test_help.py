@@ -409,9 +409,11 @@ ok("...Play: the timeline runs through the months of the programme; Conditions o
 ok("19 Oct: the guide describes the month picker, the info buttons, the badges and the council labels as built",
    "press a year, then a month, to show that month on the map" in text
    and "A small <strong>i</strong> beside a heading opens a short explanation" in src
-   and "a small white badge with a double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
+   # NARROWED 24 Nov 2026 (John, card 4b of the route lines mockup): the badges are grey-edged plates (the arrow grey, no
+   # green edge on the carbon one), under Labels All; the number, its floor and the unit are said as before
+   and "a small white badge with a grey double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
    # NARROWED 10 Nov 2026 (UI critique 18, claude/ui-fix-map-card): the badge carries its unit ("6.8 t CO₂e"), grey explained
-   and "a green badge on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
+   and "the same badge without the arrow on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
    and "a grey route has nothing in that month, or is not routed yet" in text and 'the labels say "reading…"' in text
    and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
@@ -425,7 +427,8 @@ ok("...the restriction popup gives no verdict against the vehicle: that is the r
 # REVERSED 27 Oct 2026 (F3 c): no token box; a planner reads the Data pages, an admin changes them
 ok("Data pages: no token box, only an admin changes them; More ▾ on Configuration; Make primary; Create & route; Clear all routes",
    "<strong>Admin token</strong> box" not in src and "Only an admin changes locations, routes and zones" in text
-   and "(under More ▾)" in src and "<strong>Make primary</strong>" in src
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): the button reads "Use Alt 1 as the main route" (it read "Make primary")
+   and "(under More ▾)" in src and "<strong>Use Alt 1 as the main route</strong>" in src and "Make primary" not in src
    and "<strong>Create &amp; route</strong>" in src and "<strong>Clear all routes</strong>" in src
    and "its forecast lines are not deleted with it" in text)
 ok("...a route with no rate is priced at the target rate and marked target; rate not set only when neither exists",
@@ -849,9 +852,12 @@ ok("⭐ W10: the guide offers the CLP pack beside the month and says what it hol
 
 # 17 Oct 2026: both route legs are drawn left of their own travel (map OFFSET_OUT = OFFSET_IN), so a route
 # that comes back the same road shows its green and amber side by side; the guide's legend row says so.
-ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, green and amber side by side",
+# NARROWED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q1): the legs are dark and grey, not green and
+# amber; each is still left of the way its lorries drive
+ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, the two side by side (NARROWED 24 Nov 2026: was green and amber)",
    "Each line sits just to the left of the way its lorries drive, so where a route comes back along the same road "
-   "its green and amber run side by side; they close onto the road as you zoom right in." in src)
+   "its two lines run side by side; they close onto the road as you zoom right in." in src
+   and "its green and amber run side by side" not in src)
 ok("17 Oct: ...and no longer says that nothing shows direction",
    "Nothing shows direction — the colours do." not in src)
 # 17 Oct 2026 (UI audit #17, claude/ui-fix-keyboard): the 27 lazy figure images had no size, so a figure grew from 2 px to
@@ -1027,9 +1033,12 @@ ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1
 # with a white edge and the pinch points rings (not violet dashes and dots); the flow is a light along solid lanes (no dashes)
 ok("23 Oct: chapter 14 says the staff map draws each load's line in raspberry (NARROWED 23 Oct 2026 afternoon; ink that morning) with a white edge and a ring at each pinch point, never violet dashes",
    "draws each line in raspberry with a white edge, and a ring at each potential pinch point" in src and "violet dashes" not in src and "in ink with a white edge" not in src)
-ok("23 Oct: the technical guide says a light runs along each lane only while Play runs and the lane's width is its band, never that dashes move",
-   "A light runs along each lane only while Play runs, and the lanes stand still under reduced motion; the lane's width is its band." in _tg
-   and "The dashes move only while Play runs" not in _tg)
+# NARROWED 24 Nov 2026 (the route lines mockup, card 3: the white lanes go; card 3b, Q14, 22:46 UTC: arrowheads
+# drifting): the technical guide says the arrowheads, one gap for every road, standing still unless Play runs
+ok("23 Oct: the technical guide says the arrowheads drift only while Play runs, one gap for every road, never that dashes move (NARROWED 24 Nov 2026)",
+   "They stand still unless Play runs; then they drift at one speed on screen" in _tg and "Under reduced motion they never drift." in _tg
+   and "They say the direction, never the amount." in _tg
+   and "A light runs along each lane" not in _tg and "The dashes move only while Play runs" not in _tg and "FLOW_DOT_GAPS" not in _tg)
 
 # ---- 23 Oct 2026: the abnormal loads on the public map's figures bar and in the animation ----
 _ug23 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
@@ -1124,9 +1133,11 @@ ok3("0a: the moved panel notes are in §8.2 (survey bridge, boundary ticks, chai
         "A dimmed disruption-zone row has none in force", "how many other ways the routing found", "<strong>Credits</strong>"]))
 ok3("🔴 0a: no 'Existing rail network' left in the user guide (the panel option and its Sources row are gone)",
     "Existing rail network" not in _ug0a)
-ok3("0a: the flow in §8.3 is lanes whose WIDTH is the movements (no 'Closer dashes'), keyed 'Movements a day, each way'",
-    "<strong>A wider lane means more movements a day</strong>" in _ug0a and "Closer dashes" not in _ug0a
-    and "<em>Movements a day, each way</em>" in _ug0a)
+# NARROWED 24 Nov 2026 (card 3, then card 3b, Q14): the flow is arrowheads, the way and not the amount; no lanes, no dots
+ok3("0a: the flow in §8.3 is arrowheads that show the way, not how many (no 'Closer dashes', no wider lane, no dots), keyed 'Direction of travel' (NARROWED 24 Nov 2026)",
+    "<strong>They show the way, not how many</strong>" in _ug0a and "Closer dashes" not in _ug0a and "A wider lane" not in _ug0a and "The closer the dots" not in _ug0a
+    and "<em>Direction of travel</em>" in _ug0a and "<em>Movements a day, each way</em>" not in _ug0a
+    and "Every line is one width; the darker its blue, the more movements a day" in _ug0a)   # 25 Nov 2026: static's one-width sentence kept beside the arrowheads
 ok3("0a: the technical guide says the map no longer draws the existing rail corridor",
     "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
 
@@ -1499,9 +1510,19 @@ ok("2.1-13: the Look-ahead's week map no longer reads as team colours with a dar
 _ug25 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
 _tg25 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
 _i25 = _ug25.find('<li id="ug-routes-map">'); _m25 = _ug25[_i25:_ug25.find("</li>", _i25)] if _i25 >= 0 else ""
-ok("ROUTES PAGE (2.1-7): 9.2 says out green, back amber side by side, Out · Back · Both, the blue halo, and the table's Out / Back minutes",
-   all(w in _m25 for w in ("out (laden) in green and back (empty) in amber", "<strong>Out &middot; Back &middot; Both</strong>",
-                           "blue halo", "distance and minutes, <strong>Out</strong> and <strong>Back</strong>")))
+# REVERSED 24 Nov 2026 (the Routes page rethink, Q2 to Q4; John: "Yes, as recommended"): dark grey out, light grey back (was green
+# and amber); a route picked in the list a soft blue halo; an open route alone, the pick a solid blue line, "Other routes"
+ok("ROUTES PAGE (2.1-7, REVERSED 24 Nov): 9.2 says out dark grey, back light grey side by side, Out · Back · Both, the soft blue halo, and the table's Out / Back minutes",
+   all(w in _m25 for w in ("out (laden) in dark grey and back (empty) in light grey", "<strong>Out &middot; Back &middot; Both</strong>",
+                           "soft blue halo", "distance and minutes, <strong>Out</strong> and <strong>Back</strong>"))
+   and "in green and back (empty) in amber" not in _m25)
+ok("ROUTES PAGE (24 Nov, Routes rethink Q2 and Q4): 9.2 says an open route is shown alone with its ends and its own closures, the pick a solid blue line, and Other routes",
+   all(w in _m25 for w in ("the map shows that route alone", "its two ends", "The option you pick is a solid blue line",
+                           "Tick <strong>Other routes</strong> under <strong>Layers</strong>", "off each time you open a route")))
+ok("ROUTES PAGE (24 Nov, Routes rethink): the technical guide names the pair, the open route's filters and the solid pick, and no longer the green, amber or the translucent halo",
+   all(w in _tg25 for w in ("out ink <code>#3A3C41</code>, back grey <code>#8E9197</code>", "<code>olZonesOver</code>", "<code>olOthers</code>", "<code>sel-halo</code>",
+                            "solid <code>#0B4EA2</code>", "The line in use is in neither source, so it is drawn once"))
+   and "a translucent <code>#1D4ED8</code> halo" not in _tg25 and "(out <code>#059669</code>, back <code>#F59E0B</code>, the public map's)" not in _tg25)
 ok("ROUTES PAGE (2.1-5): 9.2 names the five layers, all off each visit, from what was last fetched",
    all(w in _m25 for w in ("planned road closures, lorry limits, community places, collisions and cycle routes", "all are off each time you open the page",
                            "Config &rarr; Map and bulletin")))
@@ -1547,18 +1568,26 @@ ok("ROAD CARD (2.1-4): technical T1 #t1-road-area has the two reads, the piece, 
                              "<code>GET /api/public/area-sum", "<code>PIECE_M</code> = 150 m", "<code>BOX_ENTER_KM</code> (1 m)",
                              "<code>warm()</code>", "<code>&amp;area=w,s,e,n</code>", "Not built:")))
 # 10 Nov 2026 (road card polish, John's Q1-Q6 as recommended): the rule that makes the rows add up, in both guides
-ok("ROAD CARD POLISH: user guide 8 says the table adds up in one decimal, the bold figure is whole, '1 of 12 routes', the near click, the slide and the picker's search",
-   all(w in src for w in ('id="ug-map-road-adds"', "a row&#39;s A day is its In plus its Out, and the Total is the rows added",
+# REVERSED 24 Nov 2026 (public map lines rethink, card 7, John's Q11 = (a)): every figure whole, still adding up (was one decimal)
+ok("ROAD CARD POLISH: user guide 8 says every figure is whole and the table adds up, 'under 1', '1 of 12 routes', the near click, the slide and the picker's search",
+   all(w in src for w in ('id="ug-map-road-adds"', "Every figure is a whole number and the table adds up", "<em>under 1</em>, never 0",
+                          "can read one more in than out", "a row&#39;s A day is its In plus its Out, and the Total is the rows added",
                           "the same figure the figures bar and a traffic limit give", 'id="ug-map-road-of"', "<em>1 of 12 routes</em>",
                           "a click just beside a line counts as a click on it", 'id="ug-map-area-slide"',
                           "the search empties when the list closes, the ticks stay")))
 _ug_road = src[src.index('id="ug-map-road"'):src.index('id="8-2-filters-basemaps-and-overlays"')]
-ok("ROAD CARD POLISH: the user guide's road card keeps the back end out (no tenths, no function names)",
-   not any(w in _ug_road for w in ("share_tenths", "tenth", "fitBounds", "secsel", "px")))
+ok("ROAD CARD POLISH: the user guide's road card keeps the back end out (no tenths, no decimal, no function names)",
+   not any(w in _ug_road for w in ("share_tenths", "share_whole", "tenth", "one decimal", "fitBounds", "secsel", "px")))
 ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the moved click, the 6 px reach and the slide",
-   all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_tenths</code>", "<code>idle</code>", "<code>through(pas=)</code>",
+   # REVERSED 24 Nov 2026 (card 7): share_whole replaces share_tenths; the limit card's split is the bulletin's
+   all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_whole</code>", "reversed at his word on 24 Nov",
+                             "<code>bulletin_doc.tl_split_parts</code>", "<code>in_shown</code>", "<code>idle</code>", "<code>through(pas=)</code>",
                              "<code>secselSnap</code>", "<code>CLICK_SLOP</code> = 6 px", "<code>clearBoxOfCard</code>",
-                             "the 12 Oct whole-movements rule holds everywhere else")))
+                             "the 12 Oct whole-movements rule, which holds everywhere else")))
+ok("🔴 ROAD CARD (card 7): the technical guide no longer says the card reads one decimal or names share_tenths as the rule",
+   "the table, the in / out line and Copy read one decimal" not in _tg_rs and "<code>section_select.share_tenths</code> turns" not in _tg_rs)
+ok("card 7 (A2 addition, John 24 Nov: 'Yes, both'): T1 says the council area card and the shared road section card share their in / out by wholeWords, the council card's movements whole",
+   all(w in _tg_rs for w in ("<code>wholeWords</code>", "<code>wholeShare</code>, the same rule", "the council card&#39;s movements read whole")))
 ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
    all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
 # 10 Nov 2026 (road card top: a card opened above a click lost its first lines under the figures bar)

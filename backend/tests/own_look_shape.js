@@ -30,8 +30,10 @@ ok("1 corner: the count dots stay round (.rail-dot and the phone tab's count, 9 
    /\.rail-dot\{[^}]*height:18px;[^}]*border-radius:9px;/.test(css) && /\.phone-tab \.rail-count\{[^}]*border-radius:9px;/.test(css));
 ok("1 corner: the info button stays a ring (50 %), no 999px", /\.ibtn\{[^}]*border-radius:50%;/.test(css));
 const jsxR = [...new Set((code.match(/borderRadius: \d+/g) || []))].sort();
-ok("1 corner: inline corners in the script are the small 3 px, the one 6 px or a legend dot (999 on a 10 px dot)",
-   jsxR.every(r => ["borderRadius: 3", "borderRadius: 6", "borderRadius: 999"].includes(r)), jsxR);
+// NARROWED 26 Nov 2026 (taking main 4159b66 in): the Routes map legend's swatches (PR #325, the Routes rethink) are 2 px; counted
+// here, not restyled (the own look's one corner is 6 px; the small 3 px and 2 px are swatches, not boxes)
+ok("1 corner: inline corners in the script are the small 2 / 3 px swatches, the one 6 px or a legend dot (999 on a 10 px dot)",
+   jsxR.every(r => ["borderRadius: 2", "borderRadius: 3", "borderRadius: 6", "borderRadius: 999"].includes(r)), jsxR);
 
 // ---------------------------------------------------------------- stage 2: status = a shape and a word, no tint
 ok("2 status: RowStatus draws an empty <i> (the shape, in CSS) and the word — no glyph, no RS_ICON",
@@ -138,6 +140,8 @@ ok("8 warning: a warning sentence carries the diamond (every amber block sentenc
 // (the Working list, 21 Nov mockup, waiting for John; its look is not restyled here): cornerSizes 9 -> 11 (.work-list 10px,
 // .work-chip 999px), css999 0 -> 1 (.work-chip), tintedStatus 0 -> 6 (its Light chip reads --st-ok-bg / -warn-bg / -bad-bg,
 // 3, and keeps those three tokens beside its rules, 3)
+// RAISED 26 Nov 2026 (taking main 4159b66 in), by exactly its count: cssBoxes 16 -> 17, the Simulation full screen's "Key"
+// list .sim-key-box (PR #324, a 1 px line and the 6 px corner over the map); counted, not restyled
 const CEIL = {
   cornerSizes: 11,         // distinct border-radius values in the stylesheet (6px, 3px, 50%, 0, 0 !important, 9px count dot, three half-corners)
   css999: 1,               // border-radius:999px in the stylesheet (the count dots are 9 px on 18 px)
@@ -146,7 +150,7 @@ const CEIL = {
   boxedFigureTiles: 0,     // a figure tile with its own box ("card px-4 py-3 min-w-0", a strip cell with a 1 px border)
   roundedXlBox: 0,         // "rounded-xl border" section boxes in the markup
   roundedLgBox: 52,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
-  cssBoxes: 16,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
+  cssBoxes: 17,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
   smallCaps: 18,  // capital labels left (the rail's groups and the demo bar, kept; menus' heads, notices' heads: listed for John)
 };
 const radiiNow = [...new Set((css.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))];
@@ -164,7 +168,7 @@ const now = {
 for (const k of Object.keys(CEIL)) ok(`9 ceiling: ${k} ${now[k]} ≤ ${CEIL[k]} (may only come down)`, now[k] <= CEIL[k], { now: now[k], ceiling: CEIL[k] });
 ok("9 ceiling: the ceilings themselves are at or under the branch's measured figures (a raised ceiling fails here first)",
    CEIL.cornerSizes <= 11 && CEIL.css999 <= 1 && CEIL.inline999 <= 1 && CEIL.tintedStatus <= 6 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
-   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 16 && CEIL.smallCaps <= 18);
+   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 17 && CEIL.smallCaps <= 18);
 // 24 Nov 2026: with the carbon target flush to the column, its fold's summary (21 px) met the note's "i" at 390 px (the
 // UI audit's targets-24px): 2 px above and below make it 25 px
 ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.includes(".ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;padding:2px 0;width:fit-content;}"));
