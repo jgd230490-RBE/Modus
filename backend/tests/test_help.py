@@ -409,9 +409,11 @@ ok("...Play: the timeline runs through the months of the programme; Conditions o
 ok("19 Oct: the guide describes the month picker, the info buttons, the badges and the council labels as built",
    "press a year, then a month, to show that month on the map" in text
    and "A small <strong>i</strong> beside a heading opens a short explanation" in src
-   and "a small white badge with a double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
+   # NARROWED 24 Nov 2026 (John, card 4b of the route lines mockup): the badges are grey-edged plates (the arrow grey, no
+   # green edge on the carbon one), under Labels All; the number, its floor and the unit are said as before
+   and "a small white badge with a grey double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
    # NARROWED 10 Nov 2026 (UI critique 18, claude/ui-fix-map-card): the badge carries its unit ("6.8 t CO₂e"), grey explained
-   and "a green badge on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
+   and "the same badge without the arrow on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
    and "a grey route has nothing in that month, or is not routed yet" in text and 'the labels say "reading…"' in text
    and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
@@ -850,9 +852,12 @@ ok("⭐ W10: the guide offers the CLP pack beside the month and says what it hol
 
 # 17 Oct 2026: both route legs are drawn left of their own travel (map OFFSET_OUT = OFFSET_IN), so a route
 # that comes back the same road shows its green and amber side by side; the guide's legend row says so.
-ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, green and amber side by side",
+# NARROWED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q1): the legs are dark and grey, not green and
+# amber; each is still left of the way its lorries drive
+ok("17 Oct: the guide's dotted-lines row says each line sits left of the way its lorries drive, the two side by side (NARROWED 24 Nov 2026: was green and amber)",
    "Each line sits just to the left of the way its lorries drive, so where a route comes back along the same road "
-   "its green and amber run side by side; they close onto the road as you zoom right in." in src)
+   "its two lines run side by side; they close onto the road as you zoom right in." in src
+   and "its green and amber run side by side" not in src)
 ok("17 Oct: ...and no longer says that nothing shows direction",
    "Nothing shows direction — the colours do." not in src)
 # 17 Oct 2026 (UI audit #17, claude/ui-fix-keyboard): the 27 lazy figure images had no size, so a figure grew from 2 px to
@@ -1028,9 +1033,12 @@ ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1
 # with a white edge and the pinch points rings (not violet dashes and dots); the flow is a light along solid lanes (no dashes)
 ok("23 Oct: chapter 14 says the staff map draws each load's line in raspberry (NARROWED 23 Oct 2026 afternoon; ink that morning) with a white edge and a ring at each pinch point, never violet dashes",
    "draws each line in raspberry with a white edge, and a ring at each potential pinch point" in src and "violet dashes" not in src and "in ink with a white edge" not in src)
-ok("23 Oct: the technical guide says a light runs along each lane only while Play runs and the lane's width is its band, never that dashes move",
-   "A light runs along each lane only while Play runs, and the lanes stand still under reduced motion; the lane's width is its band." in _tg
-   and "The dashes move only while Play runs" not in _tg)
+# NARROWED 24 Nov 2026 (the route lines mockup, card 3: the white lanes go; card 3b, Q14, 22:46 UTC: arrowheads
+# drifting): the technical guide says the arrowheads, one gap for every road, standing still unless Play runs
+ok("23 Oct: the technical guide says the arrowheads drift only while Play runs, one gap for every road, never that dashes move (NARROWED 24 Nov 2026)",
+   "They stand still unless Play runs; then they drift at one speed on screen" in _tg and "Under reduced motion they never drift." in _tg
+   and "They say the direction, never the amount." in _tg
+   and "A light runs along each lane" not in _tg and "The dashes move only while Play runs" not in _tg and "FLOW_DOT_GAPS" not in _tg)
 
 # ---- 23 Oct 2026: the abnormal loads on the public map's figures bar and in the animation ----
 _ug23 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
@@ -1125,9 +1133,11 @@ ok3("0a: the moved panel notes are in §8.2 (survey bridge, boundary ticks, chai
         "A dimmed disruption-zone row has none in force", "how many other ways the routing found", "<strong>Credits</strong>"]))
 ok3("🔴 0a: no 'Existing rail network' left in the user guide (the panel option and its Sources row are gone)",
     "Existing rail network" not in _ug0a)
-ok3("0a: the flow in §8.3 is lanes whose WIDTH is the movements (no 'Closer dashes'), keyed 'Movements a day, each way'",
-    "<strong>A wider lane means more movements a day</strong>" in _ug0a and "Closer dashes" not in _ug0a
-    and "<em>Movements a day, each way</em>" in _ug0a)
+# NARROWED 24 Nov 2026 (card 3, then card 3b, Q14): the flow is arrowheads, the way and not the amount; no lanes, no dots
+ok3("0a: the flow in §8.3 is arrowheads that show the way, not how many (no 'Closer dashes', no wider lane, no dots), keyed 'Direction of travel' (NARROWED 24 Nov 2026)",
+    "<strong>They show the way, not how many</strong>" in _ug0a and "Closer dashes" not in _ug0a and "A wider lane" not in _ug0a and "The closer the dots" not in _ug0a
+    and "<em>Direction of travel</em>" in _ug0a and "<em>Movements a day, each way</em>" not in _ug0a
+    and "Every line is one width; the darker its blue, the more movements a day" in _ug0a)   # 25 Nov 2026: static's one-width sentence kept beside the arrowheads
 ok3("0a: the technical guide says the map no longer draws the existing rail corridor",
     "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
 
@@ -1436,7 +1446,8 @@ ok3("8 Nov: the big screen has six sections (#dashboard/6), the Dashboard's Site
     and "a sixth, <strong>Concerns</strong>" in _ug8)
 ok3("8 Nov: the map legend: legs solid (dotted only on a haul road), the diversion edge, the abnormal load, the holding area",
     "<td>Dotted green and amber lines</td>" not in _ug8 and "solid on public roads, dotted and thinner on a haul road" in _ug8
-    and "<td>Soft amber edge on a route</td>" in _ug8 and "<td>Raspberry line with rings</td>" in _ug8 and "<td>H and ›››</td>" in _ug8)
+    # NARROWED 24 Nov 2026 (the route lines rethink, card 5): the soft edge is two amber edges outside the line now
+    and "<td>Amber edges on both sides of a route</td>" in _ug8 and "<td>Raspberry line with rings</td>" in _ug8 and "<td>H and ›››</td>" in _ug8)
 ok3("8 Nov: §9.3's list is one list again (no </ul><li>, each item once), and Site speed / Site areas sits in §9.1",
     "</ul><li>" not in _ug8 and _ug8.count("<li><strong>Temporary haul road</strong>") == 1
     and _ug8.index("<strong>Site speed</strong> and <strong>Site areas</strong>") < _ug8.index('id="7-2-routes"')
