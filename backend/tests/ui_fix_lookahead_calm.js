@@ -120,11 +120,13 @@ ok("⭐ 5: Config → Planning has \"Flag a shortfall over, %\" (planning.short_
    && code.includes('value={"short_flag_pct" in (doc.planning || {}) ? ((doc.planning || {}).short_flag_pct ?? "") : 10}'));
 
 // ---------------------------------------------------------------- finding 6: Tonnes never mixes units unseen
+// NARROWED 26 Nov 2026 (the Look-ahead rethink's card c1, the batch's second look): the line's figures are WHOLE tonnes
+// and whole m³ as the card draws them (41 t / 17 m³), as the site rows already were; the rule of this check is unchanged
 ok("⭐ 6: under Tonnes a non-tonne row reads tonnes (the server's derived.tonnes) with its own figure as a small second line",
-   laGrid.includes('<span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></span>')
-   && laGrid.includes('own && wd.tonnes != null ? <>{grp(wd.tonnes, 1)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty, 1)}{own}</span></>'));
+   laGrid.includes('<span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes)} t<span className="la-sub">{grp(d.planned_qty)}{own}</span></span>')
+   && laGrid.includes('own && wd.tonnes != null ? <>{grp(wd.tonnes)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty)}{own}</span></>'));
 ok("...an editable cell shows the same, and while typing the box is in the line's own unit (its label says m³)",
-   laGrid.includes("? <>{grp(f.tonnes, 1)} t<span className=\"la-sub\">{grp(d.planned_qty, 1)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty, 1)}{own}</>}")
+   laGrid.includes("? <>{grp(f.tonnes)} t<span className=\"la-sub\">{grp(d.planned_qty)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty)}{own}</>}")
    && laGrid.includes("aria-label={`${dayName(d.day_date)}'s plan (${unitLbl(line.unit)})`}"));
 // NARROWED 25 Nov 2026 (task A): the same note joined with what of the week goes out ("400 t of the week goes out")
 ok("...the total row says what the tonnes include (Tonnes only)", laGrid.includes('<span className="la-sub" data-la-mix="1">{[unitSel === "tonnes" ? laMixNote(lines) : "", outWeekT > 0 ? `${grp(outWeekT)} t of the week goes out` : ""].filter(Boolean).join(" · ")}</span>}'));

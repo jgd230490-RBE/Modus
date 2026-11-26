@@ -14229,13 +14229,13 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                 ) : !locked ? (
                   <button type="button" className="la-cell" onClick={() => setEditing(k)}
                     aria-label={`${dayName(d.day_date)}'s plan, ${grp(draft[k] ?? d.planned_qty, 1)} ${unitLbl(line.unit)}: click to type`}>{own && f.tonnes != null && draft[k] == null
-                      ? <>{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty, 1)}{own}</>}</button>
+                      ? <>{grp(f.tonnes)} t<span className="la-sub">{grp(d.planned_qty)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty)}{own}</>}</button>
                 ) : own && f.tonnes != null ? (
                   // 10 Nov 2026 (UI critique finding 6, card 6): under Tonnes a concrete row reads tonnes too (its m³ at
                   // the material's density, the server's figure), its own m³ under it, so the total never mixes units unseen
-                  <span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></span>
+                  <span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes)} t<span className="la-sub">{grp(d.planned_qty)}{own}</span></span>
                 ) : (
-                  <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
+                  <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty)}{own}</span>
                 )}
                 {typed}
                 {poursAt[`${lk}|${d.day_date}`] && <span className="pour-mark la-pour" data-pour-mark={d.day_date}
@@ -14246,8 +14246,13 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
           <td className="num font-semibold" data-label="Week">
             {unitSel === "loads" ? grp(wd.trips)
              : unitSel === "lorries" ? (c.baked && wd.vehicles_peak != null ? grp(wd.vehicles_peak) : "—")
-             : own && wd.tonnes != null ? <>{grp(wd.tonnes, 1)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty, 1)}{own}</span></>
-             : <>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></>}
+             : own && wd.tonnes != null ? <>{grp(wd.tonnes)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty)}{own}</span></>
+             : <>{grp(w.planned_qty)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></>}
+            {/* 26 Nov 2026 (card c1, the batch's second look): where the days do not add to the week, the week figure
+                says what they do add to, so the site's figure (the days' sum) reads right against its lines. Tonnes only;
+                one decimal only where the whole numbers would read the same. */}
+            {unitSel !== "loads" && unitSel !== "lorries" && line.days_ne_week && line.days_sum != null
+              && <span className="la-sub" data-la-daysum="1">days add to {grp(line.days_sum) === grp(w.planned_qty) ? grp(line.days_sum, 1) : grp(line.days_sum)}{own}</span>}
           </td>
         </>}>
         <RdItem t="Route">{line.route_id}</RdItem>
