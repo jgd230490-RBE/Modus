@@ -1168,6 +1168,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate(45deg);}
   .row-st.rs-bad{color:var(--bad-text);} .row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}
   .row-st.rs-draft i{background:transparent;border:2px solid var(--st-none);}
+  [data-route-notes] .row-st, [data-busy-in-use] .row-st{white-space:normal;}   /* 26 Nov 2026 (B1): a long status word wraps in a narrow cell, its shape kept on the first line */
   .st-line.st-warn{color:var(--warn-text);} .st-line.st-warn>i:first-child{display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);}   /* 26 Nov 2026 (B1): a status sentence, its shape first, no box */
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
      John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the

@@ -202,6 +202,9 @@ ok("2 status: the five amber words are the status shape and word, no tint left o
    && code.includes('<div className="mt-2 text-[13px] st-line st-warn" data-st-line="warn">')
    && css.includes('.st-line.st-warn{color:var(--warn-text);}')
    && !/rgba\(180,83,9,\.1[02]\)/.test(code));
+// measured in Chrome at 1150 and 768 px (26 Nov): every one of them inside its cell, the long "Route again" word on two lines
+ok("2 status: a long status word wraps in the route notes and the Zones busy-hours line, its shape kept",
+   css.includes("[data-route-notes] .row-st, [data-busy-in-use] .row-st{white-space:normal;}"));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
