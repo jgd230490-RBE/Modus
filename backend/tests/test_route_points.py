@@ -563,6 +563,23 @@ def flat_raw(pdf):
     return re.sub(r"\s+", " ", pdf_text(pdf, raw=True))
 
 
+def ring_count(pdf):
+    """26 Nov 2026 (card 4 as drawn): how many times a page sets the limit ring's red as its stroke colour (one a ring)."""
+    import base64
+    import zlib
+    n = 0
+    for m in re.finditer(rb"stream\r?\n(.*?)endstream", pdf, re.S):
+        raw, s = m.group(1).strip(), None
+        for dec in (lambda b: zlib.decompress(b), lambda b: zlib.decompress(base64.a85decode(b.replace(b"~>", b""), adobe=False))):
+            try:
+                s = dec(raw)
+                break
+            except Exception:
+                continue
+        n += len(re.findall(rb"0?\.75294\d* 0?\.22352\d* 0?\.16862\d* RG", s if s is not None else raw))
+    return n
+
+
 S12 = route_sheet.sheet("R012", vehicle=FLAT)
 pdf12 = export.build_route_sheet_pdf(S12)
 T12 = flat(pdf12)
@@ -586,6 +603,13 @@ ok("7: the block was placed beside the last mile or, when too long, full width u
 T40 = flat(export.build_route_sheet_pdf(route_sheet.sheet("R040", vehicle=FLAT)))
 ok("7: a lorry over a limit: the OVER sentence on the Route sheet, the limit's line says so",
    "This lorry is over a limit below. Ask the site team before you run." in T40 and "this lorry is over it" in T40, T40[:500])
+_n_lim12 = sum(len(L["limits"]) for P in [S12["take_care"]] + [d["take_care"] for d in S12["diversions"] if d.get("take_care")]
+               for L in rp.legs_shown(P))
+ok("7 (card 4 as drawn, 26 Nov): each limit row on the Route sheet opens with the red ring, one a row (none on a place's)",
+   _n_lim12 >= 3 and ring_count(pdf12) == _n_lim12 and rp.LIMIT_RING == "#C0392B", (ring_count(pdf12), _n_lim12))
+ok("7 (card 4 as drawn): ...the same ring when the lorry is over the limit (R040), and none on a sheet with no limit row",
+   ring_count(export.build_route_sheet_pdf(route_sheet.sheet("R040", vehicle=FLAT))) >= 1
+   and "this lorry is over it" in T40)
 ok("7: the blocks the sheet prints say no banned word", not any(BANNED_RE.search(w) for P in [S12["take_care"]] + [d.get("take_care") or {"head": ""} for d in S12["diversions"]] for w in rp.all_words(P) if P.get("legs") is not None))
 
 

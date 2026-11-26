@@ -925,6 +925,30 @@ def build_pdf(data, view, day, yard=None, vehicle=None, lorry=None, sheet=None):
     st_sb = ParagraphStyle("sb", parent=st_s, fontName="Helvetica-Bold")
     ink = colors.Color(0.09, 0.10, 0.12)
     rule = colors.Color(0.78, 0.78, 0.80)
+    from reportlab.platypus import Flowable
+    import route_points as _rpr
+
+    class Ringed(Flowable):
+        """26 Nov 2026 (card 4 as drawn): a limit's figure with the red ring before it, as the limit's sign has."""
+        def __init__(self, para):
+            Flowable.__init__(self)
+            self.para, self.r = para, para.style.fontSize * 0.34
+            self.off = 2 * self.r + para.style.fontSize * 0.45
+
+        def wrap(self, aw, ah):
+            w, h = self.para.wrap(max(aw - self.off, 1), ah)
+            self.width, self.height = w + self.off, h
+            return self.width, h
+
+        def draw(self):
+            c, fs = self.canv, self.para.style.fontSize
+            lw = fs * 0.15
+            c.saveState()
+            c.setStrokeColor(colors.HexColor(_rpr.LIMIT_RING))
+            c.setLineWidth(lw)
+            c.circle(self.r + lw / 2, self.height - fs * 0.6, self.r, stroke=1, fill=0)
+            c.restoreState()
+            self.para.drawOn(c, self.off, 0)
 
     def E(v):
         return safe(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -955,7 +979,7 @@ def build_pdf(data, view, day, yard=None, vehicle=None, lorry=None, sheet=None):
                 continue
             rows_ = [[Pp(E(f"{L['title']} · {L['length'] or ''}".rstrip(" ·")), st_h), ""]]
             for it in L["limits"]:
-                rows_.append([Pp(f"<b>{E(it['w'])}</b>", st_s), Pp(E(it["text"]), st_s)])
+                rows_.append([Ringed(Pp(f"<b>{E(it['w'])}</b>", st_s)), Pp(E(it["text"]), st_s)])
             for it in L["places"]:
                 rows_.append([Pp(E(it["w"]), st_s), Pp(f"<b>{E(it['text'])}</b>", st_s)])
             for extra in (L.get("more_words"), L.get("shared_words")):

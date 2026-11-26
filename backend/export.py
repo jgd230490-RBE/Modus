@@ -3558,8 +3558,11 @@ def _rs_take_care(c, x, y, w, P, size, draw=True, cols=1, holding=False):
     gap = 6 * mm
     colw = (w - gap) / 2 if cols == 2 else w
     meas = c if c is not None else None
-    ws = [i["w"] for L in legs for i in L["limits"] + L["places"]]
-    wc = (max([(meas.stringWidth(_pdf_safe(t), B, size) if meas else len(t) * size * 0.55) for t in ws] or [0]) + 6)
+    ring_r = size * 0.34                  # 26 Nov 2026 (card 4 as drawn): the red ring before a limit's figure
+    ring_w = 2 * ring_r + size * 0.45
+    ws = [(i["w"], True) for L in legs for i in L["limits"]] + [(i["w"], False) for L in legs for i in L["places"]]
+    wc = (max([(meas.stringWidth(_pdf_safe(t), B, size) if meas else len(t) * size * 0.55) + (ring_w if lim else 0)
+               for t, lim in ws] or [0]) + 6)
     wc = min(max(wc, 12 * mm), 26 * mm)
 
     def leg_block(L, xx, top):
@@ -3569,7 +3572,13 @@ def _rs_take_care(c, x, y, w, P, size, draw=True, cols=1, holding=False):
             h += para("Nothing held this way.", R, size, GREY, xx, colw, top - h) + 1
         for wtxt, txt, is_lim in rows:
             if draw:
-                c.setFillColorRGB(*NAVY_RGB); c.setFont(B if is_lim else R, size); c.drawString(xx, top - h - size, _pdf_safe(wtxt))
+                fx = xx
+                if is_lim:
+                    lw = size * 0.15
+                    c.saveState(); c.setStrokeColor(colors.HexColor(_rpl.LIMIT_RING)); c.setLineWidth(lw)
+                    c.circle(xx + ring_r + lw / 2, top - h - size * 0.66, ring_r, stroke=1, fill=0); c.restoreState()
+                    fx = xx + ring_w
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B if is_lim else R, size); c.drawString(fx, top - h - size, _pdf_safe(wtxt))
             h += para(txt, R if is_lim else B, size, NAVY_RGB, xx + wc, colw - wc, top - h) + 1
         return h
 
