@@ -986,10 +986,11 @@ ok("...and the gate pages use the Wayscope ink, not the RBE navy",
 ok("FastAPI's app title is Wayscope", 'FastAPI(title="Wayscope"' in main_code)
 # 11 Oct 2026 (the user): the login boxes match the finalised theme, carry a show-password eye, and the
 # map is called the public map.
-ok("the gate pages use the finalised theme: orange action button, warm neutrals, orange focus ring; no blue button",
-   "background:#C2410C" in main._GATE_CSS and "outline:2px solid #C2410C" in main._GATE_CSS
-   and "border:1px solid #D6D3D1" in main._GATE_CSS and "background:#2563EB" not in main._GATE_CSS
-   and "color:#64748B" not in main._GATE_CSS)
+# 26 Nov 2026 (the own look; John "Yes, as recommended"): REVERSES the 11 Oct pin above (orange button, warm neutrals).
+ok("the gate pages use the own look: sign-blue action button and focus ring, neutral greys; no orange button, no stock blue",
+   "background:#0B4EA2" in main._GATE_CSS and "outline:2px solid #0B4EA2" in main._GATE_CSS
+   and "border:1px solid #C6C8CC" in main._GATE_CSS and "background:#2563EB" not in main._GATE_CSS
+   and "#C2410C" not in main._GATE_CSS and "color:#64748B" not in main._GATE_CSS)
 ok("the map password page is titled 'Public map', says it is shared by password, and has a show / hide eye",
    "<h1>Public map</h1>" in main._MAP_PASSWORD_PAGE and "Corridor map" not in main._MAP_PASSWORD_PAGE
    and "This map is not public" not in main._MAP_PASSWORD_PAGE

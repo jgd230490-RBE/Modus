@@ -220,5 +220,11 @@ ok("⭐ 7 ceiling: no selection is a solid blue fill (CSS for a chosen / pressed
 ok("7 the ceilings only come down: every one is at or under its figure of 24 Nov 2026",
    CEIL.INTER <= 0 && CEIL.STOCK_BLUE <= 7 && CEIL.DATA_ACCENT <= 0 && CEIL.ACTION_ORANGE <= 0 && CEIL.FILLED_SELECTION <= 0);
 
+// 26 Nov 2026: the four server-made gate pages' style block (backend/main.py _GATE_CSS) is in the own look; the old parts may not return.
+const mainPy = fs.readFileSync(path.join(ROOT, "backend", "main.py"), "utf8").replace(/\r\n?/g, "\n");
+const gateCss = (mainPy.match(/_GATE_CSS = """([\s\S]*?)"""/) || [, ""])[1].replace(/\/\*[\s\S]*?\*\//g, "");
+const gateOld = (gateCss.match(/\bInter\b|#(C2410C|9A3412|2563EB|78716C|D6D3D1|F5F5F4)\b|999px|border-radius:10px/gi) || []);
+ok("⭐ 7 ceiling: no old part (Inter, orange, stock blue, warm grey, 999px pill, 10 px corner) in backend/main.py's gate pages block", gateCss.length > 500 && gateOld.length <= 0, "found " + JSON.stringify(gateOld));
+
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

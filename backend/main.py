@@ -220,35 +220,35 @@ app.add_middleware(
 # Wayscope theme (29 Sep 2026): ink background, white box, blue for the control, the
 # stacked logo above the box. Orange appears only in the logo itself.
 _GATE_CSS = """
-  /* 11 Oct 2026 — the finalised theme (the staff app's shell): ink page, white box, warm neutrals,
-     the orange action button with white text, 14 px labels above the inputs, an orange focus ring. */
+  /* 26 Nov 2026 — the own look (notes/design-language-1123.md): ink page, white box (one look, whatever the reader's theme),
+     Sora heading + IBM Plex Sans, neutral greys, the sign blue on the button, the link and the focus ring, one 6 px corner. */
   :root { color-scheme: light; }
   body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
          justify-content:center; gap:22px; background:#1F2024; color:#fff;
-         font:15px/1.5 Inter,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+         font:15px/1.5 'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
   .logo { width:min(60vw,150px); height:auto; display:block; }
-  .box { width:min(92vw,380px); box-sizing:border-box; background:#fff; color:#1F2024; border-radius:10px;
+  .box { width:min(92vw,380px); box-sizing:border-box; background:#fff; color:#1F2024; border-radius:6px;
          padding:28px 26px; box-shadow:0 10px 40px rgba(0,0,0,.45); }
-  h1 { margin:0 0 4px; font-size:20px; font-weight:600; color:#1F2024; }
-  p  { margin:0 0 20px; font-size:14px; color:#78716C; }
+  h1 { margin:0 0 4px; font-family:Sora,'IBM Plex Sans',system-ui,sans-serif; font-size:20px; font-weight:600; color:#1F2024; }
+  p  { margin:0 0 20px; font-size:14px; color:#62656B; }
   label { display:block; font-size:14px; font-weight:500; color:#1F2024; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px 12px; font:inherit; font-size:15px; color:#1F2024;
-          background:#fff; border:1px solid #D6D3D1; border-radius:6px; }
-  input:focus { outline:2px solid #C2410C; outline-offset:1px; border-color:#C2410C; }
+          background:#fff; border:1px solid #C6C8CC; border-radius:6px; }
+  input:focus { outline:2px solid #0B4EA2; outline-offset:1px; border-color:#0B4EA2; }
   button { margin-top:16px; width:100%; padding:11px; font:inherit; font-size:15px; font-weight:600;
-           color:#fff; background:#C2410C; border:0; border-radius:6px; cursor:pointer; }
-  button:hover { background:#9A3412; }
-  button:focus-visible { outline:2px solid #C2410C; outline-offset:2px; }
+           color:#fff; background:#0B4EA2; border:0; border-radius:6px; cursor:pointer; }
+  button:hover { background:#083C7D; }
+  button:focus-visible { outline:2px solid #0B4EA2; outline-offset:2px; }
   .pw-wrap { position:relative; }
   .pw-wrap input { padding-right:46px; }
   .pw-eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:38px; height:38px;
-            margin:0; padding:0; display:grid; place-items:center; color:#78716C; background:none; border-radius:6px; }
-  .pw-eye:hover { background:#F5F5F4; color:#1F2024; }
+            margin:0; padding:0; display:grid; place-items:center; color:#62656B; background:none; border-radius:6px; }
+  .pw-eye:hover { background:#F5F5F6; color:#1F2024; }
   .pw-eye::after { content:""; position:absolute; inset:-3px; }   /* 18 Oct 2026 (UI audit, the 44 px rule): the 38 px eye taps at 44 */
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
-  .foot { margin-top:18px; font-size:13px; color:#78716C; }
-  a { color:#2563EB; }
-  .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:999px;
+  .foot { margin-top:18px; font-size:13px; color:#62656B; }
+  a { color:#0B4EA2; }
+  .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:6px;
                  background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626; text-align:center;
                  font-size:14px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
   /* 22 Oct 2026 (UI fix 6, card 8): the notice pill at 14 px, the size of the app's demo bar (was 11 px) */
@@ -256,7 +256,9 @@ _GATE_CSS = """
   .demo-notice::before { content:"DEMO"; content:"DEMO" / ""; display:inline-block; margin-right:8px; padding:0 6px;
                          border-radius:3px; background:#B91C1C; color:#FFFFFF; letter-spacing:.08em; }
 """
-_GATE_HEAD = """<link rel="icon" href="/favicon.ico" sizes="32x32">
+_GATE_HEAD = """<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#1F2024">"""
