@@ -262,6 +262,19 @@ ok("4 full screen: an open column is 25 px wider (Routes 325 | map | 405, drawin
    && code.includes('{ gridTemplateColumns: "minmax(0, 1fr) 405px", gridTemplateRows: "minmax(0, 1fr)" }')
    && !/fold\.r \? 44 : 380\}px|fold\.l \? 44 : 232\}px/.test(code)
    && html.includes('.sl-full>:has(.sl-fold[aria-expanded="false"]){padding-left:7px !important;padding-right:7px !important;}'));
+// 26 Nov 2026 (B1 after, the mother session's read of the Dark picture): the full-screen control's glyph was #111827 on the
+// dark button (--surface-3) in Dark too, while + and − are inverted to light; on main as well. In Dark it takes the ink.
+{
+  const lum = h => { const c = [0, 2, 4].map(i => parseInt(h.replace("#", "").slice(i, i + 2), 16) / 255)
+    .map(x => x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const tk = (n, dark) => ((html.match(new RegExp("--" + n + ":(#[0-9A-Fa-f]{6})", "g")) || []).map(m => m.split(":")[1]))[dark ? 1 : 0];
+  const ink = tk("ink", true), btn = tk("surface-3", true), r = ink && btn ? ratio(ink, btn) : 0;
+  ok("4 full screen: in Dark the ⤢ / ⤡ control's glyph is the ink on its dark button, at least 3:1 (" + r.toFixed(2) + ":1); light keeps #111827 on white",
+     html.includes('html[data-theme="dark"] .mapboxgl-ctrl-group button.sl-full-btn{color:var(--ink);}')
+     && html.includes('html[data-theme="dark"] .mapboxgl-ctrl-group{background:var(--surface-3)}') && r >= 3
+     && html.includes(".mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;}") && ratio("#111827", "#FFFFFF") >= 3);
+}
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
