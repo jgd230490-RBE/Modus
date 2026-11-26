@@ -264,14 +264,17 @@ def list_days(from_date=None, to_date=None, route_id=None, start_year=None, toda
 # --------------------------------------------------------------------------- #
 def _insert_day(route_id, month_index, discipline, section_id, day, planned, week_index,
                 week_qty):
+    """Write one missing day as `derived`. True when this call wrote it, False when the day was already there.
+    26 Nov 2026: the same fill race as weeks._insert_week (two first reads of the Look-ahead filling the same bucket):
+    a day another request has just written is left exactly as it is and not counted as created here."""
     now = _now()
-    db.execute(
+    return bool(db.execute_count(
         "INSERT INTO forecast_days (tenant_id, route_id, month_index, discipline, "
         "section_id, day_date, planned_qty, status, parent_week_index, parent_week_qty, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
         (db.current_tenant(), route_id, int(month_index), discipline or "",
          section_id or "", _iso(day), float(planned), "derived", int(week_index),
-         float(week_qty or 0), now, now))
+         float(week_qty or 0), now, now)))
 
 
 def materialise_week_days(route_id, month_index, discipline, section_id, week_index,
@@ -307,9 +310,11 @@ def materialise_week_days(route_id, month_index, discipline, section_id, week_in
     for d in dates:
         cur = have.get(_iso(d))
         if cur is None:
-            _insert_day(route_id, month_index, discipline, section_id, d, shares[d],
-                        week_index, wq)
-            created += 1
+            if _insert_day(route_id, month_index, discipline, section_id, d, shares[d],
+                           week_index, wq):
+                created += 1
+            else:
+                kept += 1     # 26 Nov 2026: another request wrote this day after our read; theirs, kept
         elif cur["status"] == "derived":
             # 09 Sep night: write ONLY when the figure moved. On Render every statement
             # is a network round trip, and a read that rewrote every derived row it
@@ -323,13 +328,17 @@ def materialise_week_days(route_id, month_index, discipline, section_id, week_in
             # parent_week_index is re-stamped too: on 10 Sep the weeks moved to the
             # calendar, and a day written under the old bucket (Mon 14 Sep was week 2,
             # it is now week 3) would otherwise keep saying which bucket it USED to be in.
-            db.execute(
-                "UPDATE forecast_days SET planned_qty = ?, parent_week_qty = ?, "
-                "parent_week_index = ?, updated_at = ? WHERE tenant_id = ? AND route_id = ? "
-                "AND month_index = ? AND discipline = ? AND section_id = ? AND day_date = ?",
-                (shares[d], wq, int(week_index), _now(), db.current_tenant(), route_id,
-                 int(month_index), discipline or "", section_id or "", _iso(d)))
-            refreshed += 1
+            # 26 Nov 2026: `AND status = 'derived'` — an edit or confirm that landed after our read is left alone.
+            if db.execute_count(
+                    "UPDATE forecast_days SET planned_qty = ?, parent_week_qty = ?, "
+                    "parent_week_index = ?, updated_at = ? WHERE tenant_id = ? AND route_id = ? "
+                    "AND month_index = ? AND discipline = ? AND section_id = ? AND day_date = ? "
+                    "AND status = 'derived'",
+                    (shares[d], wq, int(week_index), _now(), db.current_tenant(), route_id,
+                     int(month_index), discipline or "", section_id or "", _iso(d))):
+                refreshed += 1
+            else:
+                kept += 1
         else:
             # edited / confirmed: the figure and stamp hold; only a stale bucket number
             # from before the calendar-week change is corrected (nothing else moves).

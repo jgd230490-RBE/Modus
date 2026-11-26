@@ -274,14 +274,23 @@ def list_weeks(from_month, to_month, route_id=None):
 # --------------------------------------------------------------------------- #
 def _insert_week(route_id, month_index, discipline, section_id, week_index,
                  planned_qty, unit, parent_qty):
+    """Write one missing week as `derived`. True when this call wrote it, False when the week was already there.
+
+    26 Nov 2026 (the fill race): the Look-ahead's first reads arrive together (the Dashboard's week, the page itself, the
+    Lorry plan, the warm-up), each reads which weeks exist and fills the gap, and the second to insert a week hit the
+    table's key: an IntegrityError, a 500 and a page stuck on "Loading". The insert now does nothing when the row is
+    already there, so the week another request has just written is left EXACTLY as it is (status, figures and
+    parent_qty) and is not counted as created here. The bare ON CONFLICT (no column list) holds whatever key the
+    table carries on a database migrated in place; the key is (tenant_id, route_id, month_index, discipline,
+    section_id, week_index)."""
     now = _now()
-    db.execute(
+    return bool(db.execute_count(
         "INSERT INTO forecast_weeks (tenant_id, route_id, month_index, discipline, "
         "section_id, week_index, planned_qty, unit, status, parent_qty, created_at, "
-        "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
         (db.current_tenant(), route_id, int(month_index), discipline or "",
          section_id or "", int(week_index), float(planned_qty), unit, "derived",
-         float(parent_qty), now, now))
+         float(parent_qty), now, now)))
 
 
 def materialise_line(route_id, discipline, section_id, month_index=None):
@@ -357,9 +366,12 @@ def _materialise_parent(p, have, pours_by_week=None):
         share = shares[w]
         cur = have.get(w)
         if cur is None:
-            _insert_week(p["route_id"], p["month_index"], p["discipline"],
-                         p["section_id"], w, share, p["unit"], p["quantity"])
-            created += 1
+            # 26 Nov 2026: False = another request wrote this week between our read and this insert; it is theirs, kept.
+            if _insert_week(p["route_id"], p["month_index"], p["discipline"],
+                            p["section_id"], w, share, p["unit"], p["quantity"]):
+                created += 1
+            else:
+                kept += 1
         elif cur["status"] == "derived":
             # 09 Sep night: write ONLY when something moved — on Render every
             # statement is a network round trip, and a read that rewrote every
@@ -372,15 +384,20 @@ def _materialise_parent(p, have, pours_by_week=None):
                 continue
             # ⭐ parent_qty is re-stamped HERE and nowhere else in this branch:
             # a derived row is by definition in step with its parent again.
-            db.execute(
-                "UPDATE forecast_weeks SET planned_qty = ?, unit = ?, "
-                "parent_qty = ?, updated_at = ? WHERE tenant_id = ? "
-                "AND route_id = ? AND month_index = ? AND discipline = ? "
-                "AND section_id = ? AND week_index = ?",
-                (share, p["unit"], float(p["quantity"] or 0), _now(),
-                 db.current_tenant(), p["route_id"], p["month_index"],
-                 p["discipline"] or "", p["section_id"] or "", w))
-            refreshed += 1
+            # 26 Nov 2026 (the fill race): `AND status = 'derived'` — `cur` was read before this write, and a planner's
+            # edit or confirm can land in between; the refresh must then leave that week alone (kept), never write
+            # the ÷n share over it or re-stamp its parent_qty.
+            if db.execute_count(
+                    "UPDATE forecast_weeks SET planned_qty = ?, unit = ?, "
+                    "parent_qty = ?, updated_at = ? WHERE tenant_id = ? "
+                    "AND route_id = ? AND month_index = ? AND discipline = ? "
+                    "AND section_id = ? AND week_index = ? AND status = 'derived'",
+                    (share, p["unit"], float(p["quantity"] or 0), _now(),
+                     db.current_tenant(), p["route_id"], p["month_index"],
+                     p["discipline"] or "", p["section_id"] or "", w)):
+                refreshed += 1
+            else:
+                kept += 1
         else:
             # ⭐ edited / confirmed: left EXACTLY as it is, parent_qty included.
             # Not re-stamping it is what makes parent_changed fire on the read.
