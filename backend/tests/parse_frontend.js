@@ -3129,7 +3129,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !src.includes("RS_ICON")
      && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(html) && /\.row-st\.rs-warn i\{[^}]*border-radius:0;[^}]*transform:rotate\(45deg\);/.test(html)
      && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(html)
-     && /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     // NARROWED 26 Nov 2026 (own look B1 after): the shape drops to the first line's middle (margin-top in em)
+     && /\.row-st i\{[^}]*width:10px;height:10px;margin-top:calc\(\.675em - 5px\);border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
      && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
      && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true"></i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",

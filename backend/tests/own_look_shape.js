@@ -38,10 +38,11 @@ ok("1 corner: inline corners in the script are the small 2 / 3 px swatches, the 
 // ---------------------------------------------------------------- stage 2: status = a shape and a word, no tint
 ok("2 status: RowStatus draws an empty <i> (the shape, in CSS) and the word — no glyph, no RS_ICON",
    code.includes('<i aria-hidden="true"></i>{word}') && !code.includes("RS_ICON") && !/RS_[A-Z]+ = \{[^}]*"✓"/.test(code));
+// NARROWED 26 Nov 2026 (B1 after): each shape drops to the first line's middle (margin-top in em), the diamond too
 ok("2 status: dot = ok, diamond = warning, square = bad, ring = none (and draft), 10 px, the ring a 2 px stroke",
-   /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(css)
+   /\.row-st i\{[^}]*width:10px;height:10px;margin-top:calc\(\.675em - 5px\);border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(css)
    && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(css)
-   && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate\(45deg\);\}/.test(css)
+   && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;width:9px;height:9px;margin:calc\(\.675em - 4\.5px\) 1px 0;transform:rotate\(45deg\);\}/.test(css)
    && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(css)
    && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(css));
 // NARROWED 24 Nov 2026 (taking main 34e08ac in): the tints are gone from the token blocks and from every status; the one
@@ -237,6 +238,13 @@ ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account
    (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
      return opens.length >= 11 && opens.every(t => /className="fig-strip /.test(t)); })()
    && code.includes('<div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">'));
+// 26 Nov 2026 (own look B1, after): a status word that wraps kept its shape on the middle of the WHOLE block (17.5 px under
+// the first line in a cell, 52.6 px in a tablet card); the row is now top-aligned and the shape drops half a line less half itself
+ok("4 status: the row is top-aligned and each shape sits on the first line's middle (.675em = half of the 1.35 line, less half the shape)",
+   css.includes(".row-st{display:inline-flex;align-items:flex-start;gap:7px;") && !/\.row-st\{[^}]*align-items:center/.test(css)
+   && css.includes("height:10px;margin-top:calc(.675em - 5px);border-radius:50%;")
+   && css.includes("width:9px;height:9px;margin:calc(.675em - 4.5px) 1px 0;transform:rotate(45deg);}")
+   && /\.row-st\{[^}]*line-height:1\.35;/.test(css));
 // 26 Nov 2026 (own look B1, after): full screen (Routes, a site's layout) is on the page white with hairlines between its
 // columns, not cards on grey (design language, Sections); each open column is 25 px wider so what is inside keeps its width
 ok("4 full screen: the backdrop is the page white with no gap or frame (the grey and the 8 px gaps are gone)",
