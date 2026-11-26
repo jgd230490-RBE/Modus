@@ -674,13 +674,55 @@ def _best(answer, option=None, why="", history="current", counted=True, cols=Non
             "cols": cols, "busy_held": busy, "cycle_held": True}
 
 
+def _rows(use, opt, label, marks, history="current", counted=True, period="2021–2025"):
+    """Typed schedule rows in route_best.option_rows' shape (25 Nov 2026): `marks` {key: (mark, words)}."""
+    def r(key, lab, u, a, dp=0, bars="ink", sub=False, none=None):
+        m, w = marks.get(key, ("none", "the same"))
+        if not counted and key in ("left_turns", "cycle_meets", "cycle_beside_km", "places"):
+            m, w = "off", route_best.ROW_NOT_COUNTED
+        return {"key": key, "label": lab, "sub": sub, "unit": None, "in_use": u, "option": a,
+                "in_use_text": RR._n(u, dp) if u is not None else "", "option_text": RR._n(a, dp) if a is not None else "",
+                "mark": m, "words": w, "bars": None if none else bars, "none": none}
+    out = []
+    if history == "current":
+        out.append(dict(r("collisions", f"Collisions on the road, {period}", use["collisions"], opt["collisions"],
+                          bars="grey"), mark="plain", words=marks.get("collisions", ("plain", ""))[1]))
+        out.append(dict(r("goods", "involving an HGV", use["goods"], opt["goods"], bars="grey", sub=True), mark="plain",
+                        words=""))
+    else:
+        out.append(r("collisions", "Collisions on the road", None, None, none=(
+            route_best.ROW_STALE if history == "out_of_date" else route_best.NO_HISTORY_WORDS)))
+    out += [r("left_turns", "Left-hand turns", use["left_turns"], opt["left_turns"]),
+            r("cycle_meets", "Cycle routes met", use["cycle_meets"], opt["cycle_meets"]),
+            r("cycle_beside_km", "km beside a cycle route", use["cycle_beside_km"], opt["cycle_beside_km"], 2),
+            r("places", "Community: schools, hospitals, health centres", use["places"], opt["places"]),
+            r("round_trip", "Round trip, min", use["cycle_min"], opt["cycle_min"], 1),
+            r("trips", "Trips a lorry fits a day", use["trips"], opt["trips"])]
+    held = [h for h in ("08:00", "17:00") if (opt.get("busy_min") or {}).get(h) is not None
+            and (use.get("busy_min") or {}).get(h) is not None]
+    out += [r(f"busy_{h}", f"Setting off at {h}", use["busy_min"][h], opt["busy_min"][h], 1) for h in held]
+    if not held:
+        out.append(r("busy", "Busy hours", None, None, none=f"Not compared: no busy-hour times held for {label}."))
+    out += [r("carbon", "Carbon, kg CO₂e a trip", use["co2_kg"], opt["co2_kg"], 1),
+            r("limits", "Limits added", None, None, none="None")]
+    return out
+
+
 _USE = _col("In use", _cnt(26, 3, 17, 5, 1.2, 9, 120.0, 40.0), in_use=True)
 SUGG = _best("Suggested", "Alt 1", "Alt 1 passes fewer schools, hospitals and health centres and takes no longer.",
              cols=[_USE, _col("Alt 1", _cnt(31, 4, 12, 3, 0.8, 4, 118.0, 39.0),
                               {"left_turns": -29, "cycle_meets": -40, "cycle_beside_km": -33, "places": -56},
                               chosen=True, head={"time": "the same"})])
+SUGG["cols"][1]["rows"] = _rows(_USE["counts"], SUGG["cols"][1]["counts"], "Alt 1",
+                                {"collisions": ("plain", "more"), "left_turns": ("ok", "29 % fewer"),
+                                 "cycle_meets": ("ok", "40 % fewer"), "cycle_beside_km": ("ok", "33 % less"),
+                                 "places": ("ok", "56 % fewer"), "carbon": ("ok", "1 kg less")})
 TRADE = _best("A trade-off", None, "Alt 1 passes fewer places (6 against 9), but its round trip is 9 min longer.",
               cols=[_USE, _col("Alt 1", _cnt(23, 2, 4, 5, 1.2, 6, 129.0, 44.0), {"places": -33}, traded=True)])
+TRADE["cols"][1]["rows"] = _rows(_USE["counts"], TRADE["cols"][1]["counts"], "Alt 1",
+                                 {"collisions": ("plain", "fewer"), "left_turns": ("ok", "13 fewer"),
+                                  "places": ("ok", "33 % fewer"), "round_trip": ("warn", "9 min longer"),
+                                  "carbon": ("warn", "4 kg more")})
 KEEP = _best("Keep the route in use", None, "Every other option is ruled out: each adds a limit below this lorry.",
              cols=[_USE, _col("Alt 1", _cnt(8, 0, 2, 0, 0.0, 1, 90.0, 30.0), ruled_out=["Weight limit 7.5 t, both legs"]),
                    _col("Alt 2", _cnt(9, 0, 3, 0, 0.0, 1, 95.0, 31.0), ruled_out=["Weight limit 7.5 t, both legs"])])
@@ -731,30 +773,49 @@ if TX:
     ok("9: no answer for a route: the page says so in one sentence, no figures",
        RA.SUMMARY_UNAVAILABLE in _te and "The figures" not in _te and "At a glance" not in _te, _te[:400])
     # each part not counted: said in words, never drawn as a bar or a zero
-    _to, _ = _page(dict(SUGG, history="out_of_date"))
-    _tn, _ = _page(dict(SUGG, history="not_fetched"))
-    ok("9 not counted: collision history out of date / not fetched: 'Not compared', no collision figure",
-       "the collision history is out of date for this route" in _to and "the collision history has not been fetched" in _tn
-       and "not compared" in _to and "With a goods vehicle over 3.5 t" not in _to and " 26 " not in f" {_to} ".split("The figures")[1][:400],
-       _to[:900])
-    _tc, _ = _page(dict(SUGG, counted=False))
-    ok("9 not counted: cycle routes and places not fetched along every option: said, the figures starred 'shown'",
-       "Not counted yet: not fetched along every option." in _tc and "shown, not counted" in _tc and "17*" in _tc, _tc[:900])
-    ok("9 not counted: busy hours held for the route in use only / for none: said in words",
-       "No busy-hour times are worked out for this route." in _ts, _ts[:900])
+    def _sugg(**k):
+        """SUGG with its Alt 1 rows written again for another state (history, counted, busy minutes)."""
+        use = k.pop("use", _USE)
+        o = dict(SUGG["cols"][1], counts=dict(SUGG["cols"][1]["counts"], **k.pop("opt_counts", {})))
+        o["rows"] = _rows(use["counts"], o["counts"], "Alt 1", {"left_turns": ("ok", "29 % fewer")},
+                          history=k.get("history", "current"), counted=k.get("counted", True))
+        return dict(SUGG, cols=[use, o], **k)
+    _to, _ = _page(_sugg(history="out_of_date"))
+    _tn, _ = _page(_sugg(history="not_fetched"))
+    # REVERSED 25 Nov 2026 (the Routes page rethink, Q11; John: "Yes, as recommended"): the panel's own sentence went with
+    # the panels; the schedule's collision row says it in the rule's own words (route_best.ROW_STALE / NO_HISTORY_WORDS),
+    # across the row, with no figure ("The figures" is gone, so the table is read after the schedule's title)
+    ok("9 not counted: collision history out of date / not fetched: said in the rule's words, no collision figure",
+       RR._sum_safe(route_best.ROW_STALE) in _to and route_best.NO_HISTORY_WORDS in _tn
+       and "With a goods vehicle over 3.5 t" not in _to and "involving an HGV" not in _to
+       and " 26 " not in f" {_to} ".split(RR.SUM_SCHED)[1][:400], _to[:900])
+    _tc, _ = _page(_sugg(counted=False))
+    # REVERSED 25 Nov 2026 (Q11): the starred figures and "Not counted yet: not fetched along every option." went with
+    # "The figures" and the panels; the rows say the rule's "Not counted yet" and the note above the schedule stays
+    ok("9 not counted: cycle routes and places not fetched along every option: said in the rows and the note, no star",
+       route_best.ROW_NOT_COUNTED in _tc and "shown, not counted" in _tc and "17*" not in _tc and "(*)" not in _tc,
+       _tc[:900])
+    # NARROWED 25 Nov 2026 (Q11): busy hours not compared are said in the rule's own words for the option
+    ok("9 not counted: busy hours not held for the option: said in the rule's words",
+       "Not compared: no busy-hour times held for Alt 1." in _ts, _ts[:900])
     _USEb = _col("In use", _cnt(26, 3, 17, 5, 1.2, 9, 120.0, 40.0, {"08:00": 131.0, "17:00": 135.5}), in_use=True)
-    _tb, _ = _page(dict(SUGG, cols=[_USEb, SUGG["cols"][1]]))
-    ok("9 not counted: ...held for the route in use only", "busy-hour times are held for the route in use only" in _tb)
-    _Ob = dict(SUGG["cols"][1], counts=dict(SUGG["cols"][1]["counts"], busy_min={"08:00": 128.0, "17:00": 130.0}))
-    _th, _ = _page(dict(SUGG, busy_held=True, cols=[_USEb, _Ob]))
+    _tb, _ = _page(_sugg(use=_USEb))
+    # REVERSED 25 Nov 2026 (Q11): "held for the route in use only" was the panel's; the rule says it for the option
+    ok("9 not counted: ...held for the route in use only: the option's cells say so, no busy figure for it",
+       "Not compared: no busy-hour times held for Alt 1." in _tb and "Setting off at 08:00" not in _tb, _tb[:900])
+    _th, _ = _page(_sugg(use=_USEb, busy_held=True, opt_counts={"busy_min": {"08:00": 128.0, "17:00": 130.0}}))
     ok("9: busy hours held for every option: drawn by the hour it sets off", "Setting off at 08:00" in _th
        and "135.5" in _th and "130" in _th and "Not compared: busy-hour" not in _th, _th[-1500:])
     _tm, _ = _page(SUGG, routes=3)
     ok("9: a file of several routes: 'Summary i of n' and where each route's sections start",
        "Summary 1 of 3." in _tm and "Summary 3 of 3." in _tm and "R9's sections start on page 7" in _tm, _tm[-600:])
     # no "Better", "safer" or a percentage beside a collision count: every collision line on every typed page
+    # NARROWED 25 Nov 2026 (Q11): the schedule is one table, so a collision row's window ends at the next row's label
+    # ("Left-hand turns"), and the how-line (pinned word for word in 9c, its "Clearly better" the rule's test) is read
+    # out first
     for _lab, _t in (("Suggested", _ts), ("trade-off", _tt), ("Keep", _tk), ("held", _th)):
-        _near = [m.group(0) for m in re.finditer(r"[Cc]ollisions?[^.]{0,90}", _t)]
+        _t = _t.replace(" ".join(RR._sum_safe(RR._sum_how_line()).split()), "")
+        _near = [m.group(0).split("Left-hand turns")[0] for m in re.finditer(r"[Cc]ollisions?[^.]{0,90}", _t)]
         ok(f"9 collisions ({_lab}): counts only: no 'better', 'safer', 'worse', rate or % beside a collision count",
            _near and not any(re.search(r"better|safer|worse|%|per |rate\b", s, re.I)
                              and "never a percentage or a rate" not in s for s in _near), str(_near)[:600])
@@ -765,8 +826,11 @@ _sumsrc = _ren.split("#  The summary (16 Nov 2026")[1].split("def page_assessor(
 # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): NARROWED: step 3 of "How the answer was reached" says "Clearly better on one measure and worse on none" (the
 # rule's test, card 4 / 5 words); no other string in the summary says safer or better, and none sits by a collision
 _sumsrc_nostep = _sumsrc.replace('"Clearly better on one measure and worse on none: suggested. Mixed: the planner decides. "', '')
-ok("9 source: the summary's code exists, collisions drawn grey with no pct_key, no 'safer' / 'better' word",
-   _sumsrc and 'dict(key="collisions", grey_all=True)' in _sumsrc and 'pct_key="collisions"' not in _sumsrc
+# NARROWED 25 Nov 2026 (Q11): the panels' `dict(key="collisions", grey_all=True)` went with them; the collision rows'
+# bars are the rule's "grey" (route_best.option_rows), the route in use's grey, a row's own percentage is never read
+ok("9 source: the summary's code exists, collisions drawn grey with no percentage, no 'safer' / 'better' word",
+   _sumsrc and 'bar="grey")' in _sumsrc and 'pct_key="collisions"' not in _sumsrc
+   and 'kind = "hatch" if c["out"] else "grey" if key in ("collisions", "goods") else "ink"' in _sumsrc
    and _sumsrc_nostep != _sumsrc
    and not re.search(r'"[^"\n]*\b(safer|better|safest)\b[^"\n]*"', _sumsrc_nostep, re.I)
    and 'p.get("collisions")' not in _sumsrc, str(len(_sumsrc)))
@@ -778,8 +842,11 @@ ok("⭐ 9 source: the summary page's step 3 reads as card 6 draws it, 'Involving
    and 'SUM_HGV = "Involving an HGV"' in _sumsrc and '"Left-hand turns"' in _sumsrc
    and not re.search(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode),
    re.findall(r"trade-off|Ahead on|behind on|people, time|With a goods vehicle|\"Left turns", _sumcode))
-ok("9 source: the figures table's row keeps HGV in capitals ('involving an HGV'; a .lower() printed 'involving an hgv')",
-   'rows.append(("   " + SUM_HGV[0].lower() + SUM_HGV[1:], ' in _sumsrc and "SUM_HGV.lower()" not in _sumsrc)
+# REVERSED 25 Nov 2026 (Q11): "The figures" table is gone; the HGV row's words are the rule's own (route_best.HGV_WORDS,
+# "involving an HGV", in capitals), the page lowers nothing
+ok("9 source: the HGV row keeps HGV in capitals: the rule's label, never lowered by the page",
+   'label, sub = route_best.HGV_WORDS, True' in _sumsrc and route_best.HGV_WORDS == "involving an HGV"
+   and "SUM_HGV.lower()" not in _sumsrc and "SUM_HGV[0].lower()" not in _sumsrc)
 ok("9 source: an answer kept in older words is read in the new ones before the page draws it (route_best.answer_words)",
    '"answer": route_best.answer_words(r["answer"])' in _doc)
 ok("9 source: stored data only: the summary is gathered through route_best (no fetch), inside gather",
@@ -860,6 +927,176 @@ if TX:
     ok("9b: section C's own label still reads 'on the route' in the same file", "collisions on the route" in _full.lower())
 ok("9b XLSX: the Summary sheet says it too (A3), its column still 'Collisions on the road'",
    WB["Summary"]["A3"].value == RR.SUM_COUNT_NOTE and _S[3][5] == "Collisions on the road")
+
+# --------------------------------------------------------------------------- #
+#  9c. One schedule (25 Nov 2026, the Routes page rethink, Q11 Direction 1;    #
+#      John: "Yes, as recommended"; notes\routes-rethink-mockup-1124 card 5)   #
+# --------------------------------------------------------------------------- #
+import inspect  # noqa: E402
+_ren2 = open(os.path.join(BACKEND, "route_analysis_render.py"), encoding="utf-8").read()
+_code2 = "\n".join(l.split("#")[0] for l in _ren2.splitlines())
+ok("⭐ 9c GONE: the six panels and 'The figures' table: no 'At a glance', no 'The figures', no panel or table code",
+   '"At a glance"' not in _code2 and '"The figures"' not in _code2 and "each panel has its own scale" not in _code2
+   and not re.search(r"def _sum_(panels|table|draw_panel|bars|none)\b", _ren2) and "SUM_NOT_COUNTED" not in _code2)
+ok("9c: the schedule's title and scale line as card 5 draws them",
+   RR.SUM_SCHED == "The options, measure by measure" and RR.SUM_SCALE == "Every bar starts at zero; each row has its own scale."
+   and RR.SUM_DIFF == "Against the route in use" and RR.SUM_HEAD == "A round trip")
+_S1 = RR.schedule(SUGG)
+_k1 = [r["key"] for r in _S1["rows"]]
+ok("9c schedule: one option: the difference has its own last column; rows in the card's order, the page's two rows "
+   "(shown, length) where the old table had them",
+   _S1["diff_col"] is True and _k1 == ["collisions", "goods", "left_turns", "cycle_meets", "cycle_beside_km", "places",
+                                       "shown", "round_trip", "trips", "busy", "carbon", "km", "limits"], str(_k1))
+_c1 = {r["key"]: r for r in _S1["rows"]}
+ok("9c schedule: the rule's figures, marks and words printed as they are; in use grey, the option ink",
+   _c1["left_turns"]["cells"][0]["text"] == "17" and _c1["left_turns"]["cells"][1]["text"] == "12"
+   and _c1["left_turns"]["cells"][1]["mark"] == "ok" and _c1["left_turns"]["cells"][1]["words"] == "29 % fewer"
+   and _c1["left_turns"]["cells"][0]["bar"] == "grey" and _c1["left_turns"]["cells"][1]["bar"] == "ink"
+   and _c1["places"]["cells"][1]["words"] == "56 % fewer", str(_c1["left_turns"]))
+ok("9c collisions: both counts with grey bars, the rule's plain word only: no mark, no percentage, no ok / warn",
+   all(cl["bar"] == "grey" for k in ("collisions", "goods") for cl in _c1[k]["cells"])
+   and _c1["collisions"]["cells"][1]["mark"] == "plain" and _c1["collisions"]["cells"][1]["words"] == "more"
+   and not any("%" in cl["words"] or cl["mark"] in ("ok", "warn") for k in ("collisions", "goods")
+               for cl in _c1[k]["cells"]), str(_c1["collisions"]))
+ok("9c page rows: shown and length are figures only, never marked or worded",
+   all(not cl["mark"] and not cl["words"] for k in ("shown", "km") for cl in _c1[k]["cells"])
+   and _c1["km"]["cells"][0]["text"] == "40" and _c1["shown"]["label"] == RR.SUM_SHOWN_ROW)
+ok("9c a measure no column has: said once across the row (as card 5 draws 'Not compared …', 'None')",
+   _c1["busy"]["span"] == "Not compared: no busy-hour times held for Alt 1." and _c1["limits"]["span"] == "None")
+_SK = RR.schedule(KEEP)
+_ck = {r["key"]: r for r in _SK["rows"]}
+ok("9c ruled out: no rows from the rule, so each ruled-out column keeps its figures from its counts, hatched, never "
+   "marked; no difference column",
+   _SK["diff_col"] is False and [c["out"] for c in _SK["cols"]] == [False, True, True]
+   and _ck["left_turns"]["cells"][1]["text"] == "2" and _ck["left_turns"]["cells"][1]["bar"] == "hatch"
+   and not any(cl["mark"] or cl["words"] for r in _SK["rows"] for cl in r["cells"])
+   and "limits" not in _ck and _ck["busy"]["span"] == RR.SUM_NO_BUSY, str(list(_ck)))
+_src_rows = inspect.getsource(route_best.option_rows)
+ok("9c labels: where the rule wrote no rows the page uses the rule's own labels (each found in option_rows)",
+   all(f'"{v}"' in _src_rows or v == f"Carbon, kg {route_best.CO2E} a trip" or v.startswith("Setting off at ")
+       for v in RR.SUM_LABELS.values()) and 'f"Setting off at {h}"' in _src_rows
+   and 'f"Carbon, kg {CO2E} a trip"' in _src_rows and _ck["collisions"]["label"] == "Collisions on the road, 2021–2025"
+   and _ck["goods"]["label"] == route_best.HGV_WORDS, str(RR.SUM_LABELS))
+# two options: the difference under each option's figure; the suggested column marked
+_T2 = dict(SUGG, cols=SUGG["cols"] + [dict(TRADE["cols"][1], label="Alt 2", traded=False, rows=_rows(
+    _USE["counts"], TRADE["cols"][1]["counts"], "Alt 2", {"round_trip": ("warn", "9 min longer")}))])
+_S2 = RR.schedule(_T2)
+_c2 = {r["key"]: r for r in _S2["rows"]}
+ok("9c two options: the difference sits under each option's figure, the suggested column marked",
+   _S2["diff_col"] is False and [c["chosen"] for c in _S2["cols"]] == [False, True, False]
+   and _c2["round_trip"]["cells"][2]["words"] == "9 min longer" and _c2["round_trip"]["cells"][2]["mark"] == "warn"
+   and _c2["busy"]["span"] is None and _c2["busy"]["cells"][1]["none"] == "Not compared: no busy-hour times held for Alt 1."
+   and _c2["busy"]["cells"][2]["none"] == "Not compared: no busy-hour times held for Alt 2.")
+# an option whose roads were not searched while another's were: its own words in its own cell
+_O3 = dict(TRADE["cols"][1], label="Alt 2", traded=False,
+           rows=[dict(r) for r in TRADE["cols"][1]["rows"] if r["key"] not in ("collisions", "goods")])
+_O3["rows"].insert(0, {"key": "collisions", "label": "Collisions on the road", "sub": False, "unit": None,
+                       "in_use": None, "option": None, "in_use_text": "", "option_text": "", "mark": "off", "words": "",
+                       "bars": None, "none": route_best.ROW_NOT_SEARCHED})
+_c3 = {r["key"]: r for r in RR.schedule(dict(SUGG, cols=SUGG["cols"] + [_O3]))["rows"]}
+ok("9c an option not searched: its collision cell says the rule's words, the other option keeps its counts",
+   _c3["collisions"]["cells"][2]["none"] == route_best.ROW_NOT_SEARCHED and _c3["collisions"]["cells"][1]["text"] == "31"
+   and _c3["collisions"]["cells"][0]["text"] == "26" and _c3["goods"]["cells"][2]["text"] == "")
+ok("9c how the answer was reached: ONE line in the steps' own words (card 5)",
+   RR._sum_how_line() == "1 Rule out an option that adds a lorry limit below this lorry, or crosses a road closed on the "
+   "day → 2 Compare each option left against the route in use: collisions, cycle routes, community, time, busy "
+   "hours, carbon → 3 Clearly better on one measure and worse on none: suggested. Mixed: the planner decides. "
+   "Otherwise: keep.", RR._sum_how_line())
+ok("9c how to read this page: the collision note and the counting note word for word",
+   RR.SUM_READ[0] == ("Collisions", "Injury collisions the police recorded on the road. Counts only: never a percentage "
+                                     "or a rate. A count beside a road is not a risk.")
+   and RR.SUM_COUNT_NOTE.startswith("Collisions here are counted on this lorry's own lines, out and back."))
+
+
+def _lowest(B, routes=1):
+    """The lowest text drawn above each page's foot, and the foot's top (Doc.bottom), for typed answers."""
+    D9 = dict(D)
+    D9["routes"] = [dict(R, best=B, id=f"R{9 + i}") for i in range(routes)]
+    doc = RR.Doc(D9)
+    low, page, bot = {}, {"n": 0}, {}
+    for name in ("drawString", "drawRightString", "drawCentredString"):
+        f = getattr(doc.c, name)
+
+        def w(x, y, *a, _f=f, **k):
+            if page["n"]:
+                low[page["n"]] = min(low.get(page["n"], 1e9), y)
+            return _f(x, y, *a, **k)
+        setattr(doc.c, name, w)
+    end = doc.end_page
+
+    def ep():
+        bot[page["n"]] = doc.bottom()
+        page["n"] = None
+        return end()
+    doc.end_page = ep
+    for i, R9 in enumerate(D9["routes"], 1):
+        page["n"] = i
+        RR.page_summary(doc, R9, i, routes, {})
+    return [(low[i], bot[i]) for i in sorted(low)]
+
+
+# the tallest page the rule can give: three options left in, busy hours held for each, nothing counted for cycle and
+# places, a long reason and a held-back line, a file of several routes (two foot lines)
+_USEx = _col("In use", _cnt(26, 3, 17, 5, 1.2, 9, 120.0, 40.0, {"08:00": 131.0, "17:00": 135.5}), in_use=True)
+_ox = []
+for _j in (1, 2, 3):
+    _cx = _cnt(30 + _j, 4, 12, 3, 0.8, 4, 118.0, 39.0, {"08:00": 128.0, "17:00": 130.0})
+    _ox.append(_col(f"Alt {_j}", _cx, chosen=_j == 1))
+    _ox[-1]["rows"] = _rows(_USEx["counts"], _cx, f"Alt {_j}", {k: ("warn", "123.5 min longer") for k in (
+        "left_turns", "cycle_meets", "cycle_beside_km", "places", "round_trip", "trips", "busy_08:00", "busy_17:00",
+        "carbon")}, counted=False)
+_TALL = _best("Suggested", "Alt 1", "Alt 1 " + "passes fewer schools, hospitals and health centres; " * 30, counted=False,
+              cols=[_USEx] + _ox, busy=True, held_back="a long held-back line " * 20)
+_lw = _lowest(_TALL, routes=2) + _lowest(SUGG) + _lowest(KEEP) + _lowest(TRADE)
+ok("⭐ 9c the page fits: on the tallest typed page (three options, every row two lines, long notes) and on each "
+   "answer, the lowest text sits above the foot (R011's lesson, 17 Nov)",
+   all(lo - 2 >= b for lo, b in _lw), str(_lw))
+# the rows the rule writes are the figures the page prints. The scratch DB's route has no option left in, so the rule's
+# own option_rows is run on a typed option (its counts, parts and detail in the rule's shape)
+_use_r = {"collisions": 26, "goods": 3, "left_turns": 17, "cycle_meets": 5, "cycle_beside_km": 1.2, "places": 9,
+          "cycle_min": 120.0, "trips": 4, "co2_kg": 40.0, "busy_at": {"08:00": 131.0, "17:00": 135.5}}
+_o_r = {"label": "Alt 1", "ruled_out": [], "searched": True,
+        "counts": {"collisions": 31, "goods": 4, "left_turns": 12, "cycle_meets": 3, "cycle_beside_km": 0.8, "places": 4,
+                   "cycle_min": 118.0, "trips": 4, "co2_kg": 39.0, "km": 40.0,
+                   "busy_min": {"08:00": 128.0, "17:00": 130.0}},
+        "parts": {"collisions": -1, "goods": 0, "cycle": 1, "community": 1},
+        "detail": {"cycle_measures": {"left_turns": 1, "cycle_meets": 1, "cycle_beside_km": 1}, "community_part": 1,
+                   "time_rows": {"round_trip": 0, "trips": 0}, "busy_hours": {"08:00": 0, "17:00": 0}},
+        "heads": {"carbon": 0}, "pct": {"left_turns": -29, "cycle_meets": -40, "cycle_beside_km": -33, "places": -56}}
+_rows_r = route_best.option_rows(_o_r, _use_r, types.SimpleNamespace(period="2021–2025", lims=[1]), "current")
+ok("9c the counts the page reads for a ruled-out column are the figures the rule's own rows give (option_rows on a "
+   "typed option: every key, the busy hours included)",
+   len([r for r in _rows_r if r["key"] in RR.SUM_COUNT_OF]) == 11
+   and all(RR._sum_count(_o_r, r["key"]) == r["option"] for r in _rows_r if r["key"] in RR.SUM_COUNT_OF)
+   and all(RR.SUM_LABELS.get(r["key"], r["label"]) == r["label"] for r in _rows_r),
+   str([(r["key"], r["option"], r["label"]) for r in _rows_r])[:600])
+_r_b = {"answer": "Planner to decide", "why": "x", "checks": {"collision_history": "current"}, "counts_in_use": dict(
+    _use_r, km=40.0), "in_use": None, "options": [dict(_o_r, rows=_rows_r, chosen=False, traded=True, head_words={})]}
+route_best.evaluate = lambda rid, ctx: _r_b
+_B_r = RA.best("R1", route_best.Context(day=date(2026, 11, 9)), conversions.load_factors())
+route_best.evaluate = _real_eval
+_c_r = {r["key"]: r for r in RR.schedule(_B_r)["rows"]}
+ok("9c gather: best() hands each option left in the rule's rows as they are, and the schedule prints them",
+   _B_r["cols"][1]["rows"] == _rows_r and _B_r["cols"][0].get("rows") is None
+   and _c_r["left_turns"]["cells"][1]["words"] == "29 % fewer" and _c_r["busy_08:00"]["cells"][0]["text"] == "131"
+   and _c_r["collisions"]["label"] == "Collisions on the road, 2021–2025", str(_B_r["cols"][1].get("rows"))[:300])
+ok("9c gather on the scratch DB: a ruled-out option carries no rows",
+   all(c.get("rows") is None for c in _b9.get("cols", []) if c["ruled_out"]))
+if TX:
+    _tx1, _ = _page(SUGG)
+    ok("9c page: the schedule prints its title, scale line, the difference column and the rule's words",
+       RR.SUM_SCHED in _tx1 and RR.SUM_SCALE in _tx1 and "Against the route in use" in _tx1 and "29 % fewer" in _tx1
+       and "Length, km a round trip" in _tx1 and "At a glance" not in _tx1 and "The figures" not in _tx1
+       and "How the answer was reached" in _tx1 and "Rule out an option that adds" in _tx1, _tx1[:1200])
+    _tx2, _ = _page(_T2)
+    ok("9c page: two options: no difference column, the words under the figures", "Against the route in use" not in _tx2
+       and "9 min longer" in _tx2 and "29 % fewer" in _tx2, _tx2[:1200])
+_Sx = RR.summary_rows(dict(R, best=SUGG))
+ok("9c XLSX: the Summary sheet keeps its rows and gains the differences in the rule's words as its last column",
+   RR.SUMMARY_SHEET_HEAD[-1] == "Against the route in use" and len(_Sx) == 2 and len(_Sx[0]) == len(RR.SUMMARY_SHEET_HEAD)
+   and _Sx[0][-1] is None and _Sx[1][-1].startswith("Collisions on the road, 2021–2025: more; Left-hand turns: 29 % fewer")
+   and "involving an HGV" not in _Sx[1][-1] and "Busy hours" not in _Sx[1][-1]
+   and RR.summary_rows(dict(R, best=KEEP))[1][-1] is None and _S[3][-1] == "Against the route in use", str(_Sx[1][-1]))
 
 remove_scratch_db(db, TMP)
 print(f"\n{PASS} passed, {len(FAIL)} failed")

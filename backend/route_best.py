@@ -85,6 +85,13 @@ How each decision of John's is held (section numbers of the 16 Nov note):
     "Diversion" (it read "Way round"). The words above that say "ahead", "behind" or "A trade-off" describe the rule's
     working, never a sentence.
 
+  * 25 Nov 2026 (the Routes page rethink, cards 4, 5 and 7; John: "Yes, as recommended", Q11 to Q13). Each option left
+    in carries `rows` (option_rows): the schedule the card and the Route analysis summary page print, one row a measure
+    with its two figures, a mark (ok / warn / none / plain / off) and the difference in words. Every mark is the rule's
+    own step for that measure (`_heads` adds the time head's two halves, `detail["time_rows"]`); a collision row is
+    "plain": its two counts and the rule's "fewer" / "more", never ok or warn, never a percentage or a ratio. Nothing
+    is decided again: the answers are the same (test_route_best §16 and §17).
+
 Every threshold is a named constant below: STARTING VALUES that John has not set (he sets them on the all-50 table, Q9).
 
 WHAT IS NOT VERIFIED: run on stubbed and local lines only; never on live's figures (local worktree databases hold stand-in
@@ -309,6 +316,7 @@ class Context:
                                                   (self.tenant,))}
         self.choice_rows = route_choice._rows_by_route()
         self.zones_on = [z for z in route_choice.dated_zones() if zones.applies_on(z, self.day.isoformat())]
+        self._closures_read()
         self.lims = route_choice._load_limits()
         # collisions
         self.col_status = collisions.status() or {}
@@ -349,6 +357,32 @@ class Context:
         self.routes = self.pre["routes"]
         self.choice_rows = route_choice._rows_by_route()
         self.zones_on = [z for z in route_choice.dated_zones() if zones.applies_on(z, self.day.isoformat())]
+        self._closures_read()
+
+    def _closures_read(self):
+        """25 Nov 2026 (closures): the routing closures in force on the day or starting after it (route_choice's own
+        dated zones, so the same set _ruled_out reads; an ended one is left out), the organisation's distance unit, and
+        an empty cache for the Diversions table's periods (read per route, only where a line needs its figures)."""
+        day = self.day.isoformat()
+        self.zones_ahead = [z for z in route_choice.dated_zones()
+                            if zones.applies_on(z, day) or str(z.get("starts_on") or "")[:10] > day]
+        try:
+            import config
+            du = (config.tenant_settings(conversions).get("distance_unit") or "km")
+        except Exception:
+            du = "km"
+        self.unit = "mi" if du == "mi" else "km"
+        self._periods = {}
+
+    def periods_of(self, rid):
+        """The Diversions table's rows for one route: route_choice.periods, the SAME function GET /api/routes/diversions
+        fills the panel's table from, so the closure line and the table cannot disagree."""
+        if rid not in self._periods:
+            try:
+                self._periods[rid] = route_choice.periods(rid)
+            except Exception:
+                self._periods[rid] = []
+        return self._periods[rid]
 
     def searched_lines(self, rid):
         """{fingerprint} of every line of this route the last fetch searched (any option number), or None when the fetch
@@ -830,7 +864,10 @@ def _heads(use, opt, ctx, hist, searched_ok):
         carbon = 1 if c <= -CARBON_PCT else -1 if c >= CARBON_PCT else 0
     heads = {"people": mix(parts.values()), "time": time, "busy": mix(busy_steps.values()), "carbon": carbon}
     return heads, parts, {"cycle_measures": cyc, "cycle_part": cycle_part, "community_part": place_part,
-                          "busy_hours": busy_steps, "time_tolerance_min": round(tol, 1), "time_gap_min": round(dt, 1)}
+                          "busy_hours": busy_steps, "time_tolerance_min": round(tol, 1), "time_gap_min": round(dt, 1),
+                          # 25 Nov 2026 (the schedule): the two halves of the time head, as the rule tested them
+                          "time_rows": {"round_trip": 1 if dt <= -tol else -1 if dt >= tol else 0,
+                                        "trips": (dtrips > 0) - (dtrips < 0)}}
 
 
 def _pcts(use, opt):
@@ -979,7 +1016,7 @@ def evaluate(rid, ctx):
            "lorry": lorry, "lorry_name": (conversions.vehicle_label(ctx.factors, lorry) if lorry else None),
            "lorry_basis": basis, "other_lorries": [p for p in profiles if p != lorry],
            "answer": KEEP, "option": None, "alt": None, "why": None, "trade": None, "trade_short": None,
-           "trade_also": [], "held_back": None, "in_use_limits": [],
+           "trade_also": [], "held_back": None, "in_use_limits": [], "closures": [], "closures_more": None,
            "sentences": [], "options": [], "in_use": None, "busy_roads": [], "lines": [],
            "checks": {"limits_held": bool(ctx.lims), "community_all_options": ctx.community_all}}
     # finding 5: do the lorry types' lines differ on any (leg, option)? Every count here is on the chosen lorry's own
@@ -1061,7 +1098,185 @@ def evaluate(rid, ctx):
         out["options"].append(option_entry(a, m, use, ctx, hist, reasons, added, searched))
     _answer(out, use, ctx, hist)
     out["lines"] = line_labels(out, lines, lorry, use, use_pair)
+    # 25 Nov 2026 (closures, Q5 / Q6): REPORTED after the answer is made; nothing above reads it
+    out["closures"] = closures(rid, lorry, lines, use_pair, in_use, out["options"], ctx)
+    out["closures_more"] = closures_more(out["closures"])
     return out
+
+
+# --------------------------------------------------------------------------- #
+#  The closures over a route's lines (25 Nov 2026)                             #
+# --------------------------------------------------------------------------- #
+#: 25 Nov 2026 (the Routes page rethink, card 3; John: "Yes, as recommended" to Q5 and Q6). REPORTED only, as
+#: `in_use_limits` is: every routing closure (a dated zone that affects routing, route_choice.dated_zones(), the same set
+#: _ruled_out reads) that a line of the route runs through and that is in force on the rule's day or starts after it; an
+#: ended one is left out. The rule writes both halves a person reads: the head ("Closure in force", "Closure planned",
+#: "Closure planned on Alt 1") and the line ("A47 at the new Tilton junction · until 17 Dec 2027 · the diversion is in
+#: use"). Q6: a closure planned later changes nothing in the answer (the harness compares every route's answer, option
+#: and reasons with this off and on). An advisory zone (a works area, a closure "for information") gets no entry: it
+#: changes no route.
+CLOSURE_IN_FORCE = "Closure in force"
+CLOSURE_PLANNED = "Closure planned"
+CLOSURE_PLANNED_ON = "Closure planned on "
+CLOSURE_DIVERSION_IN_USE = "the diversion is in use"
+CLOSURE_DIVERTS = "diverts"
+#: what the line says for the line in use when its diversion row has no way round (route_choice.PROBLEM; the Routes
+#: page's DIV_PROBLEM in the rule's own lower case)
+CLOSURE_PROBLEM = {"needs_route": "no diversion yet", "no_way_round": "no road round it",
+                   "declined": "kept on the main route"}
+#: the card prints at most this many, soonest first, then the rule's "and N more closures"
+CLOSURES_SHOWN = 2
+#: the harness turns this off to prove the field moves nothing else (Q6)
+CLOSURES_ON = True
+#: config.KM_PER_MILE (asserted equal; config is not imported at module level here)
+KM_PER_MILE = 1.609344
+
+
+def closure_name(name):
+    """A closure's name as the card and the map read it: cut at its first colon ("A47 at the new Tilton junction: HGV
+    diversion while the junction is built" -> "A47 at the new Tilton junction"; the mother session's reading, for John)."""
+    s = str(name or "").strip()
+    i = s.find(":")
+    return (s[:i].strip() if i > 0 else s) or "A closure"
+
+
+def closure_dates(starts_on, ends_on, in_force):
+    """The closure's dates in words: in force "until 17 Dec 2027" (nothing with no end); planned "1–31 Dec 2027",
+    "5 Oct – 17 Dec 2027", "5 Oct 2026 – 17 Dec 2027" or "from 1 Dec 2027" (the Routes page's divWhen rule)."""
+    s, e = route_choice._d(starts_on), route_choice._d(ends_on)
+    if in_force or not s:
+        return f"until {date_words(e)}" if e else ""
+    if not e:
+        return f"from {date_words(s)}"
+    m = _MONTHS
+    if s.year == e.year and s.month == e.month:
+        return f"{s.day}–{e.day} {m[e.month - 1]} {e.year}"
+    if s.year == e.year:
+        return f"{s.day} {m[s.month - 1]} – {e.day} {m[e.month - 1]} {e.year}"
+    return f"{date_words(s)} – {date_words(e)}"
+
+
+def _js_round(x):
+    """Math.round's rule (half up), so a figure here reads as the Diversions table's beside it."""
+    return math.floor(x + 0.5)
+
+
+def _div_leg(period, lorry):
+    """The leg the Diversions table reads its figures from (its divLeg): the lorry's loaded leg, else any loaded leg,
+    else the first."""
+    legs = (period or {}).get("legs") or []
+    return (next((l for l in legs if l.get("leg") == "loaded" and l.get("vehicle_profile") == lorry), None)
+            or next((l for l in legs if l.get("leg") == "loaded"), None) or (legs[0] if legs else None))
+
+
+def diversion_words(period, lorry, unit):
+    """The Diversions table's own figures for one period, in its own form: "diverts, +2.7 mi · −3 min" (divSigned and
+    divMins: the distance to a tenth in the organisation's unit, the minutes whole, the time only where both lines carry
+    one); a period with no way round says so (CLOSURE_PROBLEM)."""
+    if not period:
+        return None
+    st = period.get("status")
+    if st != "in_use":
+        return CLOSURE_PROBLEM.get(st)
+    leg = _div_leg(period, lorry) or {}
+    km = leg.get("km_delta")
+    if km is None:
+        return CLOSURE_DIVERTS
+    d = float(km) / (KM_PER_MILE if unit == "mi" else 1.0)
+    dist = f"{'−' if d < 0 else '+'}{abs(d):.1f} {unit}"
+    hr = leg.get("hr_delta")
+    if hr is None:
+        return f"{CLOSURE_DIVERTS}, {dist}"
+    mins = f"{'−' if hr < -1 / 120 else '+'}{_js_round(abs(float(hr)) * 60)} min"
+    return f"{CLOSURE_DIVERTS}, {dist} · {mins}"
+
+
+def _hits(line, z):
+    try:
+        return bool(line) and zones.line_hits_geometry(line, z["geometry"])
+    except Exception:
+        return False
+
+
+def _legs_word(legs):
+    legs = sorted(set(legs))
+    return "both" if len(legs) > 1 else legs[0]
+
+
+def closures(rid, lorry, lines, use_pair, in_use, options, ctx):
+    """route["closures"]: one entry a routing closure over this route, soonest first (in force, then by its start).
+    Each: {"zone", "name" (closure_name), "state" "in_force" | "planned", "whose" "in_use" | "option", "alts" and
+    "labels" (the options it lies over; empty for the line in use), "legs" "loaded" | "return" | "both", "starts_on",
+    "ends_on", "dates" (closure_dates), "does" (for the line in use: what its diversion does, diversion_words, or
+    "the diversion is in use"; None for an option), "head", "line" (name · dates · does, the line as one string for
+    a file)}.
+    The line in use: a closure over its own lines, or over option 0's while a diversion is in use (the closure the
+    diversion goes round). An option: a PLANNED closure over its own lines that the line in use does not meet (one in
+    force already rules the option out, and says so in its reason); one entry a closure, naming every option it lies
+    over."""
+    if not CLOSURES_ON or not lorry:
+        return []
+    zs = ctx.zones_ahead
+    if not zs:
+        return []
+    legs = ("loaded", "return")
+    use = {leg: lines.get((lorry, leg, use_pair[i])) for i, leg in enumerate(legs)}
+    main = {leg: lines.get((lorry, leg, 0)) for leg in legs}
+    periods = ctx.periods_of(rid)
+    unit = ctx.unit
+    out, taken = [], set()
+    for z in zs:
+        zid = z.get("id")
+        force = zones.applies_on(z, ctx.day.isoformat())
+        on_use = [leg for leg in legs if _hits(use[leg], z)]
+        # the closure a diversion in use goes round: it lies over option 0's line, not over the diversion's
+        on_main = [leg for leg in legs if use_pair[legs.index(leg)] != 0 and _hits(main[leg], z)]
+        if not (on_use or on_main):
+            continue
+        taken.add(zid)
+        dates = closure_dates(z.get("starts_on"), z.get("ends_on"), force)
+        rounds = [leg for leg in on_main if (in_use.get(leg) or {}).get("status") == "in_use"
+                  and zid in ((in_use.get(leg) or {}).get("zones") or [])]
+        if force and rounds and not on_use:
+            does = CLOSURE_DIVERSION_IN_USE
+        else:
+            per = next((p for p in periods if zid in (p.get("zones") or [])), None)
+            does = diversion_words(per, lorry, unit)
+        name = closure_name(z.get("name"))
+        out.append({"zone": zid, "name": name, "state": "in_force" if force else "planned", "whose": "in_use",
+                    "alts": [], "labels": [], "legs": _legs_word(on_use + on_main),
+                    "starts_on": z.get("starts_on"), "ends_on": z.get("ends_on"), "dates": dates, "does": does,
+                    "head": CLOSURE_IN_FORCE if force else CLOSURE_PLANNED,
+                    "line": " \u00b7 ".join(x for x in (name, dates, does) if x)})
+    for z in zs:
+        zid = z.get("id")
+        if zid in taken or zones.applies_on(z, ctx.day.isoformat()):
+            continue
+        alts, labels, olegs = [], [], []
+        for o in sorted(options, key=lambda x: x["alt"]):
+            ol = {"loaded": lines.get((lorry, "loaded", o["alt"]))}
+            if o.get("return_alt") is not None:
+                ol["return"] = lines.get((lorry, "return", o["return_alt"]))
+            hit = [leg for leg, line in ol.items() if _hits(line, z)]
+            if hit:
+                alts.append(o["alt"]); labels.append(o["label"]); olegs += hit
+        if not alts:
+            continue
+        name = closure_name(z.get("name"))
+        dates = closure_dates(z.get("starts_on"), z.get("ends_on"), False)
+        out.append({"zone": zid, "name": name, "state": "planned", "whose": "option", "alts": alts, "labels": labels,
+                    "legs": _legs_word(olegs), "starts_on": z.get("starts_on"), "ends_on": z.get("ends_on"),
+                    "dates": dates, "does": None, "head": CLOSURE_PLANNED_ON + _join(labels),
+                    "line": " \u00b7 ".join(x for x in (name, dates) if x)})
+    out.sort(key=lambda c: (c["state"] != "in_force", str(c.get("starts_on") or ""), c["whose"] != "in_use",
+                            c["alts"][:1] or [-1]))
+    return out
+
+
+def closures_more(cl):
+    """The card's last line when there are more than CLOSURES_SHOWN: "and 1 more closure", "and 2 more closures"."""
+    n = len(cl or []) - CLOSURES_SHOWN
+    return f"and {n} more closure{'' if n == 1 else 's'}" if n > 0 else None
 
 
 # --------------------------------------------------------------------------- #
@@ -1144,7 +1359,117 @@ def option_entry(alt, m, use, ctx, hist, reasons=(), added=(), searched=True):
     o["head_words"] = {k: (_HEAD_WORDS[k].get(v) if v is not None else "not counted") for k, v in heads.items()}
     o["part_words"] = {k: (_PART_WORDS.get(v) if v is not None else "not counted") for k, v in parts.items()}
     o["sentences"] = sentences(o, use, ctx, hist)
+    o["rows"] = option_rows(o, use, ctx, hist)      # 25 Nov 2026: the schedule the card and the file print
     return o
+
+
+# --------------------------------------------------------------------------- #
+#  The schedule: one row a measure (25 Nov 2026)                               #
+# --------------------------------------------------------------------------- #
+#: 25 Nov 2026 (the Routes page rethink, cards 4, 5 and 7; John: "Yes, as recommended", Q11 to Q13). The card's rows
+#: and the summary page's schedule print THESE rows, so the screen and the file read the same and neither works anything
+#: out. Each row: {key, label, sub, unit, in_use, option, in_use_text, option_text, mark, words, bars, none}. `mark`:
+#: "ok" the option is on the better side by this rule's own threshold, "warn" the worse side, "none" the rule calls it
+#: the same, "plain" a collision count (never ok or warn, never a percentage or a ratio: 4c, 4e), "off" not counted.
+#: Every mark is read from the option's parts, heads and detail as `_heads` set them; nothing here decides anything.
+#: A row with no figures carries `none`, the words that stand in for them. A ruled-out option has no rows (None).
+ROW_MARKS = ("ok", "warn", "none", "plain", "off")
+ROW_SAME = "the same"
+ROW_NOT_COUNTED = "Not counted yet"           # the card's word for a cycle or community row before the wide fetch
+ROW_COLLISIONS = "Collisions on the road"
+ROW_STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin."
+ROW_NOT_SEARCHED = "Not compared: its roads were not searched at the last collision fetch."
+ROW_NO_LIMITS = "Not checked: no road limits are held."
+ROW_NO_LIMIT_ADDED = "None"
+#: what the rule's step values mean on a row
+_ROW_MARK = {1: "ok", -1: "warn", 0: "none"}
+
+
+def _row_mark(v):
+    return _ROW_MARK.get(v, "off")
+
+
+def _row_diff(a, u, unit, dp, p=None, fewer="fewer", more="more"):
+    """The difference in words: the rule's percentage where it gives one ('31 % fewer'), else in the row's unit
+    ('13 more', '1.55 km less')."""
+    if p:
+        return f"{abs(p)} % {fewer if p < 0 else more}"
+    d = round(float(a) - float(u), dp)
+    return f"{_n(abs(d), dp)}{' ' + unit if unit in ('km', 'kg') else ''} {fewer if d < 0 else more}"
+
+
+def option_rows(o, use, ctx, hist):
+    """The schedule rows of one option against the line in use (see ROW_MARKS). None for a ruled-out option."""
+    if o.get("ruled_out"):
+        return None
+    c, pt, det, hd, p = o["counts"], o["parts"], o["detail"], o["heads"], o["pct"]
+    rows = []
+
+    def add(key, label, unit, u, a, mark, words, dp=0, bars="ink", sub=False, none=None):
+        rows.append({"key": key, "label": label, "sub": sub, "unit": unit, "in_use": u, "option": a,
+                     "in_use_text": ("" if u is None else _n(u, dp)), "option_text": ("" if a is None else _n(a, dp)),
+                     "mark": mark, "words": words, "bars": (None if none is not None else bars), "none": none})
+
+    def stepped(key, label, unit, u, a, v, dp=0, p_=None, fewer="fewer", more="more", counted=True, sub=False):
+        if not counted:
+            return add(key, label, unit, u, a, "off", ROW_NOT_COUNTED, dp, sub=sub)
+        m = _row_mark(v)
+        words = ROW_SAME if m == "none" else _row_diff(a, u, unit, dp, p_, fewer, more) if m in ("ok", "warn") else ""
+        add(key, label, unit, u, a, m, words, dp, sub=sub)
+
+    # collisions (4c, 4e): the two counts with grey bars and the rule's own "fewer" / "more" where its test says clearly
+    head = f"{ROW_COLLISIONS}, {ctx.period}" if getattr(ctx, "period", "") else ROW_COLLISIONS
+    if hist == "current" and o.get("searched"):
+        for key, label, sub in (("collisions", head, False), ("goods", HGV_WORDS, True)):
+            v = pt.get(key)
+            add(key, label, "count", use[key], c[key], "plain", {1: "fewer", -1: "more"}.get(v, ""), bars="grey", sub=sub)
+    else:
+        add("collisions", head, None, None, None, "off", "",
+            none=(ROW_STALE if hist == "out_of_date" else NO_HISTORY_WORDS if hist == "not_fetched" else ROW_NOT_SEARCHED))
+    # the cycle measures and community places (4d, 4f: a percentage for each part where its base allows, no blend)
+    cyc, counted = det["cycle_measures"], pt.get("cycle") is not None
+    stepped("left_turns", "Left-hand turns", "count", use["left_turns"], c["left_turns"], cyc.get("left_turns"),
+            p_=p.get("left_turns"), counted=counted)
+    if c.get("cycle_meets") is not None and use.get("cycle_meets") is not None:
+        stepped("cycle_meets", "Cycle routes met", "count", use["cycle_meets"], c["cycle_meets"], cyc.get("cycle_meets"),
+                p_=p.get("cycle_meets"), counted=counted)
+    if c.get("cycle_beside_km") is not None and use.get("cycle_beside_km") is not None:
+        stepped("cycle_beside_km", "km beside a cycle route", "km", use["cycle_beside_km"], c["cycle_beside_km"],
+                cyc.get("cycle_beside_km"), dp=2, p_=p.get("cycle_beside_km"), fewer="less", counted=counted)
+    stepped("places", "Community: schools, hospitals, health centres", "count", use["places"], c["places"],
+            det.get("community_part"), p_=p.get("places"), counted=pt.get("community") is not None)
+    # time: the round trip and the trips a day, the two halves of the time head
+    tr = det["time_rows"]
+    m = _row_mark(tr["round_trip"])
+    dt = half_min(use["cycle_min"], c["cycle_min"])
+    add("round_trip", "Round trip, min", "min", use["cycle_min"], c["cycle_min"], m,
+        ROW_SAME if m == "none" or not dt else f"{_n(abs(dt))} min " + ("longer" if dt > 0 else "quicker"), 1)
+    m = _row_mark(tr["trips"])
+    d = int(c["trips"]) - int(use["trips"])
+    add("trips", "Trips a lorry fits a day", "trips", use["trips"], c["trips"], m,
+        ROW_SAME if m == "none" else f"{abs(d)} " + ("more" if d > 0 else "fewer"))
+    # the busy hours: a row an hour held on both sides, else one row that says why they are not compared
+    held = [h for h in BUSY_HOURS if det["busy_hours"].get(h) is not None]
+    for h in held:
+        m = _row_mark(det["busy_hours"][h])
+        dh = half_min(use["busy_at"][h], c["busy_min"][h])
+        add(f"busy_{h}", f"Setting off at {h}", "min", use["busy_at"][h], c["busy_min"][h], m,
+            ROW_SAME if m == "none" or not dh else f"{_n(abs(dh))} min " + ("longer" if dh > 0 else "quicker"), 1)
+    if not held:
+        add("busy", "Busy hours", None, None, None, "off", "",
+            none=f"Not compared: no busy-hour times held for {o['label']}.")
+    # carbon
+    v = hd.get("carbon")
+    m = _row_mark(v)
+    dk = round(float(c["co2_kg"]) - float(use["co2_kg"]), 1)
+    add("carbon", f"Carbon, kg {CO2E} a trip", "kg", use["co2_kg"], c["co2_kg"], m,
+        ROW_SAME if m == "none" else (f"{_n(abs(dk))} kg " + ("less" if dk < 0 else "more")) if m != "off" else "", 1)
+    # limits: an option left in is one that adds none below the lorry (N1); with none held nothing was checked
+    if getattr(ctx, "lims", None):
+        add("limits", "Limits added", None, None, None, "none", "", none=ROW_NO_LIMIT_ADDED)
+    else:
+        add("limits", "Limits added", None, None, None, "off", "", none=ROW_NO_LIMITS)
+    return rows
 
 
 def _answer(out, use, ctx, hist):

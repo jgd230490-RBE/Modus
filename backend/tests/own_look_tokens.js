@@ -113,8 +113,12 @@ ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's
 // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): + the Look-ahead site heading's today cell (nine)
 // NARROWED 26 Nov 2026 (the Look-ahead rethink, task C2, in the batch claude/la-rethink): + the weeks ahead's site heading's
 // commit-week cell (ten)
-ok("3 selection: a table column (today, the commit week) is the 6 % tint: ten column washes, none on the 10 % tint",
-   (html.match(/var\(--navy-soft-col\)/g) || []).length === 10 && !/\{ background: "var\(--navy-soft\)" \}/.test(html));
+// NARROWED 26 Nov 2026 (claude/route-options-schedule): a ninth column wash, the picked option's column in the
+// Routes card's schedule (.bo-sch .bo-pick), the same 6 % tint for a table column.
+// NARROWED 26 Nov 2026 (the Look-ahead batch with main e20c6f4 taken in): main's nine + the batch's two site-heading
+// cells = eleven, measured on the merged page
+ok("3 selection: a table column (today, the commit week, the picked option in the Routes schedule) is the 6 % tint: eleven column washes, none on the 10 % tint",
+   (html.match(/var\(--navy-soft-col\)/g) || []).length === 11 && !/\{ background: "var\(--navy-soft\)" \}/.test(html));
 ok("3 figures: the Cost groups and their planned and fair £, today's vehicles, the Submit page's loads and fair £ and the Today heading read the ink, not the sign blue",
    (html.match(/<Group title="Cost" tone="var\(--navy-deep\)">/g) || []).length === 2 && !/tone="var\(--navy\)"/.test(html) /* NARROWED 24 Nov 2026 (own look, B1 stage 7): the Last week bar is ink now, no tone */
    && html.includes('fig-group" style={{ color: "var(--navy-deep)" }}>Today'));

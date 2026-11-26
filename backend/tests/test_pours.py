@@ -522,7 +522,8 @@ pp = fe[fe.index("const POUR_WORD = {"):fe.index("// ===========================
 # what a person can read: the slice without its comments (// lines and {/* */} blocks)
 pp_words = re.sub(r"\{/\*.*?\*/\}", "", re.sub(r"(?m)^\s*//.*$", "", pp), flags=re.S).replace("${API}", "")
 ok("⭐ Plan → Pours: in the Plan group after Stockpiles, its icon, a desk page",
-   '{ id: "pours", label: "Pours", glyph: "◒" }' in fe and "\n  pours: \"M" in fe
+   # NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; the icon is a { d: ... } drawing
+   '{ id: "pours", label: "Pours" }' in fe and "\n  pours: { d: \"M" in fe
    and '{page === "pours" && !narrow && <PoursPage meta={meta} access={role} who={who} />}' in fe)
 ok("the page reads /pours and /pours/lines once each; the form asks /pours/preview; writes POST / PATCH / DELETE",
    pp.count("fetch(`${API}/pours`)") == 1 and pp.count("fetch(`${API}/pours/lines`)") == 1
