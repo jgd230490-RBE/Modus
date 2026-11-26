@@ -163,14 +163,16 @@ ok("C12 measured: the lightest blue on its white casing and on the Light basemap
 ok("C13 the sign blue (heat map Off) parts from its white casing at ≥ 4.5:1", contrast("#0B4EA2", "#FFFFFF") >= 4.5);
 
 // ---------------------------------------------------------------------------------------------------------------
-console.log("D. The flow's lanes (Group B replaces them): kept working, a lane on every band again");
-ok("D1 kept: the lanes, their widths and their light are as they were (Group B's task)",
-   html.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];") && html.includes("const FLOW_OFFSET = -1.75;")
-   && html.includes("const FLOW_STILL_OPACITY = 0.35;") && html.includes("const FLOW_PULSES = 3;"));
-// REVERSED 25 Nov 2026 (one width): no 3 px line any more, so the first band's lane is back and the heat map no longer re-sets it
-ok("D2 every band has its lane: flowWidthExpr as on main (no hideFirst), and the heat map leaves the lanes' width alone",
-   /function flowWidthExpr\(\)\{\s*const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], FLOW_WIDTHS\[0\]\];/.test(html)
-   && !html.includes("hideFirst") && !acm.includes("'forecast-flow', 'line-width'"));
+// (25 Nov 2026: static's one width took the lanes' first band back; moot here, the lanes are gone)
+// REVERSED 24 Nov 2026 (claude/map-lines-flow, card 3): Group B replaced the lanes with dots; the lanes' pins here are
+// reversed to "gone", the dots' own checks are in map_lines_flow.js
+console.log("D. The flow's lanes: replaced by the dots (Group B, map_lines_flow.js)");
+ok("D1 REVERSED 24 Nov 2026 (card 3): the lanes, their widths, their offset, their still opacity and their three lights are gone",
+   !html.includes("const FLOW_WIDTHS") && !html.includes("const FLOW_OFFSET")
+   && !html.includes("const FLOW_STILL_OPACITY") && !html.includes("const FLOW_PULSES") && html.includes("const FLOW_MARK_GAP = 90;"));   // NARROWED 24 Nov 2026 (Q14, card 3b): arrowheads, not dots
+ok("D2 REVERSED 24 Nov 2026 (card 3): no lane width to fit to a line, so the heat map sets none (flowWidthExpr and hideFirst gone)",
+   !/function flowWidthExpr/.test(html) && !/hideFirst/.test(html)
+   && !acm.includes("'forecast-flow'") && !acm.includes("flowWidthExpr"));
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("E. Card 9: the alternatives, a thinner neutral grey");

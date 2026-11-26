@@ -6886,7 +6886,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyFilters();            // §9: and the cards drop back to the network count
@@ -7690,7 +7690,7 @@
     function applyForecastFilter(){
         const f = forecastLayerFilter();
         FORECAST_OVERLAY_LAYERS.forEach(l => { if(map.getLayer(l)) map.setFilter(l, f); });
-        if (map.getLayer('forecast-flow')) drawFlow();     // 16 Oct (D115): the lanes are re-summed over the routes let through
+        if (map.getLayer('forecast-flow-light')) drawFlow();     // 16 Oct (D115): the lanes are re-summed over the routes let through (24 Nov: for the dots)
         if (typeof refreshMapModeFilters === 'function') refreshMapModeFilters();   // 12 Oct: Road load / Carbon too
     }
     function ensureForecastLayers(){
@@ -8044,7 +8044,6 @@
             layout: badgeLayout(ROAD_LOAD_LABEL, 'mv-badge'),
             paint: { 'text-color': BADGE_STYLE.mv.ink } });
         wireRoadLoadPopup();
-        if (typeof placeFlowLayer === 'function') placeFlowLayer();     // 16 Oct (D115): the flow's dashes over the sections
         raiseMarks();
     }
     function removeRoadLoadLayers(){
@@ -8052,7 +8051,6 @@
         ROAD_LOAD_LAYERS.slice().reverse().forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
         if (map.getSource('road-load-source')) map.removeSource('road-load-source');
         if (map.getSource(ROAD_LOAD_LABEL_SOURCE)) map.removeSource(ROAD_LOAD_LABEL_SOURCE);
-        if (had && typeof placeFlowLayer === 'function') placeFlowLayer();   // and back under the route labels
     }
     function drawRoadLoad(m){
         ensureRoadLoadLayers();
@@ -8135,7 +8133,7 @@
     // grey (where the lorries run), with no casing, no flow dashes, no labels and no cap badges; the heat map is off
     // (the two never share the blues). Unticking both boxes puts everything back.
     const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;
-    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];
+    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow-light', 'forecast-cap-badge'];   // 24 Nov 2026 (card 3): the lanes' layer is gone
     function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }
     // 12 Oct 2026 (evening): one heat map at a time. Volume (toggle-road-load) wins if both ids were ever checked at
     // once (an old shared link that carried road-load.carbon: radio buttons cannot hold both, this is the guard).
@@ -8152,8 +8150,8 @@
             map.setPaintProperty('forecast-layer', 'line-color', paint);
             map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : FORECAST_LINE_WIDTH);
         }
-        COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility',
-            (focus || (!FLOW_LANES_SHOWN && l.indexOf('forecast-flow') === 0)) ? 'none' : 'visible'); });
+        COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
+        if (typeof setFlowMarks === 'function') setFlowMarks(_flowClock);   // 24 Nov 2026 (Q14): the arrowheads stand again on leaving a council view
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', caseW);
         // the amber diversion edge takes the casing's place, at the casing's width (29 Oct)
         if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);
@@ -8412,14 +8410,53 @@
     // ⚠️ Every array output is wrapped in ['literal', …] — a bare one dropped every route on 1 Sep 2026 (the note at
     // DASH_CORE). And line-dasharray is cross-faded: each re-set re-lays out the layer's source, which is why the flow
     // has its OWN small source rather than routes-source (until 16 Oct every tick re-laid out all nine route layers).
-    const FLOW_SOURCE = 'flow-source';
+    //
+    // REPLACED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6, card 3: "On the animation i don't
+    // like the feel if thick white lines for for more vehicles looking at it it feels like its depictict less"). The
+    // WHITE LANES ARE GONE: no lane line layer, no lane width by band, no faint lane standing still, no three lights a
+    // lane. The lanes stay as DATA (buildFlowLanes, each lane's fl_mv): they place the DOTS. While Play runs, white dots
+    // with a dark blue ring travel along each lane the way its lorries go, each direction on the LEFT of its travel, and
+    // THE MORE MOVEMENTS A DAY THE CLOSER THE DOTS: one gap a band on the heat map's own five bands (FLOW_DOT_GAPS, px ON
+    // SCREEN, the same at every zoom), at ONE speed on screen for every band (FLOW_DOT_SPEED), so a busier road passes
+    // more dots a second. Standing still, paused, stopped or under reduced motion there are NO dots. Dots are made only
+    // for the part of a lane in view (plus FLOW_DOT_MARGIN), every frame, on their own small point source (setData a
+    // frame, as the 28 Oct light). The lanes' arithmetic below (D115) is unchanged.
+    //
+    // REPLACED AGAIN 24 Nov 2026, 22:46 UTC (John's "Arrowheads drifting" to the route lines mockup, card 3b, Q14, which
+    // reopened Q6: "are [the dots] there as the simulation showing actually how many vehicles are on the route? If not i
+    // would like to try alternive simulationstyle to segregate the two"). The dots are OFF. A lane now carries small SOLID
+    // ARROWHEADS (white, a dark blue outline), turned to its travel, on the LEFT of it, at ONE gap on screen for every
+    // road (FLOW_MARK_GAP): the marks say the WAY lorries go, never how many (the line's blue says that). They
+    // show whenever the lanes are on the map, STAND STILL while Play is not running or under reduced motion, and DRIFT
+    // the way the lorries go while Play runs, at one slow speed on screen (FLOW_MARK_SPEED) on their own clock, so a
+    // pause leaves them where they stand. Still made only for the part of a lane in view, on the same point source; the
+    // council views hide them. Not the "called forward" chevrons, which stay on their legs.
     const FLOW_LIGHT_SOURCE = 'flow-light-source';
-    const FLOW_OFFSET = -1.75;         // px, NEGATIVE = left of the direction of travel: each lane 0.5 to 3 px off the middle
-    //: the bands, movements a day each way: the Volume heat map's own fixed stops (under 10 · 10-25 · 25-50 · 50-100 ·
-    //: 100 and over; twenty times these when the map counts t or m³ a day), so one spacing means the same number in
-    //: every month, and a spacing step lines up with a colour step. The demo's routes run 3 to 37 a day and its shared
-    //: roads up to about 110, so the five bands are all in use.
-    const FLOW_STOPS = ROUTE_VOLUME_STOPS;
+    //: 24 Nov 2026 (Q14, card 3b): ONE gap for every road, px on screen at every zoom (the marks say nothing of the amount)
+    const FLOW_MARK_GAP = 90;
+    //: px a second on screen while Play runs, every road (the card's sketch: 90 px in 7 s)
+    const FLOW_MARK_SPEED = 13;
+    //: 25 Nov 2026 (the mother session: the line's one width is on trial, 5 or 4 px): the mark's size and side step are
+    //: set FROM the forecast line's width, never typed, so either answer needs no rework. On the 5 px line: 2.7 px off the
+    //: middle (the card's sketch), 5.2 px long and across; on a 4 px line a fifth smaller. Its two rows sit 2 x SIDE
+    //: apart, more than a mark's width, so the two directions never cross; each mark overhangs the casing by
+    //: SIDE + W / 2 - casing / 2 (1.5 px on 5 / 7.6, 0.94 px on 4 / 6.6)
+    const FLOW_MARK_SCALE = FORECAST_LINE_WIDTH / 5;
+    //: px from the line's middle to a mark's centre, left of its travel
+    const FLOW_MARK_SIDE = Math.round(2.7 * FLOW_MARK_SCALE * 100) / 100;
+    //: the mark: a SOLID white arrowhead (5.2 px long and across on the 5 px line) with a 0.8 px outline in the darkest
+    //: band blue (#00215B, CARBON_RAMP's last), its tip the way of travel; one picture (FLOW_MARK_IMG), turned per mark
+    const FLOW_MARK_LEN = Math.round(5.2 * FLOW_MARK_SCALE * 100) / 100;
+    const FLOW_MARK_W = FLOW_MARK_LEN;
+    const FLOW_MARK_RING = '#00215B';
+    const FLOW_MARK_RING_W = 0.8;
+    const FLOW_MARK_IMG = 'flow-arrowhead';
+    //: px beyond the view's edge that still get marks (a pan does not show an empty rim)
+    const FLOW_MARK_MARGIN = 48;
+    //: a ceiling on the marks made at once (the whole scheme at 1366 px makes about a hundred)
+    const FLOW_MARK_MAX = 5000;
+    //: while drifting the marks are moved about 15 times a second (under 1 px a step at FLOW_MARK_SPEED)
+    const FLOW_MARK_STEP_MS = 66;
     //: 23 Oct 2026 (the user, the route line redesign): the lanes are SOLID — no dashes on a route. The volume is the
     //: lane's WIDTH, one per band (px), and while Play runs a light runs along each lane the way its lorries go:
     //: FLOW_PULSES bright dots a lane, FLOW_PULSE_SPEED lane-lengths a second. Standing still the lane is a faint solid
@@ -8427,17 +8464,8 @@
     //: 28 Oct 2026 (8d, GL JS v3): the light was a line-gradient re-set every frame; on v3 that re-lays the lanes out each
     //: time (60 -> 10-22 fps playing, measured). It is now FLOW_PULSES dots a lane on a small point source of their own
     //: (setData a frame: 60 fps on v3 and on 2.14, measured), the lanes untouched. Same spacing, same speed, same meaning.
-    const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];
-    //: 25 Nov 2026 (the mother session's reading of the 4 px line, for the short time until claude/map-lines-flow lands):
-    //: at 4 px the old white lanes (up to 3.8 px at 1.75 px off the middle) are wider than the 6.6 px casing, so the
-    //: busiest roads drew solid white. The lanes and their light are kept in the code but NOT SHOWN (visibility none),
-    //: Play only steps the months, and the key's lane rows go (the diversion row stays). claude/map-lines-flow replaces
-    //: the lanes with arrowheads and this switch with them.
-    const FLOW_LANES_SHOWN = false;
-    const FLOW_STILL_OPACITY = 0.35;
-    const FLOW_PULSES = 3;
-    const FLOW_PULSE_LEN = 0.07;
-    const FLOW_PULSE_SPEED = 0.22;
+    //: REPLACED 24 Nov 2026 (card 3): the lane widths, the still opacity and the three lights a lane are gone; the dots'
+    //: point source of 28 Oct is kept and carries the dots above.
     const FLOW_TICK_MS = 65;
     const FLOW_SNAP = 1e-5;            // degrees: road_sections.SNAP_DEG
     const FLOW = { feats: null, n: -1, legs: [], lanes: [], drawn: null, count: 0 };
@@ -8455,7 +8483,9 @@
     // still as faint solid stripes, so the width (movements a day) and the lanes (which way) still read on a paused map.
     //: the tick count's cycle (28 Oct 2026: the rail's seven-step march that set it is gone; the count is kept)
     const FLOW_CYCLE = 7 * 60;
-    let _dashIx=0,_dashT=0,_flowRAF=null,_pulseT=0;
+    // 24 Nov 2026 (Q14): _flowT the frame the marks were last moved at; _flowClock the drift's own clock (ms), which runs
+    // only while Play runs; _flowLast the frame before (null after a stop, so Play carries on without a jump)
+    let _dashIx=0,_dashT=0,_flowRAF=null,_flowT=0,_flowClock=0,_flowLast=null;
 
     // the legs the map draws, in page order (their positions are the lanes' leg indexes)
     function flowLegs(feats){
@@ -8556,122 +8586,165 @@
         });
         return out;
     }
-    // the lanes on screen; the source is re-sent only when a lane's figure changed (the lanes themselves are fixed)
+    // the lanes with movements; worked out again only when a lane's figure changed (the lanes are fixed)
+    // 24 Nov 2026 (card 3, Q14): no lane is drawn; FLOW.lit is what the arrowheads sit on ({ lane }), and they are set
+    // again at once (standing or drifting), so a month step, a filter or a basemap switch shows them straight away
     function drawFlow(){
-        const src = map.getSource(FLOW_SOURCE);
-        if (!src) return;
         const feats = flowFeatures();
         const key = feats.map(f => f.properties.lane + ':' + f.properties.fl_mv).join(',');
-        if (key !== FLOW.drawn) { src.setData({ type: 'FeatureCollection', features: feats }); FLOW.drawn = key; FLOW.lit = feats.map(f => FLOW.lanes[f.properties.lane]); }
+        if (key !== FLOW.drawn) { FLOW.drawn = key; FLOW.lit = feats.map(f => ({ lane: FLOW.lanes[f.properties.lane] })); }
         FLOW.count = feats.length;
+        setFlowMarks(_flowClock);
         renderFlowLegend();
+    }
+    // the arrowhead's picture, once a style (a basemap switch drops a style's pictures): drawn pointing UP at twice the
+    // screen's px, turned per mark by the layer
+    function flowMarkImage(){
+        if (!map.hasImage || !map.addImage || map.hasImage(FLOW_MARK_IMG)) return;
+        try {
+            const pr = 2, size = Math.ceil(Math.max(FLOW_MARK_LEN, FLOW_MARK_W) + 2 * FLOW_MARK_RING_W) + 2, n = size * pr;
+            const cv = document.createElement('canvas'); cv.width = n; cv.height = n;
+            const g = cv.getContext('2d'); g.scale(pr, pr);
+            const c = size / 2, h = FLOW_MARK_LEN / 2;
+            g.beginPath(); g.moveTo(c, c - h); g.lineTo(c + FLOW_MARK_W / 2, c + h); g.lineTo(c - FLOW_MARK_W / 2, c + h); g.closePath();
+            g.fillStyle = '#ffffff'; g.fill();
+            g.lineJoin = 'round'; g.lineWidth = FLOW_MARK_RING_W; g.strokeStyle = FLOW_MARK_RING; g.stroke();
+            map.addImage(FLOW_MARK_IMG, g.getImageData(0, 0, n, n), { pixelRatio: pr });
+        } catch (e) {}
     }
     function ensureFlowLayer(){
         if (!map.getSource('routes-source')) return;
-        if (!map.getSource(FLOW_SOURCE)) { map.addSource(FLOW_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, lineMetrics: true }); FLOW.drawn = null; }
-        if (!map.getLayer('forecast-flow')) {
-            map.addLayer({ id: 'forecast-flow', type: 'line', source: FLOW_SOURCE,
-                layout: { 'line-cap': 'round', 'line-join': 'round', visibility: (councilFocus() || !FLOW_LANES_SHOWN) ? 'none' : 'visible' },
-                paint: { 'line-color': '#ffffff', 'line-width': flowWidthExpr(), 'line-opacity': FLOW_STILL_OPACITY, 'line-offset': FLOW_OFFSET } });
-        }
-        // the light's dots: their own small source, above the names like the abnormal load's dot
+        // the arrowheads: their own small point source (the 28 Oct light's), above the names like the abnormal load's dot
         if (!map.getSource(FLOW_LIGHT_SOURCE)) map.addSource(FLOW_LIGHT_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        flowMarkImage();
         if (!map.getLayer('forecast-flow-light')) {
-            map.addLayer({ id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE,
-                layout: { visibility: (councilFocus() || !FLOW_LANES_SHOWN) ? 'none' : 'visible' },
-                paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 2.2, 12, 3, 16, 3.8], 'circle-color': '#ffffff',
-                         'circle-stroke-color': '#1F2024', 'circle-stroke-width': 1, 'circle-opacity': 0.95, 'circle-stroke-opacity': 0.85 } });
-            if (_flowRAF != null) setFlowPulse(_pulseT);   // re-added while playing (a basemap switch): the light runs on
+            map.addLayer({ id: 'forecast-flow-light', type: 'symbol', source: FLOW_LIGHT_SOURCE,
+                layout: { visibility: councilFocus() ? 'none' : 'visible', 'icon-image': FLOW_MARK_IMG, 'icon-rotate': ['get', 'rot'],
+                          'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
+                          'icon-allow-overlap': true, 'icon-ignore-placement': true },
+                paint: { 'icon-opacity': 1 } });
         }
+        // a pan or a zoom places the marks again for the new view (wired once; the handler outlives a style switch)
+        if (!FLOW.moveWired && map.on) { FLOW.moveWired = true; map.on('move', flowMarksOnMove); }
         drawFlow();
-        placeFlowLayer();
         raiseMarks();
     }
-    // the flow sits right over the blue (or over the Volume heat map's shared sections, drawn over the blue) and under
-    // every label and badge: until 16 Oct it was added last, so its dashes ran over the route labels
-    function placeFlowLayer(){
-        if (!map.getLayer('forecast-flow')) return;
-        let ids;
-        try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
-        const anchor = ['road-load-line', 'forecast-layer'].find(l => ids.indexOf(l) >= 0);
-        if (!anchor) return;
-        const next = ids[ids.indexOf(anchor) + 1];
-        if (next === 'forecast-flow') return;
-        try { if (next) map.moveLayer('forecast-flow', next); else map.moveLayer('forecast-flow'); } catch (e) {}
-    }
-    // the lane's width by its figure: a step on fl_mv at the five bands' stops
-    function flowWidthExpr(){
-        const e = ['step', ['to-number', ['get', 'fl_mv'], 0], FLOW_WIDTHS[0]];
-        FLOW_STOPS.forEach((s, i) => { e.push(s, FLOW_WIDTHS[i + 1]); });
-        return e;
-    }
-    // the light: FLOW_PULSES dots along each lane with movements (0 to 1 is the lane's direction of travel) at phase t in
-    // [0, 1); t null = standing still, no dots. Each lane's length along its points is worked out once (laneMetric).
-    function laneMetric(l){
-        if (l.cum) return l;
-        const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, c = l.coords, cum = [0];
-        for (let i = 1; i < c.length; i++) cum.push(cum[i - 1] + Math.hypot((c[i][0] - c[i - 1][0]) * kx, (c[i][1] - c[i - 1][1]) * ky));
-        l.cum = cum; l.len = cum[cum.length - 1];
+    // Web Mercator, as the map draws: x, y in [0, 1] (y down), so a px on screen is 1 / (512 * 2^zoom) of it at every
+    // place and every direction, and a gap set in px is one constant along the whole lane
+    function mercX(lng){ return (lng + 180) / 360; }
+    function mercY(lat){ const s = Math.sin(lat * Math.PI / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); }
+    function mercLngLat(x, y){ return [x * 360 - 180, 360 / Math.PI * Math.atan(Math.exp((180 - y * 360) * Math.PI / 180)) - 90]; }
+    // each lane's points in Mercator, its length along them and its box, worked out once a lane
+    function laneMerc(l){
+        if (l.mcum) return l;
+        const c = l.coords, mx = [], my = [], cum = [0];
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let i = 0; i < c.length; i++) {
+            const x = mercX(c[i][0]), y = mercY(c[i][1]);
+            mx.push(x); my.push(y);
+            if (i) cum.push(cum[i - 1] + Math.hypot(x - mx[i - 1], y - my[i - 1]));
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+        l.mx = mx; l.my = my; l.mcum = cum; l.mlen = cum[cum.length - 1]; l.mbox = [x0, y0, x1, y1];
         return l;
     }
-    function lanePoint(l, f){
-        const d = f * l.len, c = l.coords; let i = 1;
-        while (i < l.cum.length - 1 && l.cum[i] < d) i++;
-        const a = l.cum[i - 1], b = l.cum[i], t = b > a ? (d - a) / (b - a) : 0;
-        return [c[i - 1][0] + (c[i][0] - c[i - 1][0]) * t, c[i - 1][1] + (c[i][1] - c[i - 1][1]) * t];
-    }
-    function flowLightPoints(t){
+    // the arrowheads at drift time ts (ms of Play; null = none), for the part of each lane in view: along a lane they sit
+    // at phase + k gaps from its start (px on screen), the phase growing FLOW_MARK_SPEED px a second of Play; each mark
+    // FLOW_MARK_SIDE px to the left of its travel (y down: left of (dx, dy) is (dy, -dx)) and turned to it (rot, degrees
+    // clockwise from north, as the layer turns a picture on the map)
+    function flowMarkPoints(ts, view){
         const out = [];
-        if (t == null) return { type: 'FeatureCollection', features: out };
-        (FLOW.lit || []).forEach(l => { if (!l || !l.coords || l.coords.length < 2) return; laneMetric(l); if (!(l.len > 0)) return;
-            for (let i = 0; i < FLOW_PULSES; i++) out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: lanePoint(l, (t + i / FLOW_PULSES) % 1) }, properties: {} }); });
+        if (ts == null || !isFinite(ts)) return { type: 'FeatureCollection', features: out };
+        const z = view ? view.zoom : map.getZoom(), W = 512 * Math.pow(2, z);
+        let bx0 = -Infinity, by0 = -Infinity, bx1 = Infinity, by1 = Infinity;
+        const b = view ? view.bounds : (map.getBounds ? map.getBounds() : null);
+        if (b) {
+            const m = FLOW_MARK_MARGIN / W;
+            bx0 = mercX(b.getWest()) - m; bx1 = mercX(b.getEast()) + m; by0 = mercY(b.getNorth()) - m; by1 = mercY(b.getSouth()) + m;
+        }
+        const side = FLOW_MARK_SIDE / W, run = FLOW_MARK_SPEED * ts / 1000;
+        const gp = FLOW_MARK_GAP, gap = gp / W, phase = (run % gp) / W;
+        for (const it of (FLOW.lit || [])) {
+            const l = it && it.lane;
+            if (!l || !l.coords || l.coords.length < 2) continue;
+            laneMerc(l);
+            if (!(l.mlen > 0)) continue;
+            const bb = l.mbox;
+            if (bb[2] < bx0 || bb[0] > bx1 || bb[3] < by0 || bb[1] > by1) continue;
+            const mx = l.mx, my = l.my, cum = l.mcum;
+            for (let i = 1; i < mx.length; i++) {
+                const ax = mx[i - 1], ay = my[i - 1], cx = mx[i], cy = my[i], s0 = cum[i - 1], s1 = cum[i], len = s1 - s0;
+                if (!(len > 0)) continue;
+                if (Math.max(ax, cx) < bx0 || Math.min(ax, cx) > bx1 || Math.max(ay, cy) < by0 || Math.min(ay, cy) > by1) continue;
+                const dx = cx - ax, dy = cy - ay, nx = dy / len, ny = -dx / len;
+                // only the stretch of the piece inside the view and its margin (a long straight piece off screen makes none)
+                let t0 = 0, t1 = 1;
+                for (const [p, q] of [[-dx, ax - bx0], [dx, bx1 - ax], [-dy, ay - by0], [dy, by1 - ay]]) {
+                    if (p === 0) { if (q < 0) { t1 = -1; break; } continue; }
+                    const r = q / p;
+                    if (p < 0) { if (r > t0) t0 = r; } else if (r < t1) t1 = r;
+                }
+                if (t0 > t1) continue;
+                const rot = Math.round(Math.atan2(dx, -dy) * 1800 / Math.PI) / 10;
+                const e0 = s0 + t0 * len, e1 = s0 + t1 * len;
+                for (let d = phase + Math.ceil((e0 - phase) / gap) * gap; d < e1 && d < s1; d += gap) {
+                    const u = (d - s0) / len;
+                    out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: mercLngLat(ax + dx * u + nx * side, ay + dy * u + ny * side) }, properties: { rot } });
+                    if (out.length >= FLOW_MARK_MAX) return { type: 'FeatureCollection', features: out };
+                }
+            }
+        }
         return { type: 'FeatureCollection', features: out };
     }
-    // t null: standing still (pause, stop, reduced motion): a faint lane and no dots; else the dots at phase t on a bright lane
-    function setFlowPulse(t){
-        if (!map.getLayer('forecast-flow')) return;
+    // the arrowheads at drift time ts; null, or a council view (where the layer is hidden), makes none
+    function setFlowMarks(ts){
+        if (!map.getLayer('forecast-flow-light')) return;
         try {
-            map.setPaintProperty('forecast-flow', 'line-opacity', t == null ? FLOW_STILL_OPACITY : 1);
             const src = map.getSource(FLOW_LIGHT_SOURCE);
-            if (src) src.setData(flowLightPoints(t));
+            const fc = (ts == null || councilFocus()) ? flowMarkPoints(null) : flowMarkPoints(ts);
+            FLOW.marksShown = fc.features.length;
+            if (src) src.setData(fc);
         } catch (e) {}
     }
-    // the legend, under the heat map: the five spacings as the map draws them (one lane on the blue), and what they mean
-    // 10 Nov 2026 (UI critique 18, John's yes to the map-card mockup 18c): at the map's own size the five samples looked
-    // alike (a 1.6 to 3.8 px lane), so the key draws them at FLOW_KEY_SCALE times the map's size: the same widths, the
-    // same proportions, a step you can see. The map itself does not change.
+    // a pan or a zoom: the marks are placed again for the new view, once a frame at most (standing or drifting, so a
+    // zoom never stretches their gap)
+    function flowMarksOnMove(){
+        if (FLOW.movePending || !map.getLayer('forecast-flow-light')) return;
+        FLOW.movePending = true;
+        requestAnimationFrame(() => { FLOW.movePending = false; setFlowMarks(_flowClock); });
+    }
+    // the key, under the heat map: ONE row, an arrowhead each way on its own side of a line, "Direction of travel" and
+    // an "i" (24 Nov 2026, Q14: the title "Movements a day, each way" and its five band rows are gone; the box stays,
+    // and the closure's row under it is the diversions' own). Drawn at FLOW_KEY_SCALE times the map's size, as the
+    // closure's sample, so the two rows line up.
+    function flowMarkSample(){
+        const h = FLOW_MARK_W / 2, l = FLOW_MARK_LEN / 2;
+        const head = (x, y, dir) => '<polygon points="' + (x - dir * l) + ',' + (y - h) + ' ' + (x + dir * l) + ',' + y + ' ' + (x - dir * l) + ',' + (y + h) + '"/>';
+        return flowKeySvg(
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecastCasing + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/>' +
+            '<g fill="#ffffff" stroke="' + FLOW_MARK_RING + '" stroke-width="' + FLOW_MARK_RING_W + '" stroke-linejoin="round">' +
+            head(11, 6 - FLOW_MARK_SIDE, 1) + head(21, 6 + FLOW_MARK_SIDE, -1) + '</g>');
+    }
+    // the lanes' old key (10 Nov 2026, UI critique 18): drawn at FLOW_KEY_SCALE times the map's size; since 24 Nov the
+    // arrowheads' row and the diversion's row (divEdgeSample) draw through it
     const FLOW_KEY_SCALE = 2;
     function flowKeySvg(inner){
         return '<svg class="fl-sw" width="64" height="' + (12 * FLOW_KEY_SCALE) + '" viewBox="0 0 64 ' + (12 * FLOW_KEY_SCALE) + '" aria-hidden="true">'
             + '<g transform="scale(' + FLOW_KEY_SCALE + ')">' + inner + '</g></svg>';
     }
-    function flowSample(w){
-        return flowKeySvg(
-            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecastCasing + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
-            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/>' +
-            '<line x1="6" y1="6" x2="26" y2="6" stroke="#ffffff" stroke-width="' + w + '" stroke-linecap="round" stroke-opacity="0.9"/>');
-    }
     function renderFlowLegend(){
         const box = document.getElementById('flow-legend');
         if (!box) return;
-        const on = !!map.getLayer('forecast-flow') && !councilFocus() && FLOW.count > 0;
-        const divRow = (typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
-            ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '';
-        // 25 Nov 2026: the lanes are not shown (FLOW_LANES_SHOWN), so their five rows go and only the diversion row stays
-        if (!FLOW_LANES_SHOWN) { box.hidden = !(on && divRow); box.innerHTML = (on && divRow) ? divRow : ''; return; }
+        const on = !!map.getLayer('forecast-flow-light') && !councilFocus() && FLOW.count > 0;
         box.hidden = !on;
         if (!on) return;
-        const m = mapModeMonth(), win = m ? null : (forecastWindow() || []);
-        const when = m ? 'In ' + rlEsc(monthLabel(m))
-                       : (win[0] ? 'A daily average, ' + rlEsc(monthLabel(win[0])) + (win[1] && win[1] !== win[0] ? ' to ' + rlEsc(monthLabel(win[1])) : '') : 'A daily average');
-        const unit = FLOW_STOPS !== VOLUME_STOPS ? rlEsc(CONFIG.FORECAST_UNIT) + ' a day' : 'Movements a day';
-        // 28 Oct 2026 (task 0a): the title says it; the paragraph is behind the "i" (kept open across a rebuild)
+        // 28 Oct 2026 (task 0a): the paragraph is behind the "i" (kept open across a rebuild)
+        // 24 Nov 2026 (Q14): the "i" says what the arrowheads are, and are not, in two sentences (20 words, R1)
         const was = document.getElementById('info-flow'), open = !!(was && !was.hidden);
-        box.innerHTML = '<div class="ctl-head" style="margin:0 0 4px"><b style="margin:0">' + unit + ', each way</b>' +
-            '<button type="button" class="info-i" aria-expanded="' + open + '" aria-controls="info-flow" onclick="toggleInfo(this)" title="About the lanes" aria-label="About the lanes"><span aria-hidden="true">i</span></button></div>' +
-            '<div class="info-pop" id="info-flow"' + (open ? '' : ' hidden') + '><p>Each direction has its own lane, on the left. Where routes share a road, the lane shows their total. While Play runs, a light moves along each lane the way its lorries go.</p></div>' +
-            '<div class="ml-sub">' + when + '</div>' +
-            stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_WIDTHS[i]) + t + '</div>').join('') +
+        box.innerHTML = '<div class="ml-row">' + flowMarkSample() + '<span>Direction of travel</span>' +
+            '<button type="button" class="info-i" aria-expanded="' + open + '" aria-controls="info-flow" onclick="toggleInfo(this)" title="About the arrowheads" aria-label="About the arrowheads"><span aria-hidden="true">i</span></button></div>' +
+            '<div class="info-pop" id="info-flow"' + (open ? '' : ' hidden') + '><p>The arrowheads show the way lorries travel, each direction on its own side of the line. They are not vehicles.</p></div>' +
             // 29 Oct 2026: one line, only in a month with a diversion on the map (variant B of the mockup)
             ((typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
                 ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '');
@@ -8684,9 +8757,13 @@
     // ===== end of the flow =====
 
     function animateFlow(ts){
-        if(!TL.playing){ _flowRAF=null; setFlowPulse(null); return; }
+        if(!TL.playing){ _flowRAF=null; _flowLast=null; setFlowMarks(_flowClock); return; }
         // 23 Oct 2026: the hauls' light runs every frame (a phase, not a tick); the rail keeps its 65 ms dash steps
-        if(map.getLayer && map.getLayer('forecast-flow')){ _pulseT=((ts*FLOW_PULSE_SPEED)/1000)%1; setFlowPulse(_pulseT); }
+        // 24 Nov 2026 (Q14, card 3b): the arrowheads drift on their own clock, which runs only while Play runs (a pause
+        // leaves them standing and Play carries on from there, no jump), moved about 15 times a second
+        if(_flowLast!=null) _flowClock+=Math.min(ts-_flowLast, 250);
+        _flowLast=ts;
+        if(map.getLayer && map.getLayer('forecast-flow-light') && ts-_flowT>=FLOW_MARK_STEP_MS){ _flowT=ts; setFlowMarks(_flowClock); }
         // 23 Oct 2026 (the user): the abnormal load on its way, at the same frame
         if(typeof setAbnormalDots === 'function') try { setAbnormalDots(((ts*ABN_DOT_SPEED)/1000)%1); } catch(e){}
         if(map.getLayer && (ts-_dashT>FLOW_TICK_MS)){
@@ -8701,16 +8778,18 @@
     // steps) and "Show on map" jumps instead of flying. GL JS 2.14.1 has no respectPrefersReducedMotion.
     // 16 Oct 2026 (D115), 23 Oct 2026: the hauls' lanes stand still (setFlowPulse(null): a faint solid stripe, the width
     // by band) rather than moving.
+    // 24 Nov 2026 (card 3): no lanes now; under reduced motion there are no dots at all.
+    // 24 Nov 2026 (Q14, card 3b): the arrowheads, which show standing still, simply never drift under reduced motion.
     function reducedMotion(){
         try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){ return false; }
     }
     function startFlowAnimation(){
-        if(reducedMotion()){ setFlowPulse(null); return; }   // no motion: the lanes stand still
+        if(reducedMotion()){ setFlowMarks(_flowClock); return; }   // no motion: the arrowheads stand still
         if(_flowRAF==null) _flowRAF=requestAnimationFrame(animateFlow);
     }
     function stopFlowAnimation(){
         if(_flowRAF!=null){ cancelAnimationFrame(_flowRAF); _flowRAF=null; }
-        setFlowPulse(null);
+        _flowLast=null; setFlowMarks(_flowClock);   // 24 Nov 2026 (Q14): the arrowheads stand where they are
         try { setAbnormalDots(null); } catch(e){}      // 23 Oct 2026: the load's dot goes with the light
     }
 
@@ -9193,7 +9272,7 @@
                  d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
         // left the month's shared sections on the map
-        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         if (typeof updateDiversionEdge === 'function') updateDiversionEdge(src && src._data);   // 29 Oct 2026: no month, no edge
         if (typeof updateHoldingChevrons === 'function') updateHoldingChevrons(src && src._data);   // 29 Oct 2026 (task 3c): every route again
         applyZoneMonth(null);   // no month on screen: show every active zone again
