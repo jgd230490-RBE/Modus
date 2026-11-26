@@ -638,7 +638,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 8 Nov 2026 (2.1-13): the week maps' key row */
   .cm-key > span{display:inline-flex;align-items:center;gap:6px;}
   .cm-k{display:inline-block;flex:none;width:22px;border-radius:3px;}
-  .cm-k-out{height:4px;background:#059669;} .cm-k-back{height:3px;background:#f59e0b;} .cm-k-faded{height:2px;background:#9CA3AF;opacity:.7;}
+  .cm-k-out{height:4px;background:#3A3C41;} .cm-k-back{height:3px;background:#8E9197;} .cm-k-faded{height:2px;background:#C6C8CC;opacity:.9;}
+  /* 26 Nov 2026 (lines-prints Q1, Q2): the week maps' key follows the map's ground; on Dark the Routes page's pale pair */
+  .cm-key[data-cm-dark="1"] .cm-k-out{background:#D4D6DA;} .cm-key[data-cm-dark="1"] .cm-k-back{background:#9A9DA3;} .cm-key[data-cm-dark="1"] .cm-k-faded{background:#7D8087;}
   .cm-k-site{width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--ink);}
   .cm-k-gate{width:8px;height:8px;border-radius:0;background:var(--ink);}
   .cm-k-load{font-style:normal;font-size:12px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:0 4px;}
@@ -1235,7 +1237,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   [data-route-notes] .row-st, [data-busy-in-use] .row-st{white-space:normal;}   /* 26 Nov 2026 (B1): a long status word wraps in a narrow cell, its shape kept on the first line */
   .st-line.st-warn{color:var(--warn-text);} .st-line.st-warn>i:first-child{display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);}   /* 26 Nov 2026 (B1): a status sentence, its shape first, no box */
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
-     John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
+     John 16 Nov "Yes, plain words"): since 25 Nov a collision row is two counts with grey bars and plain words. Under 600 px of card the
      head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
   .bo-card{container-type:inline-size;background:none;border:0;border-top:2px solid var(--ink);border-radius:0;padding:10px 0 0;margin:0 0 10px;max-width:820px;}
   .bo-eye{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:400;color:var(--muted);}
@@ -1243,6 +1245,13 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .bo-why{font-size:13px;margin:0 0 8px;}
   .bo-done{font-size:13px;margin:0 0 10px;max-width:820px;}
   .bo-state{background:none;border:0;border-left:2px solid var(--line-2);border-radius:0;padding:2px 0 2px 10px;font-size:13px;margin:6px 0;}
+  /* 25 Nov 2026 (the Routes page rethink, card 3, Q5 / Q6): the lines at the top of the card are MARGIN LINES, no box: a
+     2 px ink rule at the left, the status shape and the head, then the rule's line (a diamond for a closure in force, a
+     ring for one planned); the busy-hours and in-use limit lines take the same rule with no shape. 26 Nov 2026 (main's
+     own look B1 taken in): the shape and the head are RowStatus (.row-st rs-warn / rs-none), the one status form, not
+     shapes of the card's own */
+  .bo-cl{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;border-left:2px solid var(--ink);padding:1px 0 1px 9px;margin:0 0 6px;font-size:13px;}
+  .bo-cl .bo-g{color:var(--muted);}
   .bo-heads{border-top:1px solid var(--line);}
   .bo-tabs{margin:8px 0 8px;}
   /* 17 Nov 2026 (route option labels): the labels on the Routes map. A small solid box in the app's look (not the
@@ -1261,10 +1270,28 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .bo-h{display:grid;grid-template-columns:116px 140px 1fr;gap:10px;align-items:start;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
   .bo-k{font-weight:600;} .bo-k.bo-sub{font-weight:500;padding-left:12px;}
   .bo-v{font-variant-numeric:tabular-nums;} .bo-v small,.bo-grey{color:var(--muted);} .bo-v small{font-size:12px;}
-  .bo-dash{color:var(--muted);}
   .bo-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
   .bo-fold{margin-left:auto;font-size:13px;font-weight:600;color:var(--navy);background:none;border:0;cursor:pointer;padding:6px 4px;}
   .bo-foot{font-size:12px;color:var(--muted);margin:8px 0 0;}
+  /* 25 Nov 2026 (the Routes page rethink, cards 4 and 7): the option's schedule. A row a measure; the tab's option in
+     the selection tint (sign blue at 6 %); a small bar each on the row's own scale, the route in use and both collision
+     bars grey; the difference a status SHAPE and its words (dot ok, diamond warning), plain text otherwise; no filled
+     cell, no pill. Under 600 px of the card's own width the bars go */
+  .bo-sch{--bo-bar:#62656B;--bo-bar-use:#A9ABB0;border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums;margin:2px 0 0;}
+  .bo-sch th,.bo-sch td{text-align:left;vertical-align:middle;padding:5px 8px;border-bottom:1px solid var(--line);}
+  .bo-sch thead th{font-weight:500;font-size:12px;color:var(--muted);padding:7px 8px 5px;border-bottom:1px solid var(--grey);}
+  .bo-sch tbody th{font-weight:500;color:var(--ink);} .bo-sch tbody th.bo-sub{font-weight:400;padding-left:22px;color:var(--muted);}
+  .bo-sch .bo-pick{background:var(--navy-soft-col);} .bo-sch thead th.bo-pick{color:var(--navy);font-weight:600;}
+  .bo-c{display:flex;align-items:center;gap:8px;} .bo-n{min-width:46px;text-align:right;flex:none;}
+  .bo-bar{display:inline-block;flex:none;height:7px;border-radius:3px;background:var(--bo-bar);} .bo-bar.bo-bar-use{background:var(--bo-bar-use);}
+  .bo-sch td.bo-none{color:var(--muted);}
+  .bo-mk{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap;}
+  .bo-mk i{flex:none;width:9px;height:9px;border-radius:50%;}
+  .bo-mk-ok{color:var(--ok-text);} .bo-mk-ok i{background:var(--ok-text);}
+  .bo-mk-warn{color:var(--warn-text);} .bo-mk-warn i{background:var(--warn-text);border-radius:0;transform:rotate(45deg) scale(.82);}
+  .bo-mk-plain{color:var(--ink);} .bo-mk-plain.bo-mk-none,.bo-mk-plain.bo-mk-off{color:var(--muted);}
+  html[data-theme="dark"] .bo-sch{--bo-bar:#C9CACE;--bo-bar-use:#6B6E74;}
+  @container (max-width:600px){.bo-sch .bo-bar{display:none;}.bo-sch th,.bo-sch td{padding:5px 6px;}.bo-n{min-width:0;}.bo-sch tbody th.bo-sub{padding-left:12px;}.bo-mk{white-space:normal;}}
   @container (max-width:600px){.bo-h{grid-template-columns:1fr auto;gap:2px 8px;}.bo-h .bo-v{grid-column:1 / -1;}.bo-k.bo-sub{padding-left:0;}}
   /* 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117, Q1 to Q4): an open route
      has a panel of its own under the Routes list. One column: the card, then all figures and diversions, then the
@@ -8868,61 +8895,72 @@ function UsersPage({ access }){
 //     on the server since Task F; the tab is not where the boundary is.
 const NAV = [
   { group: "Plan", items: [
-    { id: "dashboard", label: "Dashboard", glyph: "▦" },
-    { id: "submit", label: "Submit forecast", glyph: "✎" },
-    { id: "forecasts", label: "Forecasts", glyph: "☰" },
-    { id: "carbon", label: "Carbon planner", glyph: "◐" },
+    { id: "dashboard", label: "Dashboard" },
+    { id: "submit", label: "Submit forecast" },
+    { id: "forecasts", label: "Forecasts" },
+    { id: "carbon", label: "Carbon planner" },
     // 22 Oct 2026 (S16 / B5): each abnormal load planned on its own; a team code plans its own, a planner approves
-    { id: "abnormal", label: "Abnormal loads", glyph: "⬌" },
+    { id: "abnormal", label: "Abnormal loads" },
     // 27 Oct 2026 (stockpile forecast, D4 a): each stockpile's planned use, stock count and forecast
-    { id: "stockpiles", label: "Stockpiles", glyph: "▲" },
+    { id: "stockpiles", label: "Stockpiles" },
     // 29 Oct 2026 (task 3a): each concrete pour's mixers, their gap and the flags
-    { id: "pours", label: "Pours", glyph: "◒" },
+    { id: "pours", label: "Pours" },
     // 29 Oct 2026 (the user: "the simulation needs its own page now"): after the planning views; #simulation
-    { id: "simulation", label: "Simulation", glyph: "▶" },
+    { id: "simulation", label: "Simulation" },
     // 31 Oct 2026 (task 4a, PR 3a): the Construction Logistics Plans — every login; a team sees its own team's only
-    { id: "clp", label: "CLP documents", glyph: "▤" },
+    { id: "clp", label: "CLP documents" },
   ]},
   { group: "Track", items: [
-    { id: "lookahead", label: "Look-ahead", glyph: "◔" },
+    { id: "lookahead", label: "Look-ahead" },
     // 5 Nov 2026 (group 6): concerns from the public map, email, phone or in person — planners and admins only (Q4)
-    { id: "concerns", label: "Concerns", glyph: "!", approverOnly: true },
+    { id: "concerns", label: "Concerns", approverOnly: true },
   ]},
   { group: "Data", admin: true, items: [
-    { id: "locations", label: "Locations", glyph: "◉" },
-    { id: "routes", label: "Routes", glyph: "⇄" },
-    { id: "zones", label: "Zones", glyph: "◇" },
-    { id: "config", label: "Config", glyph: "⚙" },
+    { id: "locations", label: "Locations" },
+    { id: "routes", label: "Routes" },
+    { id: "zones", label: "Zones" },
+    { id: "config", label: "Config" },
     // G3 (14 Oct 2026, D57): admins only — the logins, the leads, the activity log
-    { id: "users", label: "Users", glyph: "☺", adminOnly: true },
+    { id: "users", label: "Users", adminOnly: true },
   ]},
   { group: "Map", items: [
-    { id: "map", label: "Route map", glyph: "🗺" },
+    { id: "map", label: "Route map" },
   ]},
 ];
 const DATA_PAGES = ["locations", "routes", "zones"];
-// 11 Oct 2026 — line icons for the rail (fresh-directions, A). Inline SVG paths, no library.
+// 26 Nov 2026 (own look, the icon set, step 1; John's "Yes, as recommended" to Q1 to Q8 of the icon mockup, 24 Nov):
+// Wayscope's own drawings for the 17 pages, the User guide and the phone's More, in place of the 11 Oct line icons.
+// One 24-unit grid, one line 2 units thick with round ends and joins, currentColor; d = the lines, rings = stroked
+// circles, dots = the one filled shape. Each is decorative beside its word (aria-hidden); a new icon is drawn to these
+// rules and shown to John first (notes: design language, "Icons").
 const NAV_ICON = {
-  dashboard: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
-  users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M21 21v-1a6 6 0 0 0-4-5.7",
-  submit: "M5 19h4L19 9l-4-4L5 15zM13 7l4 4",
-  forecasts: "M5 6h14M5 12h14M5 18h9",
-  carbon: "M5 19c0-8.3 5.7-14 14-14 0 8.3-5.7 14-14 14zM5 19l7-7",
-  lookahead: "M4 7h16v13H4zM4 11h16M9 4v5M15 4v5",
-  locations: "M12 21s-6-6.2-6-11a6 6 0 0 1 12 0c0 4.8-6 11-6 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
-  routes: "M6 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 16h5a3 3 0 0 0 3-3v-3",
-  zones: "M12 3l8 4.5v9L12 21l-8-4.5v-9z",
-  config: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.4-1.4M5.6 18.4L7 17M17 17l1.4 1.4M5.6 5.6L7 7",
-  map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
-  stockpiles: "M3 19h18L14 6l-3 5-2-3z",
-  pours: "M4 15h11l3-5h2v5h-1M4 15V9l6-3 5 3v6M7 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
-  abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
-  simulation: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5l6 3.5-6 3.5z",
-  clp: "M7 3h7l5 5v13H7zM14 3v5h5M10 12h6M10 15.5h6M10 19h4",
-  concerns: "M4 5h16v11H10l-5 4v-4H4zM12 8v4M12 14.5h.01",
+  dashboard: { d: "M3 20h18M7 16v-3M12 16V6M17 16v-7" },
+  submit: { d: "M4 20v-4L14.5 5.5l4 4L8 20zM12 8l4 4M13 20h7" },
+  forecasts: { d: "M4 6h16M4 12h9M4 18h5M12.5 17l3 3 5.5-5.5" },
+  carbon: { d: "M6 18a10 10 0 0 1 12-12a10 10 0 0 1-12 12zM4 20l8.5-8.5" },
+  abnormal: { d: "M5 5h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM7 16h10", rings: [[8.5, 19, 2], [15.5, 19, 2]] },
+  stockpiles: { d: "M2 20h20M3 20l6.59-6.59a2 2 0 0 1 2.82 0l3.34 3.34M15.75 16.75l.34-.34a2 2 0 0 1 2.82 0L22 19.5" },
+  pours: { d: "M2.5 9l3.5-3.5h6L15.5 9 12 12.5H6zM17 16V9h1.5l2.5 2.5V16M3 16h18", rings: [[7.5, 19, 2], [17.5, 19, 2]] },
+  simulation: { d: "M10.5 7.5v9l4.5-4.5z", rings: [[12, 12, 9]] },
+  clp: { d: "M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 13h6M9 17h3.5" },
+  lookahead: { d: "M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM3 10h18M8 3v4M16 3v4M12.5 15.5H17", dots: [[8, 15.5, 1.75]] },
+  concerns: { d: "M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM12 7v3.5M12 13h.01" },
+  locations: { d: "M12 20.4L7.05 15.45a7 7 0 1 1 9.9 0z", dots: [[12, 10.5, 2.25]] },
+  routes: { d: "M4.5 18.5h5.67a2 2 0 0 0 1.42-.59l5.82-5.82a2 2 0 0 0 .59-1.42V9.5", dots: [[4.5, 18.5, 2]], rings: [[18, 6.5, 3]] },
+  zones: { d: "M4 9.5L9.5 4H18a2 2 0 0 1 2 2v8.5L14.5 20H6a2 2 0 0 1-2-2zM8.5 12.5l4-4M11.5 15.5l4-4" },
+  config: { d: "M3 8h4M13 8h8M3 16h9M18 16h3", rings: [[10, 8, 3], [15, 16, 3]] },
+  users: { d: "M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1M15.5 4.7a3.5 3.5 0 0 1 0 6.6M17.5 14.3a5 5 0 0 1 3.5 4.7v1", rings: [[9, 8, 3.5]] },
+  map: { d: "M3 6h5l2-2h4l2 2h5v13h-5l-2-2h-4l-2 2H3zM9 5v13M15 5v13" },
+  guide: { d: "M12 7v13M12 7a3 3 0 0 0-3-3H3v13h6a3 3 0 0 1 3 3M12 7a3 3 0 0 1 3-3h6v13h-6a3 3 0 0 0-3 3" },
+  more: { d: "", dots: [[5, 12, 1.75], [12, 12, 1.75], [19, 12, 1.75]] },
 };
 function NavIcon({ id }){
-  return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICON[id] || NAV_ICON.forecasts} /></svg>;
+  const ic = NAV_ICON[id] || NAV_ICON.forecasts;
+  return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-icon={NAV_ICON[id] ? id : "forecasts"}>
+    {ic.d && <path d={ic.d} />}
+    {(ic.rings || []).map((c, i) => <circle key={"r" + i} cx={c[0]} cy={c[1]} r={c[2]} />)}
+    {(ic.dots || []).map((c, i) => <circle key={"d" + i} cx={c[0]} cy={c[1]} r={c[2]} fill="currentColor" stroke="none" />)}
+  </svg>;
 }
 
 // ================================================================= the phone shell (14 Oct 2026, D9)
@@ -8948,7 +8986,7 @@ function PhoneTabs({ groups, page, onPick, moreOpen, onMore }){
       ))}
       <button type="button" className={"phone-tab" + (moreOpen || deskOn ? " is-on" : "")}
         aria-expanded={moreOpen ? "true" : "false"} aria-controls="phone-more" onClick={onMore}>
-        <svg className="nav-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+        <NavIcon id="more" />
         <span>More</span>
       </button>
     </nav>
@@ -8978,7 +9016,7 @@ function PhoneMore({ groups, page, onPick, onClose, role, who }){
           </button>
         ))}
         <a className="phone-more-item" href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer">
-          <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01" /></svg>
+          <NavIcon id="guide" />
           <span>User guide</span><span className="pm-note">new tab</span>
         </a>
         {role && <div className="phone-more-who">{teamText(who) || "—"} · {role.ipt ? teamName(role.ipt) : role.label}</div>}
@@ -9664,9 +9702,9 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
               not a React view, and a new tab keeps the app's state. 10 Nov 2026 (wave 4): on a tablet it is in the
               opened rail only. */}
           {(!tablet || railShown) && <a href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer"
-             title={railShown ? "Opens in a new tab" : "User guide"}
+             title={railShown ? "Opens in a new tab" : "User guide"} aria-label={railShown ? undefined : "User guide"}
              className="w-full flex items-center gap-3 px-2 py-1.5 mb-1 text-xs rounded text-slate-500 hover:bg-slate-50 hover:text-[color:var(--navy)] transition">
-            <span className="w-4 text-center text-sm leading-none opacity-80">?</span>
+            <NavIcon id="guide" />
             {railShown && <span className="truncate">User guide</span>}
           </a>}
           <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railShown ? "Collapse" : "Expand"}
@@ -14631,6 +14669,7 @@ const simMapStyle = () => (typeof document !== "undefined" && document.documentE
 const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (drawn before the app starts) opens on Light
 // 11 Nov 2026 (card B-X1): a dark ground under the data pages' map (the public map's labelsDark test), and the zone
 // names' paint on it: the public map's name rule (labelPaint), near-white on a near-black halo, else ink on white
+const SIM_ROUTE_LINE = "#A9ABB0";   // 26 Nov 2026 (lines-prints Q3): the Simulation's route lines, the public map's quiet grey
 const mapGroundDark = (style) => /dark|night|satellite|maaamet/.test(String(style || ""));
 const zoneLabelPaint = (dark) => ({ "text-color": dark ? "#F5F5F4" : "#1F2024",
   "text-halo-color": dark ? "rgba(18,19,22,0.92)" : "#FFFFFF", "text-halo-width": 1.75, "text-halo-blur": 0.5 });
@@ -14665,10 +14704,12 @@ function SimMap({ meta, D, store, frame, site, wall, full }){
       const dk = mapGroundDark(styleNow), nm = simLabelPaint(dk);
       const empty = { type: "FeatureCollection", features: [] };
       ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash", "sim-called", "sim-busy", "sim-busy-main"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
-      m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      // 26 Nov 2026 (lines-prints Q3; John: "Yes, as recommended"; card 2): the public map's quiet grey for a route line (was
+      // the slate #94A3B8); the lorry marks keep their own colours
+      m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": SIM_ROUTE_LINE, "line-width": 1.6, "line-opacity": 0.75 } });
       // 5 Nov 2026 (task 0d-2, Q14 = C): a busy-hours road shows only in its hours, in the navy with a soft glow, and
       // the stretch of the main road it replaces fades (the frame sets both); its main road is drawn here, not in sim-routes
-      m.addLayer({ id: "sim-busy-main", type: "line", source: "sim-busy-main", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      m.addLayer({ id: "sim-busy-main", type: "line", source: "sim-busy-main", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": SIM_ROUTE_LINE, "line-width": 1.6, "line-opacity": 0.75 } });
       m.addLayer({ id: "sim-busy-glow", type: "line", source: "sim-busy", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": tok("--navy", "#1D4ED8"), "line-width": 12, "line-blur": 6, "line-opacity": 0 } });
       m.addLayer({ id: "sim-busy", type: "line", source: "sim-busy", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": tok("--navy", "#1D4ED8"), "line-width": 2.6, "line-opacity": 0 } });
       m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
@@ -15725,6 +15766,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
   const [geo, setGeo] = useState(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
+  const [cmDark] = useState(() => mapGroundDark(lookMapStyle()));   // the ground the one map opens on (it is never re-styled)
   const ids = lines.map(l => l.route_id).filter((v, i, a) => a.indexOf(v) === i);
   const idKey = ids.join(",");
   const byRoute = useMemo(() => {
@@ -15769,14 +15811,15 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
       const before = under ? under.id : undefined;
       const OFF = ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4];    // each leg left of its own travel (UK)
       const round = { "line-cap": "round", "line-join": "round" };
+      const L = cmLegs(cmDark);   // the same ground the key reads (both taken when the one map is made)
       m.addLayer({ id: "la-faded", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "faded"], layout: round,
-                   paint: { "line-color": CM_FADED, "line-width": 2, "line-opacity": 0.55 } }, before);
+                   paint: { "line-color": L.faded, "line-width": 2, "line-opacity": CM_FADED_OPACITY } }, before);
       m.addLayer({ id: "la-routes-casing", type: "line", source: "la-routes", filter: ["!=", ["get", "kind"], "faded"], layout: round,
-                   paint: { "line-color": "#ffffff", "line-width": ["match", ["get", "kind"], "out", 6.5, 5], "line-opacity": 0.9, "line-offset": OFF } }, before);
+                   paint: { "line-color": L.edge, "line-width": ["match", ["get", "kind"], "out", 6.5, 5], "line-opacity": 0.9, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-back", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "back"], layout: round,
-                   paint: { "line-color": CM_BACK, "line-width": 2.5, "line-offset": OFF } }, before);
+                   paint: { "line-color": L.back, "line-width": 2.5, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-routes", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "out"], layout: round,
-                   paint: { "line-color": CM_OUT, "line-width": 4, "line-offset": OFF } }, before);
+                   paint: { "line-color": L.out, "line-width": 4, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-ends", type: "circle", source: "la-ends",
                    paint: { "circle-radius": 5.5, "circle-color": "#1F2024", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
       m.addLayer({ id: "la-gates", type: "symbol", source: "la-gates", minzoom: CM_GATE_ZOOM,
@@ -15863,7 +15906,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
       <div className={(flush ? "" : "ruled overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
         {/* 14 Oct 2026: on a filled big screen the map takes the whole card; its ResizeObserver follows */}
         <div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />
-        <div className="cm-key px-3 py-2 text-[13px] text-slate-600 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1" data-commit-key={today ? "today" : "week"}>
+        <div className="cm-key px-3 py-2 text-[13px] text-slate-600 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1" data-commit-key={today ? "today" : "week"} data-cm-dark={cmDark ? "1" : "0"}>
           <span data-key="out"><i className="cm-k cm-k-out" aria-hidden="true" />{today ? "Today, out (loaded)" : "Out (loaded)"}</span>
           {today && <span data-key="back"><i className="cm-k cm-k-back" aria-hidden="true" />Today, back (empty)</span>}
           {today && <span data-key="faded"><i className="cm-k cm-k-faded" aria-hidden="true" />Later this week</span>}
@@ -15885,7 +15928,17 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
 // Look-ahead passes none and every line of the week is drawn at full strength, out only. Colours by leg as on the public
 // map and the route sheet (out #059669, back #f59e0b, each left of its own travel); the team is in the hover box. One dot a
 // place with its name; gates (with names) from town-level zoom; a tag on each drawn line with its load.
-const CM_OUT = "#059669", CM_BACK = "#f59e0b", CM_FADED = "#9CA3AF";
+// 26 Nov 2026 (lines-prints Q1, Q2; John: "Yes, as recommended"; notes map-lines-prints-mockup-1125 card 1): the public map's
+// and the Routes page's pair in place of green and amber (BENDS 8 Nov "out green, back amber"; "as on the public map" stays):
+// out (loaded) ink, back (empty) grey, "later this week" the line grey #C6C8CC at 0.9 so it parts from the empty leg. On a
+// dark ground the Routes page's Dark pair on its dark casing (LEG_OUT_DARK / LEG_BACK_DARK / LEG_CASE_DARK); "later this week"
+// there is the Routes page's dark quiet grey #7D8087 (darker than the back leg, as the light one is paler).
+const CM_OUT = "#3A3C41", CM_BACK = "#8E9197", CM_FADED = "#C6C8CC", CM_FADED_OPACITY = 0.9;
+const CM_FADED_DARK = "#7D8087";
+function cmLegs(dark){
+  return dark ? { out: LEG_OUT_DARK, back: LEG_BACK_DARK, faded: CM_FADED_DARK, edge: LEG_CASE_DARK }
+              : { out: CM_OUT, back: CM_BACK, faded: CM_FADED, edge: "#ffffff" };
+}
 const CM_GATE_ZOOM = 11.5;
 // Per route: is it on today's plan, and the words of its tag (today's on the Dashboard, the week's on the Look-ahead).
 // Pure, so dom_frontend tests it. Quantities in the lines' own unit when they share one (m³ for concrete), else tonnes.
@@ -16575,11 +16628,57 @@ function olZonesOver(lines, zones){
     return false;
   }).map(z => z.properties && z.properties.id);
 }
+// 25 Nov 2026 (the Routes page rethink, card 3, Q5): the zone names on an open route. A closure the rule reports reads
+// its name and, on a second line, its dates (route_best.closures: the rule's own halves, nothing made here); any other
+// zone's name is cut at its first colon, as the rule cuts a closure's
+const OL_NAME_CUT = ["let", "n", ["to-string", ["get", "name"]], ["let", "i", ["index-of", ":", ["var", "n"]],
+  ["case", [">", ["var", "i"], 0], ["slice", ["var", "n"], 0, ["var", "i"]], ["var", "n"]]]];
+function olZoneText(closures){
+  const seen = new Set(), pairs = [];
+  (closures || []).forEach(c => {
+    if(!c || !c.zone || seen.has(c.zone)) return;
+    seen.add(c.zone);
+    pairs.push(c.zone, c.dates ? `${c.name}\n${c.dates}` : c.name);
+  });
+  return pairs.length ? ["match", ["get", "id"], ...pairs, OL_NAME_CUT] : OL_NAME_CUT;
+}
 // 24 Nov 2026 (Routes rethink): the ruled-out stretch a neutral near-black (was the slate #334155 / #E2E8F0)
 const OL_MARK = "#1F2024", OL_MARK_DARK = "#E6E7EA";
 // the selected route's other options, drawn UNDER the line in use: one thin neutral grey on white (24 Nov 2026, Routes
 // rethink, card 2; was the slate #94A3B8 at 0.8); on a dark ground the public map's dark alternative grey on a dark casing
 const ALT_COLOR = "#8E9197", ALT_COLOR_DARK = "#7D8087";
+// 25 Nov 2026 (the Routes page rethink, card 3, Q5; drawn as the public map's Q8, claude/map-lines-diversions): while a
+// dated diversion is in use on an open route, the stretches of the line in use that leave its usual road carry an amber
+// edge under the line's casing (the ONLY amber on the Routes map), and the stretches of the usual road (option 0) it leaves
+// are a thin grey on a casing with "×" marks along them, upright and evenly spaced. The public map's own values
+// (DIV_USUAL in map/index.html): keep the two in step. The crosses are marks, not names: they stay under any label rule
+const OL_DIV = { edge: "#F59E0B", edgeW: 10.5, core: "#B4B6BA", casing: "#FFFFFF", x: "#6B6E74", coreDark: "#6E7177",
+                 casingDark: "#26282C", xDark: "#C9CBCF", coreW: 2.6, casingW: 5, xEvery: 66, xSize: 15,
+                 near: 30, minRun: 150 };
+// the parts of line A (one coordinate list) that run more than OL_DIV.near from every line in B (a list of coordinate
+// lists), as runs of at least OL_DIV.minRun metres; a run starts at the last point still on B, so it meets the junction
+function olOffPieces(A, B){
+  const pts = olDense(A || [], OL_STEP_M);
+  if(pts.length < 2) return [];
+  const cell = 0.001, grid = new Map(), key = (x, y) => x + ":" + y;
+  (B || []).forEach(L => olDense(L, OL_STEP_M).forEach(p => {
+    const k = key(Math.floor(p[0] / cell), Math.floor(p[1] / cell)); if(!grid.has(k)) grid.set(k, []); grid.get(k).push(p); }));
+  const near = (p) => {
+    const cx = Math.floor(p[0] / cell), cy = Math.floor(p[1] / cell);
+    for(let i = -1; i <= 1; i++) for(let j = -1; j <= 1; j++){ const g = grid.get(key(cx + i, cy + j)); if(g && g.some(q => olMetres(p, q) <= OL_DIV.near)) return true; }
+    return false;
+  };
+  const out = []; let run = null, last = null;
+  const len = (r) => r.reduce((t, p, i) => i ? t + olMetres(r[i - 1], p) : 0, 0);
+  const flush = () => { if(run && run.length >= 2 && len(run) >= OL_DIV.minRun) out.push(run); run = null; };
+  pts.forEach(p => {
+    if(near(p)){ if(run){ run.push(p); flush(); } last = p; return; }
+    if(!run) run = last ? [last] : [];
+    run.push(p); last = p;
+  });
+  flush();
+  return out;
+}
 const MAP_H = "62vh";     // map height — the right-hand column matches it and scrolls inside
 // ⚠️ This is the ADMIN map's node legend, not the public map's palette — the public
 // map draws nodes as DOM markers with their own colouring. #0F766E is the rail colour
@@ -17510,9 +17609,6 @@ function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, ro
 // the history is not counted. Cycle routes and places: a chip, each measure's counts and its percentage. No pick on a
 // trade-off (no Make primary there, Q2); none on a route whose line in use is a dated diversion (Q4). Make primary
 // moves the card's lorry only (Q3).
-const BO_TONE = { fewer: "ok", quicker: "ok", less: "ok", same: "none", more: "warn", slower: "warn", mixed: "warn" };
-const BO_STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin.";
-const BO_NO_HISTORY = "Collisions are not compared: the collision history has not been fetched.";
 // Q9 (John, 16 Nov 2026): the rule names a limit below the lorry that the line IN USE meets ({words, legs, short}); the card
 // says it in one grey sentence of its own, the words John saw on Q9: "The diversion in use meets a 7.5 t limit below this
 // lorry." (taken under his one-hour rule, 17 Nov) from the rule's `short` ("7.5 t limit"); without `short`, around `words`:
@@ -17533,8 +17629,6 @@ const BO_WAIT = "Working out the route options…";
 // its mark "Mixed" (it read "Your call"). The card compares the rule's own words, never a word of its own.
 const BO_PLANNER = "Planner to decide";
 const BO_MARK = { "Suggested": ["Suggested", "ok"], [BO_PLANNER]: ["Mixed", "warn"] };
-// Q9: the rule's sentence about the HGV collisions ("… collisions involving an HGV on it …")
-const BO_HGV = "involving an HGV";
 // Q1: a reason the rule gives as a fragment ("it adds 7.5 t limits, except for access, on Syston Road…") is shown on a
 // row as a sentence. The words are the rule's; nothing here splits or rewrites them.
 function boSay(s){
@@ -17546,18 +17640,6 @@ function boSay(s){
 function boAlso(list){
   const a = list || [];
   return !a.length ? "" : (a.length === 1 ? `${a[0]} is mixed too.` : `${a.length} others are mixed too.`);
-}
-function boDate(s){
-  if(!s) return "";
-  const d = new Date(String(s).length > 10 ? s : s + "T12:00:00Z");
-  return isNaN(d) ? String(s) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-function boNum(x, d){ if(x == null) return "–"; const v = Math.round(Number(x) * Math.pow(10, d || 1)) / Math.pow(10, d || 1); return String(v); }
-// a measure's percentage in words: none where the base was too small (null) or nothing changed (0)
-function boPct(p, fewer, more){ return p ? ` (${Math.abs(p)} % ${p < 0 ? fewer || "fewer" : more || "more"})` : ""; }
-function boChip(word, notYet){
-  if(!word || word === "not counted") return <RowStatus word={notYet ? "Not counted yet" : "Not counted"} tone="none" />;
-  return <RowStatus word={word.charAt(0).toUpperCase() + word.slice(1)} tone={BO_TONE[word] || "none"} />;
 }
 // the lorry names with the two concrete mixers said once ("both concrete mixers"), as drawn on the third draft's card 5
 function boOthers(list){
@@ -17591,6 +17673,58 @@ function boLineName(r, x){
   const ln = (r.lines || []).find(l => l.alt != null && Number(l.alt) === Number(x.alt) && l.state !== "in_use");
   return (ln && ln.name) || x.label;
 }
+// 25 Nov 2026 (the Routes page rethink, card 3, Q5 / Q6): one closure over the route, as the rule wrote it
+// (route_best.closures): the head, then its name, its dates and what its diversion does. The page joins the rule's halves
+// with " · " and makes no words of its own. A diamond for a closure in force, a ring for one planned.
+const BO_CL_SHOWN = 2;      // route_best.CLOSURES_SHOWN
+function BoClosure({ cl }){
+  return (
+    <div className="bo-cl" data-bo-closure={cl.state} data-bo-closure-zone={cl.zone}>
+      <RowStatus word={cl.head} tone={cl.state === "in_force" ? "warn" : "none"} />
+      <span>{[cl.name, cl.dates].filter(Boolean).join(" · ")}{cl.does ? <> · <span className="bo-g">{cl.does}</span></> : null}</span>
+    </div>);
+}
+// 25 Nov 2026 (the Routes page rethink, cards 4 and 7; John: "Yes, as recommended", Q12 and Q13): the option's rows are
+// ONE schedule, read from the rule's own `rows` (route_best.option_rows): the measure, the route in use, the tab's option
+// in the selection tint, and the difference with the status shape and the rule's words. Each figure has a small bar on
+// the row's own scale (the larger of the two the full width); the collision rows' bars are both grey and their words
+// plain. Nothing here decides or words anything: the page prints the rows. Bars are hidden from a screen reader; a mark
+// is a shape AND its words. Under 600 px of the card's own width the bars go (the CSS).
+const BO_BAR_W = 86;
+function boBar(v, max, grey){
+  const w = max > 0 && v > 0 ? Math.max(2, Math.round(v / max * BO_BAR_W)) : 0;
+  return <span className={"bo-bar" + (grey ? " bo-bar-use" : "")} aria-hidden="true" style={{ width: w + "px" }} />;
+}
+function boMark(x){
+  if(x.mark === "ok" || x.mark === "warn")
+    return <span className={"bo-mk bo-mk-" + x.mark} data-bo-mark={x.mark}><i aria-hidden="true" />{x.words}</span>;
+  return <span className={"bo-mk-plain bo-mk-" + x.mark} data-bo-mark={x.mark}>{x.words}</span>;
+}
+function BoSchedule({ rows, name }){
+  return (
+    <table className="bo-sch" data-bo-schedule="1">
+      <caption className="sr-only">{name} against the route in use</caption>
+      <thead><tr>
+        <th scope="col">A round trip</th><th scope="col">In use</th>
+        <th scope="col" className="bo-pick">{name}</th><th scope="col">Against the route in use</th>
+      </tr></thead>
+      <tbody>{(rows || []).map(x => {
+        if(x.none != null) return (
+          <tr key={x.key} data-bo-row={x.key}>
+            <th scope="row" className={"bo-k" + (x.sub ? " bo-sub" : "")}>{x.label}</th>
+            <td className="bo-none" colSpan={3}>{x.none}</td>
+          </tr>);
+        const max = Math.max(Number(x.in_use) || 0, Number(x.option) || 0);
+        return (
+          <tr key={x.key} data-bo-row={x.key}>
+            <th scope="row" className={"bo-k" + (x.sub ? " bo-sub" : "")}>{x.label}</th>
+            <td><span className="bo-c"><span className="bo-n">{x.in_use_text}</span>{boBar(Number(x.in_use), max, true)}</span></td>
+            <td className="bo-pick"><span className="bo-c"><span className="bo-n">{x.option_text}</span>{boBar(Number(x.option), max, x.bars === "grey")}</span></td>
+            <td className="bo-d">{boMark(x)}</td>
+          </tr>);
+      })}</tbody>
+    </table>);
+}
 function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoting, busyUses, frame, pick, onPick }){
   const allBtn = (
     <button type="button" className="bo-fold" aria-expanded={showAll ? "true" : "false"} data-bo-all="1"
@@ -17620,28 +17754,6 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
     why = hist === "out_of_date" ? "Not suggested yet: the collision history is out of date." : `Not suggested yet: ${r.held_back}`;
   else if(allOut) why = "Every other option is ruled out.";
   else why = r.why;
-  const sent = o ? (o.sentences || []) : [];
-  const colSent = sent.find(s => s.startsWith(o.label + " had") && !s.includes(BO_HGV));
-  const goodsSent = sent.find(s => s.startsWith(o.label + " had") && s.includes(BO_HGV));
-  const busySent = sent.find(s => s.startsWith("Setting off"));
-  const c = o ? o.counts || {} : {};
-  const colRow = (k, s, key) => {
-    if(hist === "out_of_date") return boRow(k, boChip(null), BO_STALE, { sub: true, grey: true, key });
-    if(hist === "not_fetched") return boRow(k, boChip(null), BO_NO_HISTORY, { sub: true, grey: true, key });
-    return boRow(k, <span className="bo-dash">—</span>, s || "", { sub: true, key });
-  };
-  const pw = o ? o.part_words || {} : {}, hw = o ? o.head_words || {} : {}, p = o ? o.pct || {} : {};
-  const cyc = o ? [
-    `Left-hand turns ${c.left_turns} against ${cu.left_turns}${boPct(p.left_turns)}`,
-    c.cycle_meets != null && cu.cycle_meets != null ? `met ${c.cycle_meets} against ${cu.cycle_meets}${boPct(p.cycle_meets)}` : null,
-    c.cycle_beside_km != null && cu.cycle_beside_km != null ? `beside ${boNum(c.cycle_beside_km, 2)} km against ${boNum(cu.cycle_beside_km, 2)}${boPct(p.cycle_beside_km, "less", "more")}` : null,
-  ].filter(Boolean).join(" · ") : "";
-  const tripsWords = o && (c.trips === cu.trips ? `${c.trips} trips a day either way` : `${c.trips} trips a day, not ${cu.trips}`);
-  const limitsRow = () => {
-    if(!(r.checks || {}).limits_held) return boRow("Limits", <RowStatus word="Not checked" tone="none" />, "No road limits are held.", { grey: true });
-    if((o.added_limits || []).length) return boRow("Limits", <RowStatus word="Added" tone="warn" />, (o.ruled_out || []).map(boSay).join(" "));
-    return boRow("Limits", <RowStatus word="None added" tone="none" />, "");
-  };
   const ownWayBack = o && o.return_alt != null && Number(o.return_alt) === Number(o.alt);
   const canPromote = r.answer === "Suggested" && o && o.chosen && onPromote && !div;
   const tabs = !allOut && (r.options || []).length > 1 && onPick ? r.options : null;
@@ -17655,14 +17767,17 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
   };
   const busyUse = (busyUses || []).find(u => u.status === "in_use");
   const inUseLimits = r.in_use_limits || [];
+  const closures = r.closures || [];
   const also = r.answer === BO_PLANNER ? boAlso(r.trade_also) : "";
   return (
     <div className="bo-card" data-best-option={r.answer} data-bo-route={routeId}>
       <div className="bo-eye"><span>Route options{lorry ? ` · ${lorry}` : ""}</span><InfoTip id="routes.best" /></div>
-      {/* 24 Nov 2026 (Q9): a line baked round the closure is "Diversion" (it read "Way round"), so it is not named twice */}
-      {div && <p className="bo-state" data-bo-in-use="diversion">In use: {/^Diversion\b/.test(div.label || "") ? "" : `${div.label}, `}the diversion{div.until ? `, until ${boDate(div.until)}` : ""}. Compared with it.</p>}
-      {busyUse && <p className="bo-state" data-bo-in-use="busy">Busy hours: Alt {busyUse.alt} is in use on weekdays {busyUse.from}–{busyUse.to}.</p>}
-      {inUseLimits.map((L, i) => <p key={i} className="bo-state bo-grey" data-bo-in-use-limit="1">{boInUseLimit(L, div)}</p>)}
+      {/* 25 Nov 2026 (the Routes page rethink, card 3, Q5 / Q6): the rule's closure lines replace "In use: Alt 2, the
+          diversion, until 17 Dec 2027. Compared with it."; soonest first, at most BO_CL_SHOWN, then the rule's "and N more" */}
+      {closures.slice(0, BO_CL_SHOWN).map(cl => <BoClosure key={cl.zone + "-" + cl.whose} cl={cl} />)}
+      {r.closures_more && <p className="bo-cl bo-grey" data-bo-closure-more="1">{r.closures_more}</p>}
+      {busyUse && <p className="bo-cl" data-bo-in-use="busy">Busy hours: Alt {busyUse.alt} is in use on weekdays {busyUse.from}–{busyUse.to}.</p>}
+      {inUseLimits.map((L, i) => <p key={i} className="bo-cl bo-grey" data-bo-in-use-limit="1">{boInUseLimit(L, div)}</p>)}
       <div className="bo-ans">
         <b>{r.answer === "Suggested" && r.option ? r.option : r.answer}</b>
         <RowStatus word={tag} tone={tone} />
@@ -17685,18 +17800,11 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
           {boRow(boLineName(r, o), <RowStatus word="Ruled out" tone="none" />,
             Array.from(new Set(o.ruled_out || [])).map(boSay).join(" "), { key: "out-" + o.alt })}
         </div>)}
+      {/* 25 Nov 2026 (the Routes page rethink, Q12 and Q13): the option's rows are ONE schedule, the rule's own rows */}
       {o && !allOut && !oOut && (
-        <div className="bo-heads" data-bo-option={o.label}>
-          {/* 24 Nov 2026 (Q9): no "People" heading (the rows name themselves); "Involving an HGV" (it read "Goods vehicle") */}
-          {colRow("Collisions", colSent, "collisions")}
-          {colRow("Involving an HGV", goodsSent, "goods")}
-          {boRow("Cycle routes", boChip(pw.cycle, !counted), cyc, { sub: true, grey: !counted, key: "cycle" })}
-          {boRow("Community", boChip(pw.community, !counted), `${c.places} against ${cu.places}${boPct(p.places)}`, { sub: true, grey: !counted, key: "places" })}
+        <div className="bo-sch-box" data-bo-option={o.label}>
+          <BoSchedule rows={o.rows} name={boLineName(r, o)} />
           {!counted && <p className="bo-state" data-bo-not-counted="community">Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.</p>}
-          {boRow("Time", boChip(hw.time), <>{boNum(c.cycle_min)} min a round trip <small>· {boNum(cu.cycle_min)} now · {tripsWords}{o.n5 ? " · a shorter road that takes longer" : ""}</small></>)}
-          {boRow("Busy hours", boChip(hw.busy), busySent || (hw.busy === "not counted" ? `No busy-hour times held for ${o.label}.` : "At 08:00 and 17:00."), { grey: hw.busy === "not counted" })}
-          {boRow("Carbon", boChip(hw.carbon), <>{boNum(c.co2_kg)} kg CO₂e a trip <small>· {boNum(cu.co2_kg)} now</small></>)}
-          {limitsRow()}
         </div>)}
       <div className="bo-acts">
         {o && onFocus && <button type="button" className="btn-sec" data-bo-show={o.alt}
@@ -18156,6 +18264,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [olLabels, setOlLabels] = useState([]);
   const focusByHand = useRef(false), roQuiet = useRef(false), olFitFor = useRef(null), olLayer = useRef(null);
   const olUseFC = useRef({ type: "FeatureCollection", features: [] }), olHide = useRef(null);
+  const olWayFC = useRef({ type: "FeatureCollection", features: [] }), olUsualFC = useRef({ type: "FeatureCollection", features: [] });
   const olMarkFC = useRef({ type: "FeatureCollection", features: [] }), olSignFC = useRef({ type: "FeatureCollection", features: [] });
   const olSignsAll = useRef([]);
   const onCardBest = (id, b) => setCardBest(m => (m[id] === b ? m : { ...m, [id]: b }));
@@ -18454,6 +18563,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     ["route-arrows", "ol-use-arrows"].forEach(l => { set(l, "icon-halo-color", leg); set(l, "icon-color", dark ? LEG_CASE_DARK : "#ffffff"); });
     ["route-casing", "ol-use-casing", "alt-casing", "sel-casing"].forEach(l => set(l, "line-color", cas));
     set("alt-line", "line-color", dark ? ALT_COLOR_DARK : ALT_COLOR);
+    set("ol-usual-casing", "line-color", dark ? OL_DIV.casingDark : OL_DIV.casing);
+    set("ol-usual-line", "line-color", dark ? OL_DIV.coreDark : OL_DIV.core);
+    set("ol-usual-x", "text-color", dark ? OL_DIV.xDark : OL_DIV.x); set("ol-usual-x", "text-halo-color", dark ? OL_DIV.casingDark : OL_DIV.casing);
     set("sel-line", "line-color", sign); set("sel-halo", "line-color", sign);
     set("sel-arrows", "icon-halo-color", sign); set("sel-arrows", "icon-color", dark ? LEG_CASE_DARK : "#ffffff");
   };
@@ -18461,6 +18573,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // drawn lines run through (an area it crosses; a haul road or a road's limit it runs along: OL_ALONG_M, at least
   // OL_ALONG_MIN of it); closing the panel puts every location and zone back. olScopeIds holds what the open route keeps
   const olScopeIds = useRef(null);   // { ends: [origin, destination], zones: [ids] } or null
+  const olClosRef = useRef([]);      // the open route's closures as the rule wrote them (route_best.closures)
   const olScope = (m) => {
     const sc = olOpenRef.current ? olScopeIds.current : null;
     const poly = ["==", ["geometry-type"], "Polygon"];
@@ -18470,6 +18583,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(m.getLayer("zone-fill")) m.setFilter("zone-fill", z ? ["all", poly, z] : poly);
       if(m.getLayer("zone-outline")) m.setFilter("zone-outline", z);
       if(m.getLayer("zone-label")) m.setFilter("zone-label", z);
+      // 25 Nov 2026 (the Routes page rethink, card 3, Q5): with a route open a closure over its lines reads the rule's
+      // name and dates on two lines (route_best.closures); any other zone's name is cut at its first colon. Closed: as before
+      if(m.getLayer("zone-label")) m.setLayoutProperty("zone-label", "text-field", sc ? olZoneText(olClosRef.current) : ["get", "name"]);
     } catch(e){}
   };
 
@@ -18483,6 +18599,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!m.getSource("oluse")) m.addSource("oluse", { type: "geojson", data: olUseFC.current });
     if(!m.getSource("olmarks")) m.addSource("olmarks", { type: "geojson", data: olMarkFC.current });
     if(!m.getSource("olsigns")) m.addSource("olsigns", { type: "geojson", data: olSignFC.current });
+    if(!m.getSource("oldivway")) m.addSource("oldivway", { type: "geojson", data: olWayFC.current });
+    if(!m.getSource("olusual")) m.addSource("olusual", { type: "geojson", data: olUsualFC.current });
     if(!m.getSource("selnode")) m.addSource("selnode", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     if(!m.getSource("newnode")) m.addSource("newnode", { type: "geojson", data: newFC.current });
     // Phase 3 zones: the saved shapes, and the one currently being drawn
@@ -18512,6 +18630,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": LEG_CASE, "line-width": 5.4 } });
     if(!m.getLayer("alt-line")) m.addLayer({ id: "alt-line", type: "line", source: "alts",
       layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ALT_COLOR, "line-width": 2.4, "line-opacity": 1 } });
+    // 25 Nov 2026 (card 3, Q5): the usual road a diversion in use leaves, over the alternatives' grey (it is one of them),
+    // and the way round's amber edge, UNDER the line in use's casing (OL_DIV)
+    if(!m.getLayer("ol-usual-casing")) m.addLayer({ id: "ol-usual-casing", type: "line", source: "olusual",
+      layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": OL_DIV.casing, "line-width": OL_DIV.casingW } });
+    if(!m.getLayer("ol-usual-line")) m.addLayer({ id: "ol-usual-line", type: "line", source: "olusual",
+      layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": OL_DIV.core, "line-width": OL_DIV.coreW } });
+    if(!m.getLayer("ol-div-edge")) m.addLayer({ id: "ol-div-edge", type: "line", source: "oldivway",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": OL_DIV.edge, "line-width": OL_DIV.edgeW, "line-offset": LEG_OFFSET } });
     // 17 Nov 2026 (route option labels): the open route's line in use, in the same leg colours, casing and arrows.
     // 24 Nov 2026 (Routes rethink, card 1): 3.2 px on a 6 px white casing, no halo (nothing else is on the map with it)
     if(!m.getLayer("ol-use-casing")) m.addLayer({ id: "ol-use-casing", type: "line", source: "oluse",
@@ -18544,6 +18671,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 "icon-rotation-alignment": "map", "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.1],
                 "icon-offset": ["interpolate", ["linear"], ["zoom"], 9, ["literal", [0, -5]], 14, ["literal", [0, -8]]] },
       paint: { "icon-color": "#ffffff", "icon-halo-color": SEL_HALO, "icon-halo-width": 2 } });
+    // 25 Nov 2026 (card 3, Q5): the usual road's "×" marks, upright (viewport) and evenly spaced, over every line, under
+    // the limit marks and signs
+    if(!m.getLayer("ol-usual-x")) m.addLayer({ id: "ol-usual-x", type: "symbol", source: "olusual",
+      layout: { "symbol-placement": "line", "symbol-spacing": OL_DIV.xEvery, "text-field": "\u00d7", "text-size": OL_DIV.xSize,
+                "text-rotation-alignment": "viewport", "text-pitch-alignment": "viewport", "text-keep-upright": false,
+                "text-allow-overlap": true, "text-ignore-placement": true },
+      paint: { "text-color": OL_DIV.x, "text-halo-color": OL_DIV.casing, "text-halo-width": 1.2 } });
     // 17 Nov 2026 (route option labels, F2 / Q7): the stretch of a limit that rules an option out, SOLID and dark on the
     // option's line (never the red dashes of the Lorry limits layer: a route's line is never red and never dotted)
     const olMarkInk = mapGroundDark(basemapShown.current || basemap) ? OL_MARK_DARK : OL_MARK;
@@ -18883,6 +19017,34 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     try { const src = m.getSource("oluse"); if(src) src.setData(olUseFC.current); } catch(e){}
     olRouteFilter(m);
   }, [olOn, olBest, selGeoms, showLeg, mapReady, olRoute]);
+  // 25 Nov 2026 (the Routes page rethink, card 3, Q5): a leg on a dated diversion in use (the rule's in_use: why
+  // "diversion", status "in_use") draws the way round's amber edge and the usual road it leaves (olOffPieces); a stretch of
+  // usual road both legs leave is drawn once. Nothing while no diversion is in use, or the lorry shown is not the card's
+  useEffect(() => {
+    const m = mapObj.current; if(!m || !mapReady) return;
+    const way = [], usual = [];
+    if(olOn){
+      const u = olBest.in_use || {}, fs = olFeats();
+      ["loaded", "return"].filter(l => showLeg === "both" || l === oneLeg(showLeg)).forEach(l => {
+        const x = u[l];
+        if(!x || x.why !== "diversion" || x.status !== "in_use" || Number(x.alt) === 0) return;
+        const line = (a) => { const f = fs.find(f => f.properties.leg === l && Number(f.properties.alt_index) === a); return f && f.geometry ? f.geometry.coordinates : null; };
+        const use = line(Number(x.alt)), main = line(0);
+        if(!use || !main) return;
+        olOffPieces(use, [main]).forEach(c => way.push({ type: "Feature", properties: { leg: l }, geometry: { type: "LineString", coordinates: c } }));
+        const drawn = usual.map(f => f.geometry.coordinates);
+        olOffPieces(main, [use]).forEach(c => (drawn.length ? olOffPieces(c, drawn) : [c])
+          .forEach(p => usual.push({ type: "Feature", properties: { leg: l }, geometry: { type: "LineString", coordinates: p } })));
+      });
+    }
+    olWayFC.current = { type: "FeatureCollection", features: way };
+    olUsualFC.current = { type: "FeatureCollection", features: usual };
+    try { const a = m.getSource("oldivway"); if(a) a.setData(olWayFC.current); const b = m.getSource("olusual"); if(b) b.setData(olUsualFC.current); } catch(e){}
+  }, [olOn, olBest, selGeoms, showLeg, mapReady, olRoute]);
+  useEffect(() => {
+    olClosRef.current = (olBest && olBest.closures) || [];
+    const m = mapObj.current; if(m && mapReady) olScope(m);
+  }, [olBest, mapReady]);
   // 24 Nov 2026 (Routes rethink, Q2 A): what an open route keeps on the map: its two ends and the zones its drawn lines
   // meet (every option of the lorry drawn, both legs as shown); none of it on Locations or Zones (olRoute is the Routes page's)
   useEffect(() => {

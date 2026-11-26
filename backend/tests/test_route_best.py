@@ -1253,6 +1253,167 @@ ok("⭐ 16. Q8: every short line this harness makes is at most SHORT_MAX (25) wo
    _all_short16 and max(len(s.split()) for s in _all_short16) <= RB.SHORT_MAX,
    max(_all_short16, key=lambda s: len(s.split())) if _all_short16 else "")
 
+# =========================================================================== #
+#  17. The schedule's rows (25 Nov 2026, the Routes page rethink, cards 4, 5   #
+#      and 7; John: "Yes, as recommended", Q11 to Q13)                         #
+# =========================================================================== #
+# The card and the summary page print route_best.option_rows: one row a measure, its two figures, a mark and the
+# difference in words. Every mark must be read from the option's parts, heads and detail as the rule set them (nothing
+# new is decided), and a collision row is never ok or warn, never a percentage or a ratio (4c, 4e: kept).
+_cases17 = dict(_cases16)
+_cases17.update({"R1rr": R1rr, "R1h": R1h, "R1n": R1n, "R4": R4, "R1p": R1p})
+_opts17 = [(k, v, o) for k, v in _cases17.items() if isinstance(v, dict) for o in (v.get("options") or [])]
+_ORDER17 = ["collisions", "goods", "left_turns", "cycle_meets", "cycle_beside_km", "places", "round_trip", "trips",
+            "busy_08:00", "busy_17:00", "busy", "carbon", "limits"]
+_KEYS17 = {"key", "label", "sub", "unit", "in_use", "option", "in_use_text", "option_text", "mark", "words", "bars", "none"}
+_bad17 = []
+for k, v, o in _opts17:
+    rows = o.get("rows")
+    if o.get("ruled_out"):
+        if rows is not None:
+            _bad17.append((k, o["label"], "a ruled-out option has rows"))
+        continue
+    if not isinstance(rows, list) or not rows:
+        _bad17.append((k, o["label"], "no rows"))
+        continue
+    keys = [x["key"] for x in rows]
+    if keys != [x for x in _ORDER17 if x in keys] or len(set(keys)) != len(keys):
+        _bad17.append((k, o["label"], "order", keys))
+    for x in rows:
+        if set(x) != _KEYS17 or x["mark"] not in RB.ROW_MARKS:
+            _bad17.append((k, o["label"], "shape", x))
+        if x["none"] is not None and (x["bars"] is not None or x["in_use"] is not None):
+            _bad17.append((k, o["label"], "a 'none' row with figures", x["key"]))
+        if x["mark"] in ("ok", "warn") and not x["words"]:
+            _bad17.append((k, o["label"], "a mark with no words", x["key"]))
+        if x["mark"] == "none" and x["none"] is None and x["words"] != RB.ROW_SAME:
+            _bad17.append((k, o["label"], "'the same' missing", x["key"]))
+ok("⭐ 17. every option left in has its rows in the card's order and shape; a ruled-out option has none",
+   len(_opts17) > 300 and not _bad17, _bad17[:3])
+
+# the marks follow the rule's own steps, row by row
+_MK17 = {1: "ok", -1: "warn", 0: "none", None: "off"}
+_mis17 = []
+for k, v, o in _opts17:
+    if o.get("ruled_out"):
+        continue
+    R = {x["key"]: x for x in o["rows"]}
+    det, pt, hd = o["detail"], o["parts"], o["heads"]
+    for key in ("left_turns", "cycle_meets", "cycle_beside_km"):
+        if key in R:
+            want = _MK17[det["cycle_measures"].get(key)] if pt.get("cycle") is not None else "off"
+            if R[key]["mark"] != want:
+                _mis17.append((k, o["label"], key, R[key]["mark"], want))
+    if R["places"]["mark"] != (_MK17[det["community_part"]] if pt.get("community") is not None else "off"):
+        _mis17.append((k, o["label"], "places"))
+    if R["carbon"]["mark"] != _MK17[hd.get("carbon")]:
+        _mis17.append((k, o["label"], "carbon"))
+    # the time head is exactly the round trip's and the trips' steps put together
+    tv = {"ok": 1, "warn": -1, "none": 0}
+    if RB.mix([tv[R["round_trip"]["mark"]], tv[R["trips"]["mark"]]]) != hd.get("time"):
+        _mis17.append((k, o["label"], "time", R["round_trip"]["mark"], R["trips"]["mark"], hd.get("time")))
+    bus = [tv[R[b]["mark"]] for b in ("busy_08:00", "busy_17:00") if b in R]
+    if (RB.mix(bus) if bus else None) != hd.get("busy") or (not bus and "busy" not in R):
+        _mis17.append((k, o["label"], "busy"))
+    # the cycle part is the three cycle rows' steps put together, as the rule mixes them
+    if pt.get("cycle") is not None and RB.mix([tv[R[c]["mark"]] for c in ("left_turns", "cycle_meets", "cycle_beside_km")
+                                               if c in R]) != pt["cycle"]:
+        _mis17.append((k, o["label"], "cycle part"))
+ok("⭐ 17. every mark is the rule's own step for that measure: cycle measures, community, carbon, the two halves of the "
+   "time head (they mix to the head) and each busy hour (they mix to the head); nothing decides again",
+   not _mis17, _mis17[:3])
+
+# collisions: plain, two counts and the rule's word; never ok or warn, never a percentage or a ratio
+_col17 = [(k, o["label"], x) for k, v, o in _opts17 if not o.get("ruled_out") for x in o["rows"]
+          if x["key"] in ("collisions", "goods")]
+_colbad17 = [c for c in _col17 if c[2]["mark"] not in ("plain", "off") or c[2]["words"] not in ("", "fewer", "more")
+             or "%" in (c[2]["words"] + c[2]["label"] + (c[2]["none"] or "")) or " per " in c[2]["label"]
+             or (c[2]["none"] is None and c[2]["bars"] != "grey")]
+ok("⭐ 17. GUARD: a collision row is never 'ok' or 'warn', never a percentage, a rate or a ratio, its bars grey and its "
+   "words only the rule's 'fewer' / 'more' (4c, 4e kept)", len(_col17) > 300 and not _colbad17, _colbad17[:2])
+_colw17 = [c for c in _col17 if c[2]["none"] is None and c[2]["words"] != {1: "fewer", -1: "more"}.get(
+    next(o for k, v, o in _opts17 if o["label"] == c[1] and k == c[0])["parts"].get(c[2]["key"]), "")]
+ok("17. ...and its word is the rule's collision test's ('fewer' only where clearly fewer)", not _colw17, _colw17[:2])
+ok("17. GUARD (source): the rows' code writes no percentage on a collision row",
+   "p_=" not in read("backend/route_best.py").split("# collisions (4c, 4e)")[1].split("# the cycle measures")[0])
+# a percentage only where the rule gives one
+_pct17 = []
+for k, v, o in _opts17:
+    if o.get("ruled_out"):
+        continue
+    for x in o["rows"]:
+        pk = {"left_turns": "left_turns", "cycle_meets": "cycle_meets", "cycle_beside_km": "cycle_beside_km",
+              "places": "places"}.get(x["key"])
+        has = "%" in x["words"]
+        if has != bool(pk and o["pct"].get(pk) and x["mark"] in ("ok", "warn")):
+            _pct17.append((k, o["label"], x["key"], x["words"]))
+ok("⭐ 17. a percentage only where the rule gives one and the row is marked (4f: a base under 5 is counts alone)",
+   not _pct17, _pct17[:3])
+
+# the history and the checks the rows say in words
+_hist17 = {}
+for k, v, o in _opts17:
+    if not o.get("ruled_out"):
+        _hist17.setdefault((v.get("checks") or {}).get("collision_history"), set()).add(o["rows"][0]["none"])
+ok("⭐ 17. collisions out of date or not fetched: one row that says so, no counts and no HGV row",
+   _hist17.get("out_of_date") == {RB.ROW_STALE} and _hist17.get("not_fetched") == {RB.NO_HISTORY_WORDS}
+   and all(o["rows"][1]["key"] != "goods" for k, v, o in _opts17 if not o.get("ruled_out")
+           and (v.get("checks") or {}).get("collision_history") in ("out_of_date", "not_fetched")), str(_hist17))
+_lim17 = {x["none"] for o in (R1n.get("options") or []) if not o.get("ruled_out") for x in o["rows"] if x["key"] == "limits"}
+ok("17. no road limits held: 'Limits added' reads 'Not checked: …'; with limits held an option left in reads 'None'",
+   _lim17 == {RB.ROW_NO_LIMITS} and {x["none"] for o in R1["options"] if not o.get("ruled_out") for x in o["rows"]
+                                      if x["key"] == "limits"} == {"None"}, str(_lim17))
+_nc17 = [x for o in (R1["options"] or []) if not o.get("ruled_out") for x in o["rows"]
+         if x["key"] in ("left_turns", "places")]
+ok("17. the community layer not fetched along every option: the cycle and community rows read 'Not counted yet', off",
+   R1["checks"]["community_all_options"] is False and _nc17 and all(x["mark"] == "off" and x["words"] == RB.ROW_NOT_COUNTED
+                                                                    for x in _nc17))
+
+# live's R001 (24 Nov, the figures card 4 was drawn with): the rows, word for word as drawn
+_r17 = {x["key"]: x for x in L001["options"][0]["rows"]}
+_want17 = {"collisions": ("165", "97", "plain", "fewer"), "goods": ("12", "5", "plain", ""),
+           "left_turns": ("4", "17", "warn", "13 more"), "cycle_meets": ("42", "29", "ok", "31 % fewer"),
+           "cycle_beside_km": ("15.81", "14.26", "ok", "10 % less"), "places": ("18", "23", "warn", "28 % more"),
+           "round_trip": ("120.3", "143.8", "warn", "23.5 min longer"), "trips": ("4", "3", "warn", "1 fewer"),
+           "carbon": ("42.2", "57.8", "warn", "15.6 kg more")}
+_got17 = {k: (x["in_use_text"], x["option_text"], x["mark"], x["words"]) for k, x in _r17.items() if x["none"] is None}
+ok("⭐ 17. live's R001 (card 4's figures): every row's figures, mark and words as drawn", _got17 == _want17,
+   {k: (_got17.get(k), w) for k, w in _want17.items() if _got17.get(k) != w})
+ok("17. ...its labels as drawn, the HGV row a sub-row, the busy hours not compared, no limit added",
+   [x["label"] for x in L001["options"][0]["rows"]] == [
+       "Collisions on the road, 2021–2025", "involving an HGV", "Left-hand turns", "Cycle routes met",
+       "km beside a cycle route", "Community: schools, hospitals, health centres", "Round trip, min",
+       "Trips a lorry fits a day", "Busy hours", "Carbon, kg CO₂e a trip", "Limits added"]
+   and _r17["goods"]["sub"] and _r17["busy"]["none"] == "Not compared: no busy-hour times held for Alt 1."
+   and _r17["limits"]["none"] == "None", [x["label"] for x in L001["options"][0]["rows"]])
+# busy hours held: a row an hour, the minutes to the nearest half
+_busy17 = [(k, o["label"], x) for k, v, o in _opts17 if not o.get("ruled_out") for x in o["rows"]
+           if x["key"].startswith("busy_")]
+ok("17. busy-hour times held: a row 'Setting off at 08:00' / '17:00' each, its words in half minutes",
+   _busy17 and all(x["label"] == "Setting off at " + x["key"][5:] and (x["words"] == RB.ROW_SAME or
+                   re.fullmatch(r"\d+(\.5)? min (longer|quicker)", x["words"])) for _, _, x in _busy17),
+   [x for _, _, x in _busy17][:2])
+# nothing a row says is longer than the rule's short line allows, and no word the 24 Nov renames took out
+_txt17 = [t for k, v, o in _opts17 if not o.get("ruled_out") for x in o["rows"]
+          for t in (x["label"], x["words"], x["none"] or "")]
+ok("17. every row's words at most 15 words and none of the old words (trade, ahead, behind, goods vehicle, left turn, "
+   "Way round, People, Places)",
+   _txt17 and max(len(t.split()) for t in _txt17) <= 15
+   and not [t for t in _txt17 if re.search(r"trade|\bahead\b|\bbehind\b|goods vehicle|\bleft turn|Way round|People|Places", t)],
+   max(_txt17, key=lambda t: len(t.split())))
+
+# the rows for the card's own harness (ui_fix_routes_schedule.js): live's R001 and R003 shapes, a stale history, no
+# limits held; sorted keys, so a run rewrites the same bytes
+def _fx17(v):
+    keep = ("route", "answer", "option", "alt", "why", "trade_short", "trade_also", "held_back", "counts_in_use", "checks")
+    return dict({k: v.get(k) for k in keep},
+                options=[{k: o.get(k) for k in ("alt", "label", "ruled_out", "chosen", "traded", "rows", "return_alt")}
+                         for o in v.get("options") or []])
+with open(os.path.join(ROOT, "backend", "tests", "fixtures", "route_rows_1125.json"), "w", encoding="utf-8", newline="\n") as f_:
+    json.dump({"L001": _fx17(L001), "L003": _fx17(L003), "R1rr": _fx17(R1rr), "R1n": _fx17(R1n), "R2_out": _fx17(R2_out)},
+              f_, sort_keys=True, ensure_ascii=False, indent=1)
+    f_.write("\n")
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

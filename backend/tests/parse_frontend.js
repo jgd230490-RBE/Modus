@@ -608,8 +608,9 @@ ok("...creates ONE map and keeps it (the guard), and never draws an unbaked rout
   && /if\(r\.geometry && r\.geometry\.length > 1\)\{/.test(_cmBody) && _cmBody.includes("Not drawn (no route worked out)"));   // 13 Oct 2026 (W3, narrowed): plain words
 // REVERSED 8 Nov 2026 (2.1-13, Q2): the lines are coloured by LEG (green out, amber back, as on the public map and the
 // route sheet); the team moved into the hover box through teamText. Still never rendered under the render harness.
-ok("...colours lines by leg (CM_OUT / CM_BACK), not by team; the team is named in the hover box; not rendered under the render harness",
-  !_cmBody.includes("IPT_PALETTE_C[iptKey(") && _cmBody.includes('"line-color": CM_OUT') && _cmBody.includes('"line-color": CM_BACK')
+// NARROWED 26 Nov 2026 (lines-prints Q1): still by LEG, now through cmLegs (the pair for the ground the map opens on)
+ok("...colours lines by leg (cmLegs: out / back), not by team; the team is named in the hover box; not rendered under the render harness",
+  !_cmBody.includes("IPT_PALETTE_C[iptKey(") && _cmBody.includes('"line-color": L.out') && _cmBody.includes('"line-color": L.back')
   && _cmBody.includes("const team = teamText(") && _laBody.includes("!initialPage && <CommitMap"));
 // 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
 // NARROWED 17 Oct 2026 (UI fix 2, claude/ui-fix-dark, finding 2): the wash is var(--navy-soft) INLINE — the .tbl th rule
@@ -1565,7 +1566,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
      // NARROWED 29 Oct 2026 (the Simulation's own page): + Simulation after Pours, the last of the Plan group
      // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents after the Simulation, now the last
-     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\s*(\/\/[^\n]*\s*)?\{ id: "simulation", label: "Simulation", glyph: "▶" \},\s*(\/\/[^\n]*\s*)?\{ id: "clp", label: "CLP documents", glyph: "▤" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     /* NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; each page's icon is a { d: ... } drawing */ /\{ id: "abnormal", label: "Abnormal loads" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours" \},\s*(\/\/[^\n]*\s*)?\{ id: "simulation", label: "Simulation" \},\s*(\/\/[^\n]*\s*)?\{ id: "clp", label: "CLP documents" \},\n  \]\},/.test(code) && /\n  abnormal: \{ d: "M/.test(code)
      && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
      && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
   ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
@@ -1768,7 +1769,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 22 Oct 2026 (abnormal loads, S16 / B5): "Abnormal loads" follows it in the Plan group, so the Carbon planner is
   // after Forecasts but no longer the group's last item
   ok("⭐ the Carbon planner is a Plan-group page after Forecasts (not admin-gated: a team code sees its own lines)",
-     /\{ id: "forecasts", label: "Forecasts", glyph: "☰" \},\n    \{ id: "carbon", label: "Carbon planner", glyph: "◐" \},\n/.test(code)
+     /* NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; each page's icon is a { d: ... } drawing */ /\{ id: "forecasts", label: "Forecasts" \},\n    \{ id: "carbon", label: "Carbon planner" \},\n/.test(code)
      && code.indexOf('{ id: "carbon", label: "Carbon planner"') < code.indexOf('{ id: "abnormal", label: "Abnormal loads"')
      && code.indexOf('{ id: "abnormal", label: "Abnormal loads"') < code.indexOf('{ group: "Track"')
      && !/group: "Plan", admin/.test(code));
@@ -1834,7 +1835,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("after the UI pass (11 Oct): the Carbon page keeps the 14 px floor (13 px allowance; no 9, 10 or 11 px text) and no dashed border",
      !/text-\[(9|10|11)px\]/.test(cb) && !cb.includes("border-dashed"));
   ok("after the UI pass (11 Oct): the Carbon planner has its own rail icon, the Plan kicker, and the error kind of the empty state",
-     /\n  carbon: "M/.test(code) && (cb.match(/<PageHeader title="Carbon planner" kicker="Plan"/g) || []).length === 2
+     /\n  carbon: \{ d: "M/.test(code) /* NARROWED 26 Nov 2026 (own look, icons step 1): the icon is a { d: ... } drawing */ && (cb.match(/<PageHeader title="Carbon planner" kicker="Plan"/g) || []).length === 2
      && cb.includes('<EmptyState kind="error" title="Couldn\'t compute the carbon scenario"'));
   // 11 Oct 2026 — the plain-English pass (notes/carbon-ui-1011, every item checked against its source)
   // NARROWED 11 Oct 2026 (the process layout: the "Approved plan" card is now step 1, "Your approved plan", from the step titles)
@@ -2073,7 +2074,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (html.match(/var\(--brand-orange\)/g) || []).length <= 2);
   ok("the rail has line icons (inline SVG, no library) in place of the glyphs, one per nav entry",
     code.includes("function NavIcon({ id })") && code.includes("<NavIcon id={it.id} />") && !code.includes("{it.glyph}</span>")
-    && ["dashboard", "submit", "forecasts", "lookahead", "locations", "routes", "zones", "config", "map"].every(k => new RegExp("\\n  " + k + ": \"M").test(code)));
+    && ["dashboard", "submit", "forecasts", "lookahead", "locations", "routes", "zones", "config", "map"].every(k => new RegExp("\\n  " + k + ": \\{ d: \"M").test(code)));   // NARROWED 26 Nov 2026 (own look, icons step 1): each icon is a { d: ... } drawing
   ok("the rail search filters the pages in place, Enter opens the first match, Ctrl K focuses it",
     code.includes('placeholder="Find a page…"') && code.includes("g.items.filter(navMatch)") && code.includes("if(e.key === \"Enter\" && navFirst){ setPage(navFirst.id); setNavQ(\"\"); }")
     && code.includes('(e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")'));
@@ -3973,7 +3974,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      code.includes("const isAdmin = isAdminLogin(role);") && !code.includes('role.can_approve && role.via !== "login"'));
   // NARROWED 14 Oct 2026 (merged with the mobile shell, D9): and only at 768 px and up; on a phone it is the desk card
   ok("G3: Users is an admin-only item, rendered only for an admin",
-     code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && !narrow && <UsersPage access={role} />}')
+     /* NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; each page's icon is a { d: ... } drawing */ code.includes('{ id: "users", label: "Users", adminOnly: true }') && code.includes('{page === "users" && isAdmin && !narrow && <UsersPage access={role} />}')
      // NARROWED 5 Nov 2026 (group 6): the same filter also drops an approverOnly item (Concerns) for a team code
      && code.includes(".map(g => ({ ...g, items: g.items.filter(i => (!i.adminOnly || isAdmin) && (!i.approverOnly || canApprove)) }))"));
   ok("G3 (D51): only a DEMO login reports page opens", /if\(!role \|\| role\.kind !== "demo"\) return;\s*\n\s*fetch\(`\$\{API\}\/activity`/.test(code));
@@ -4788,7 +4789,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
 {
   const _sp = src.slice(src.indexOf("function StockpilesPage({ meta, access, who }){"), src.indexOf("function AbnormalPage({ meta, access, who }){"));
   ok("STOCKPILES: a Plan-group page on a desk (a phone gets the desk-only card), its own line icon",
-     src.includes('{ id: "stockpiles", label: "Stockpiles", glyph: "▲" },') && /\n  stockpiles: "M/.test(src)
+     /* NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; each page's icon is a { d: ... } drawing */ src.includes('{ id: "stockpiles", label: "Stockpiles" },') && /\n  stockpiles: \{ d: "M/.test(src)
      && src.includes('{page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}') && _sp.length > 6000);
   ok("STOCKPILES: ONE read of the balance (the whole programme) and ONE of the plan; the writes are the plan, the count and (admins) the capacity",
      (_sp.match(/fetch\(`\$\{API\}\/stockpiles/g) || []).length === 2 && _sp.includes("fetch(`${API}/stockpiles?from_month=1&to_month=${months.count}`)")
@@ -5127,8 +5128,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const cp = c0 > 0 && c1 > c0 ? src.slice(c0, c1) : "";
   const cpx = cp.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
   ok("⭐ CLP DOCS: the page is its own section (ClpPage), a Plan-group rail item after the Simulation for every login, desk only (a phone gets the desk-only card)",
-     cp.length > 6000 && /function ClpPage\(\{ access \}\)/.test(cp) && code.includes('{ id: "clp", label: "CLP documents", glyph: "▤" },')
-     && code.includes('{page === "clp" && !narrow && <ClpPage access={role} />}') && /\n  clp: "M/.test(code)
+     cp.length > 6000 && /function ClpPage\(\{ access \}\)/.test(cp) && /* NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; each page's icon is a { d: ... } drawing */ code.includes('{ id: "clp", label: "CLP documents" },')
+     && code.includes('{page === "clp" && !narrow && <ClpPage access={role} />}') && /\n  clp: \{ d: "M/.test(code)
      && !/PHONE_PAGES = \[[^\]]*clp/.test(code) && !/PHONE_READ_PAGES = \[[^\]]*clp/.test(code));
   ok("⭐ CLP DOCS: ONE list read; the writes are the record's own calls (POST new, PATCH, DELETE, send, changes, approve) and the files are fetched as blobs (draft, issue)",
      (cpx.match(/fetch\(`\$\{API\}\/clp\/documents`\)/g) || []).length === 1
@@ -5522,8 +5523,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 2.1-13 (Q1): a line not on today's plan is drawn faded grey under today's; the Look-ahead (no today) draws every line out",
      cm.includes('kind: fg.today ? "out" : "faded"') && cm.includes('filter: ["==", ["get", "kind"], "faded"]')
      && cm.includes("today: today ? r.today : true"));
-  ok("⭐ 2.1-13 (Q2, Q3): out green and back amber, each left of its own travel; the way back only for today's lines on the Dashboard",
-     cm.includes('const CM_OUT = "#059669", CM_BACK = "#f59e0b"') && cm.includes('"line-offset": OFF')
+  // REVERSED 26 Nov 2026 (lines-prints Q1, Q2; John: "Yes, as recommended"): out ink, back grey (was green and amber)
+  ok("⭐ 2.1-13 (Q2, Q3; REVERSED 26 Nov): out ink and back grey, each left of its own travel; the way back only for today's lines on the Dashboard",
+     cm.includes('const CM_OUT = "#3A3C41", CM_BACK = "#8E9197"') && !cm.includes('"#059669"') && !cm.includes('"#f59e0b"') && cm.includes('"line-offset": OFF')
      && cm.includes("if(today && fg.today && r.return_geometry && r.return_geometry.length > 1)"));
   ok("⭐ 2.1-13 (card 3): one dot a place, keyed by the location (no dark + red dot pair), with its name on top; gates only from town-level zoom (Q4)",
      cm.includes("ends[e.id || e.name] =") && !cm.includes('["dest", "#DC2626"]') && cm.includes('id: "la-names", type: "symbol", source: "la-ends"')
@@ -5537,7 +5539,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes('"map.commit.today": {') && code.includes('"map.commit.week": {'));
   ok("🔴 2.1-13: the map still prints no cost, no team id (the team through teamText) and no word-rule word",
      !/€|\beur\b|_eur|fair|rate_|\brates?\b/i.test(cm) && !/IPT[1-6]/.test(cm) && !/\b(geometry|server|endpoint|token)\b/.test(cm.slice(cm.indexOf("return (\n"))));
-  ok("2.1-13: the key's swatches are CSS (no images)", html.includes(".cm-k-out{height:4px;background:#059669;}") && html.includes(".cm-k-back{height:3px;background:#f59e0b;}"));
+  // REVERSED 26 Nov 2026 (lines-prints Q1, Q2): the swatches in ink, grey and the line grey (was green, amber and #9CA3AF)
+  ok("2.1-13 (REVERSED 26 Nov): the key's swatches are CSS (no images), ink out, grey back, the line grey for later this week",
+     html.includes(".cm-k-out{height:4px;background:#3A3C41;}") && html.includes(".cm-k-back{height:3px;background:#8E9197;}")
+     && html.includes(".cm-k-faded{height:2px;background:#C6C8CC;opacity:.9;}") && !html.includes(".cm-k-out{height:4px;background:#059669;}"));
 }
 
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan — each lorry's day used to the full (mockup notes/drivers-day-fill-mockup-1108 v2 + addendum) ----
