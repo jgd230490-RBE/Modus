@@ -284,7 +284,7 @@ def _insert_week(route_id, month_index, discipline, section_id, week_index,
     table carries on a database migrated in place; the key is (tenant_id, route_id, month_index, discipline,
     section_id, week_index)."""
     now = _now()
-    return bool(db.execute_count(
+    return bool(db.execute(
         "INSERT INTO forecast_weeks (tenant_id, route_id, month_index, discipline, "
         "section_id, week_index, planned_qty, unit, status, parent_qty, created_at, "
         "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
@@ -387,7 +387,7 @@ def _materialise_parent(p, have, pours_by_week=None):
             # 26 Nov 2026 (the fill race): `AND status = 'derived'` — `cur` was read before this write, and a planner's
             # edit or confirm can land in between; the refresh must then leave that week alone (kept), never write
             # the ÷n share over it or re-stamp its parent_qty.
-            if db.execute_count(
+            if db.execute(
                     "UPDATE forecast_weeks SET planned_qty = ?, unit = ?, "
                     "parent_qty = ?, updated_at = ? WHERE tenant_id = ? "
                     "AND route_id = ? AND month_index = ? AND discipline = ? "

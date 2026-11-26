@@ -15,7 +15,7 @@ read, then both write. On `main`'s code (ad152be) it fails; with the fix:
   * the counts stay truthful: a week another request wrote is "kept" here, never "created" twice;
   * an edited week and a confirmed week are left EXACTLY as they were (figures, status, parent_qty, stamps);
   * a refresh working from a read taken before a planner's edit does not write the ÷n share over that edit;
-  * a fill that met only existing rows moves no data version;
+  * a fill that met only existing rows writes nothing and says so (db.execute's rows changed);
   * the same for the days of the commit week.
 Stubs nothing: db, weeks and days on a scratch SQLite database. Postgres is NOT exercised here.
 """
@@ -218,23 +218,23 @@ ok("⭐ C: a refresh from a stale read leaves a week edited since untouched (mai
 ok("C: ... and counts it kept, the other weeks refreshed", (c, r, k) == (0, n1 - 1, 1), str((c, r, k)))
 
 # =========================================================================== #
-#  D. A fill that met only rows already there moves no data version
+#  D. A fill that met only rows already there writes nothing; db.execute says how many rows a write changed
 # =========================================================================== #
-print("D. the data version")
+print("D. a fill that met only rows already there")
 reset_db()
 weeks.materialise_window(1, 1)
-v0 = db.data_version()
+before_d = week_rows()
 res = weeks._materialise_parent(dict(weeks._parent_of("R1", 1, "earthworks", "WS1"), route_id="R1", month_index=1,
                                      discipline="earthworks", section_id="WS1"), {})      # as if it read nothing
 ok("⭐ D: a fill that read nothing but found every week already written raises nothing and counts them kept",
    res == (0, 0, n1), str(res))
-ok("D: ... and moves no data version (it changed nothing)", db.data_version() == v0, f"{v0} -> {db.data_version()}")
+ok("D: ... and leaves every row exactly as it was", week_rows() == before_d)
 v1 = db.data_version()
-db.execute_count("UPDATE forecast_weeks SET planned_qty = planned_qty WHERE route_id = 'R1' AND month_index = 1")
-ok("D: a counted write that changed rows still moves it", db.data_version() > v1)
-v2 = db.data_version()
-db.execute("UPDATE forecast_weeks SET planned_qty = planned_qty WHERE route_id = 'nobody'")
-ok("D: execute() itself bumps as it always did, even on no row", db.data_version() > v2)
+ok("D: db.execute gives the rows a write changed (an UPDATE of one month's weeks, then of none)",
+   db.execute("UPDATE forecast_weeks SET planned_qty = planned_qty WHERE route_id = 'R1' AND month_index = 1") == n1
+   and db.execute("UPDATE forecast_weeks SET planned_qty = planned_qty WHERE route_id = 'nobody'") == 0)
+ok("D: it moves the data version as before, even for no row (a rebuild too many, never a stale figure)",
+   db.data_version() >= v1 + 2)
 
 # =========================================================================== #
 #  E. The days of the commit week: the same race
@@ -273,9 +273,10 @@ ok("⭐ E: a day refresh from a stale read leaves a day edited since untouched",
 # =========================================================================== #
 src_w = open(os.path.join(BACKEND, "weeks.py"), encoding="utf-8").read()
 src_d = open(os.path.join(BACKEND, "days.py"), encoding="utf-8").read()
-ok("F: both fills insert with ON CONFLICT DO NOTHING and count through execute_count",
+ok("F: both fills insert with ON CONFLICT DO NOTHING and count what db.execute says it wrote",
    src_w.count("ON CONFLICT DO NOTHING") == 1 and src_d.count("ON CONFLICT DO NOTHING") == 1
-   and "db.execute_count(" in src_w and "db.execute_count(" in src_d)
+   and "return bool(db.execute(" in src_w and "return bool(db.execute(" in src_d
+   and "if db.execute(" in src_w and "if db.execute(" in src_d)
 ok("F: both refreshes write a row only while it is still derived",
    "AND section_id = ? AND week_index = ? AND status = 'derived'" in src_w
    and "AND day_date = ? \"\n                    \"AND status = 'derived'" in src_d)

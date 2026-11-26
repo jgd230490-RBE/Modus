@@ -332,7 +332,7 @@ def _adapt(sql):
     return sql.replace("?", "%s") if IS_PG else sql
 
 
-def _run(sql, params, fetch, counted=False):
+def _run(sql, params, fetch):
     """
     One statement on a borrowed connection. If the connection turns out to be dead
     (the server dropped it while it sat in the pool), discard it and retry ONCE on a
@@ -349,12 +349,8 @@ def _run(sql, params, fetch, counted=False):
             if fetch:
                 return [dict(r) for r in cur.fetchall()]
             conn.commit()
-            n = cur.rowcount
-            # 26 Nov 2026: a counted write that changed nothing (an INSERT ... ON CONFLICT DO NOTHING that met the row
-            # another request had just written) moves no data version; execute() bumps as it always did.
-            if not (counted and n == 0):
-                note_write(sql)
-            return n
+            note_write(sql)
+            return cur.rowcount     # 26 Nov 2026: execute()'s answer, the rows the write changed
         except Exception as e:
             if attempt == 0 and _is_conn_error(e) and isinstance(conn, _PooledConn):
                 conn.discard()
@@ -455,15 +451,13 @@ def query(sql, params=()):
 
 
 def execute(sql, params=()):
-    """Run an INSERT/UPDATE/DELETE and commit."""
-    _run(sql, params, fetch=False)
+    """Run an INSERT/UPDATE/DELETE and commit.
 
-
-def execute_count(sql, params=()):
-    """26 Nov 2026 (the Look-ahead's weeks fill race): execute(), returning how many rows the statement changed (the
-    driver's rowcount: 0 when an INSERT ... ON CONFLICT DO NOTHING met an existing row, or an UPDATE matched none).
-    A statement that changed nothing does not move the data version."""
-    return _run(sql, params, fetch=False, counted=True)
+    26 Nov 2026 (the Look-ahead's weeks fill race): returns how many rows the statement changed (the driver's
+    rowcount: 0 when an INSERT ... ON CONFLICT DO NOTHING met an existing row, or an UPDATE matched none). Callers
+    that ignored the old None are unchanged. The data version moves as before, even when nothing changed: a rebuild
+    too many, never a stale figure."""
+    return _run(sql, params, fetch=False)
 
 
 def execute_atomic(steps):

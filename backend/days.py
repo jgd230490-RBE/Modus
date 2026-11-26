@@ -268,7 +268,7 @@ def _insert_day(route_id, month_index, discipline, section_id, day, planned, wee
     26 Nov 2026: the same fill race as weeks._insert_week (two first reads of the Look-ahead filling the same bucket):
     a day another request has just written is left exactly as it is and not counted as created here."""
     now = _now()
-    return bool(db.execute_count(
+    return bool(db.execute(
         "INSERT INTO forecast_days (tenant_id, route_id, month_index, discipline, "
         "section_id, day_date, planned_qty, status, parent_week_index, parent_week_qty, "
         "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
@@ -329,7 +329,7 @@ def materialise_week_days(route_id, month_index, discipline, section_id, week_in
             # calendar, and a day written under the old bucket (Mon 14 Sep was week 2,
             # it is now week 3) would otherwise keep saying which bucket it USED to be in.
             # 26 Nov 2026: `AND status = 'derived'` — an edit or confirm that landed after our read is left alone.
-            if db.execute_count(
+            if db.execute(
                     "UPDATE forecast_days SET planned_qty = ?, parent_week_qty = ?, "
                     "parent_week_index = ?, updated_at = ? WHERE tenant_id = ? AND route_id = ? "
                     "AND month_index = ? AND discipline = ? AND section_id = ? AND day_date = ? "
