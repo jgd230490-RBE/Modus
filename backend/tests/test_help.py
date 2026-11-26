@@ -1500,12 +1500,15 @@ ok3("WORKS AREA (2.1-12): technical T1 has the two addresses, the outline rule a
                              "<code>zones.from_phase_id</code> / <code>from_phase_version</code>", "<code>layout_changed</code>", "<code>zone_changed</code>")))
 
 # 8 Nov 2026 (v2.1 task 2.1-13): the two week maps' words (no team colours, no dark / red dot pair any more)
-ok("2.1-13: the guide says what the Dashboard's Today map shows: bold today, green out / amber back, the week faded, names, gates, tags, the key",
-      all(w in _ug0d for w in ("<strong>Today on the map</strong>", "out (loaded) in green and back (empty) in amber",
-                               "lines later this week faded grey", "zoom in for the gates", "The key is under the map.")))
+# REVERSED 26 Nov 2026 (lines-prints Q1, Q2; John: "Yes, as recommended"): dark grey out, light grey back, the week paler
+ok("2.1-13 (REVERSED 26 Nov): the guide says what the Dashboard's Today map shows: bold today, dark grey out / light grey back, the week paler, names, gates, tags, the key",
+      all(w in _ug0d for w in ("<strong>Today on the map</strong>", "out (loaded) in dark grey and back (empty) in light grey",
+                               "lines later this week thinner and paler", "zoom in for the gates", "The key is under the map."))
+      and "out (loaded) in green and back (empty) in amber" not in _ug0d and "lines later this week faded grey" not in _ug0d)
 ok("2.1-13: the Look-ahead's week map no longer reads as team colours with a dark and a red dot",
       "draws this week's lines in their team colour, with a dark dot at the origin and a red dot" not in _ug0d
-      and "draws this week's lines, out (loaded) in green, with the week's load on a tag" in _ug0d)
+      and "draws this week's lines, out (loaded) in dark grey, with the week's load on a tag" in _ug0d   # REVERSED 26 Nov (was "in green")
+      and "draws this week's lines, out (loaded) in green" not in _ug0d)
 # 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8): 9.2's map item, few words, no back end; technical T1 "The Routes page's map"
 _ug25 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
 _tg25 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()

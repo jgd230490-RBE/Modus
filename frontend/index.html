@@ -568,7 +568,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 8 Nov 2026 (2.1-13): the week maps' key row */
   .cm-key > span{display:inline-flex;align-items:center;gap:6px;}
   .cm-k{display:inline-block;flex:none;width:22px;border-radius:2px;}
-  .cm-k-out{height:4px;background:#059669;} .cm-k-back{height:3px;background:#f59e0b;} .cm-k-faded{height:2px;background:#9CA3AF;opacity:.7;}
+  .cm-k-out{height:4px;background:#3A3C41;} .cm-k-back{height:3px;background:#8E9197;} .cm-k-faded{height:2px;background:#C6C8CC;opacity:.9;}
+  /* 26 Nov 2026 (lines-prints Q1, Q2): the week maps' key follows the map's ground; on Dark the Routes page's pale pair */
+  .cm-key[data-cm-dark="1"] .cm-k-out{background:#D4D6DA;} .cm-key[data-cm-dark="1"] .cm-k-back{background:#9A9DA3;} .cm-key[data-cm-dark="1"] .cm-k-faded{background:#7D8087;}
   .cm-k-site{width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--ink);}
   .cm-k-gate{width:8px;height:8px;border-radius:0;background:var(--ink);}
   .cm-k-load{font-style:normal;font-size:12px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
@@ -14182,6 +14184,7 @@ const simMapStyle = () => (typeof document !== "undefined" && document.documentE
 const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (drawn before the app starts) opens on Light
 // 11 Nov 2026 (card B-X1): a dark ground under the data pages' map (the public map's labelsDark test), and the zone
 // names' paint on it: the public map's name rule (labelPaint), near-white on a near-black halo, else ink on white
+const SIM_ROUTE_LINE = "#A9ABB0";   // 26 Nov 2026 (lines-prints Q3): the Simulation's route lines, the public map's quiet grey
 const mapGroundDark = (style) => /dark|night|satellite|maaamet/.test(String(style || ""));
 const zoneLabelPaint = (dark) => ({ "text-color": dark ? "#F5F5F4" : "#1F2024",
   "text-halo-color": dark ? "rgba(18,19,22,0.92)" : "#FFFFFF", "text-halo-width": 1.75, "text-halo-blur": 0.5 });
@@ -14216,10 +14219,12 @@ function SimMap({ meta, D, store, frame, site, wall, full }){
       const dk = mapGroundDark(styleNow), nm = simLabelPaint(dk);
       const empty = { type: "FeatureCollection", features: [] };
       ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash", "sim-called", "sim-busy", "sim-busy-main"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
-      m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      // 26 Nov 2026 (lines-prints Q3; John: "Yes, as recommended"; card 2): the public map's quiet grey for a route line (was
+      // the slate #94A3B8); the lorry marks keep their own colours
+      m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": SIM_ROUTE_LINE, "line-width": 1.6, "line-opacity": 0.75 } });
       // 5 Nov 2026 (task 0d-2, Q14 = C): a busy-hours road shows only in its hours, in the navy with a soft glow, and
       // the stretch of the main road it replaces fades (the frame sets both); its main road is drawn here, not in sim-routes
-      m.addLayer({ id: "sim-busy-main", type: "line", source: "sim-busy-main", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      m.addLayer({ id: "sim-busy-main", type: "line", source: "sim-busy-main", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": SIM_ROUTE_LINE, "line-width": 1.6, "line-opacity": 0.75 } });
       m.addLayer({ id: "sim-busy-glow", type: "line", source: "sim-busy", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": tok("--navy", "#1D4ED8"), "line-width": 12, "line-blur": 6, "line-opacity": 0 } });
       m.addLayer({ id: "sim-busy", type: "line", source: "sim-busy", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": tok("--navy", "#1D4ED8"), "line-width": 2.6, "line-opacity": 0 } });
       m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
@@ -15276,6 +15281,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
   const [geo, setGeo] = useState(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
+  const [cmDark] = useState(() => mapGroundDark(lookMapStyle()));   // the ground the one map opens on (it is never re-styled)
   const ids = lines.map(l => l.route_id).filter((v, i, a) => a.indexOf(v) === i);
   const idKey = ids.join(",");
   const byRoute = useMemo(() => {
@@ -15301,8 +15307,9 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
     if(mapObj.current || !mapDiv.current || !window.mapboxgl) return;
     window.mapboxgl.accessToken = meta.mapbox_token;
     let m;
+    const ground = lookMapStyle();
     try {
-      m = new window.mapboxgl.Map({ container: mapDiv.current, style: lookMapStyle(),   // 10 Nov 2026 (card 14): opens on the look's basemap
+      m = new window.mapboxgl.Map({ container: mapDiv.current, style: ground,   // 10 Nov 2026 (card 14): opens on the look's basemap
                                     center: UK_VIEW.center, zoom: UK_VIEW.zoom, attributionControl: true });
     } catch(e) {
       // 11 Sep: the Dashboard mounts this too — a map that cannot start (no token, no
@@ -15320,14 +15327,15 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
       const before = under ? under.id : undefined;
       const OFF = ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4];    // each leg left of its own travel (UK)
       const round = { "line-cap": "round", "line-join": "round" };
+      const L = cmLegs(mapGroundDark(ground));
       m.addLayer({ id: "la-faded", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "faded"], layout: round,
-                   paint: { "line-color": CM_FADED, "line-width": 2, "line-opacity": 0.55 } }, before);
+                   paint: { "line-color": L.faded, "line-width": 2, "line-opacity": CM_FADED_OPACITY } }, before);
       m.addLayer({ id: "la-routes-casing", type: "line", source: "la-routes", filter: ["!=", ["get", "kind"], "faded"], layout: round,
-                   paint: { "line-color": "#ffffff", "line-width": ["match", ["get", "kind"], "out", 6.5, 5], "line-opacity": 0.9, "line-offset": OFF } }, before);
+                   paint: { "line-color": L.edge, "line-width": ["match", ["get", "kind"], "out", 6.5, 5], "line-opacity": 0.9, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-back", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "back"], layout: round,
-                   paint: { "line-color": CM_BACK, "line-width": 2.5, "line-offset": OFF } }, before);
+                   paint: { "line-color": L.back, "line-width": 2.5, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-routes", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "out"], layout: round,
-                   paint: { "line-color": CM_OUT, "line-width": 4, "line-offset": OFF } }, before);
+                   paint: { "line-color": L.out, "line-width": 4, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-ends", type: "circle", source: "la-ends",
                    paint: { "circle-radius": 5.5, "circle-color": "#1F2024", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
       m.addLayer({ id: "la-gates", type: "symbol", source: "la-gates", minzoom: CM_GATE_ZOOM,
@@ -15414,7 +15422,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
       <div className={(flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
         {/* 14 Oct 2026: on a filled big screen the map takes the whole card; its ResizeObserver follows */}
         <div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />
-        <div className="cm-key px-3 py-2 text-[13px] text-slate-600 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1" data-commit-key={today ? "today" : "week"}>
+        <div className="cm-key px-3 py-2 text-[13px] text-slate-600 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1" data-commit-key={today ? "today" : "week"} data-cm-dark={cmDark ? "1" : "0"}>
           <span data-key="out"><i className="cm-k cm-k-out" aria-hidden="true" />{today ? "Today, out (loaded)" : "Out (loaded)"}</span>
           {today && <span data-key="back"><i className="cm-k cm-k-back" aria-hidden="true" />Today, back (empty)</span>}
           {today && <span data-key="faded"><i className="cm-k cm-k-faded" aria-hidden="true" />Later this week</span>}
@@ -15436,7 +15444,17 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
 // Look-ahead passes none and every line of the week is drawn at full strength, out only. Colours by leg as on the public
 // map and the route sheet (out #059669, back #f59e0b, each left of its own travel); the team is in the hover box. One dot a
 // place with its name; gates (with names) from town-level zoom; a tag on each drawn line with its load.
-const CM_OUT = "#059669", CM_BACK = "#f59e0b", CM_FADED = "#9CA3AF";
+// 26 Nov 2026 (lines-prints Q1, Q2; John: "Yes, as recommended"; notes map-lines-prints-mockup-1125 card 1): the public map's
+// and the Routes page's pair in place of green and amber (BENDS 8 Nov "out green, back amber"; "as on the public map" stays):
+// out (loaded) ink, back (empty) grey, "later this week" the line grey #C6C8CC at 0.9 so it parts from the empty leg. On a
+// dark ground the Routes page's Dark pair on its dark casing (LEG_OUT_DARK / LEG_BACK_DARK / LEG_CASE_DARK); "later this week"
+// there is the Routes page's dark quiet grey #7D8087 (darker than the back leg, as the light one is paler).
+const CM_OUT = "#3A3C41", CM_BACK = "#8E9197", CM_FADED = "#C6C8CC", CM_FADED_OPACITY = 0.9;
+const CM_FADED_DARK = "#7D8087";
+function cmLegs(dark){
+  return dark ? { out: LEG_OUT_DARK, back: LEG_BACK_DARK, faded: CM_FADED_DARK, edge: LEG_CASE_DARK }
+              : { out: CM_OUT, back: CM_BACK, faded: CM_FADED, edge: "#ffffff" };
+}
 const CM_GATE_ZOOM = 11.5;
 // Per route: is it on today's plan, and the words of its tag (today's on the Dashboard, the week's on the Look-ahead).
 // Pure, so dom_frontend tests it. Quantities in the lines' own unit when they share one (m³ for concrete), else tonnes.
