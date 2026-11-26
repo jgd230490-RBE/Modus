@@ -1266,7 +1266,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 23 Nov 2026 (claude/working-list): bad-text 63 -> 65, warn-text 33 -> 35 — the "Working" chip on the Light
    # look's white header bar: its word and its edge, red (Stopped) and amber (Working), on the status tints
    # (both together, merged 24 Nov: 65, measured on the merged page)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 65 and  # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 66 and  # NARROWED 26 Nov 2026 (the Look-ahead rethink, C1): 65 -> 66, the driver sheet panel's failed read ("The driver sheet could not be read."); # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
@@ -1503,7 +1503,8 @@ ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink 
    round(_cr("#F87171", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.27 and round(_cr("#9C9FA4", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.44
    and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
    # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
-   and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
+   # NARROWED 26 Nov 2026 (the Look-ahead rethink, C1): 9 -> 7, the Lorry plan's view and day chips are a segment and an underline now
+   and len(_nsInline) >= 7 and all('color: "var(--navy)"' in m for m in _nsInline)
    # NARROWED 24 Nov 2026 (own look, B1 stage 5): 8 -> 7, the Config read-only note is a margin line now (no tint)
    # NARROWED 24 Nov 2026 (own look, B1 stage 8): 7 -> 6, a chosen tab is an underline now, no tint
    and len(_nsCss) >= 6 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),

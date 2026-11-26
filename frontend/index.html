@@ -735,7 +735,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .lp-sheets>summary{list-style:none;cursor:pointer}
   .lp-sheets>summary::-webkit-details-marker{display:none}
   .lp-sheets .row-menu-list{right:0;left:auto;min-width:260px}
-  .lp-row.is-sel{background:var(--navy-soft);box-shadow:inset 2px 0 0 var(--navy)}
+  .lp-row.is-sel{background:var(--navy-soft);box-shadow:inset 2px 0 0 var(--navy);color:var(--ink)}
+  /* the own look (test_h1_uk OWN LOOK 3): nothing muted sits on the sign-blue tint, so the open row's second lines read in ink */
+  .lp-row.is-sel .lp-nm small,.lp-row.is-sel .lp-free{color:var(--ink)}
   .lp-row.is-sel .lp-nm{padding-left:8px}
   .lp-open{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:none;border:0;padding:0 4px 0 0;min-height:24px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-align:left}
   .lp-open i{display:block;flex:none;width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}

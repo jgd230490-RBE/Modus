@@ -51,9 +51,12 @@ ok("C-F4: the phone keeps its own Day sheet button", code.includes("const dayShe
 // ------------------------------------------------------------------ C-F4: readable route codes
 ok("⭐ C-F4: a trip's block is its trip's full width, white, left-aligned (the .row-menu summary's 32 px and grey are overridden)",
    css.includes(".lp-trip summary.lp-blk{width:100%;justify-content:flex-start;color:#fff;font-weight:600;padding:0 4px}"));
-ok("C-F4: a code is drawn whole or not at all: a container query on the block hides it under 38 px; its title / menu keep it",
-   css.includes(".lp-blk:not(.is-break){container-type:inline-size}") && css.includes("@container (max-width:37px){ .lp-code{visibility:hidden} }")
-   && trip.includes('<span className="lp-code">{b.route_id}</span></summary>') && row.includes('<span className="lp-code">{b.route_id}</span>'));
+// NARROWED 26 Nov 2026 (the Look-ahead rethink, C1, card 3): a block carries its SITE's name, not the route code; the name is
+// drawn whole or not at all, measured against its block (is-cut); the route stays in the block's title and its menu
+ok("C-F4: a block's name is drawn whole or not at all (measured: is-cut hides it); its title / menu keep the route",
+   css.includes(".lp-name.is-cut{visibility:hidden}") && !trip.includes('className="lp-code"') && !row.includes('className="lp-code"')
+   && trip.includes('<span className="lp-name">{lpSiteName(b.dest_name)}</span></summary>') && row.includes('<span className="lp-name">{lpSiteName(b.dest_name)}</span>')
+   && trip.includes("label={`${b.start} ${b.route_id}") === false && row.includes("label={`${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, lorry ${r.n}`}"));
 let F = {};
 try {
   const grab = (start) => { const i = code.indexOf(start); return i < 0 ? "" : code.slice(i, code.indexOf("\n}\n", i) + 2); };
@@ -77,22 +80,24 @@ if (F.lpDeep) {
   const hue = (h) => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return r >= g && r >= b ? "r" : g >= b ? "g" : "b"; };
   ok("C-F4: deepening keeps the hue family (orange stays orange, teal stays teal)", tokens.every((t, i) => hue(t) === hue(deep[i])));
 }
+// NARROWED 26 Nov 2026 (the Look-ahead rethink, C1, card 3): colours by SITE from their own list, still through lpDeep
 ok("C-F4: the Lorry plan's palette goes through lpDeep (the trips and their key share it)",
-   code.includes('.concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]).map(lpDeep);'));
+   code.includes("const lpPalette = () => LP_SITE_HEX.map((h, i) => tok(`--lp-s${i + 1}`, h)).map(lpDeep);"));
 
 // ------------------------------------------------------------------ C-F6: Move trips
 ok("⭐ C-F6: a trip is draggable only while 'Move trips' is on (dnd.dragOn); a drag started otherwise is cancelled",
    trip.includes('draggable={dnd.dragOn ? "true" : "false"}') && trip.includes("if(!dnd.dragOn){ e.preventDefault(); return; }")
    && lp.includes("dragOn: canMove && moving && !busy,") && lp.includes("const [moving, setMoving] = useState(false);"));
 ok("C-F6: the toggle sits before Driver sheets, for a planner / admin with trips on screen, reads 'Move trips' / 'Done', aria-pressed",
-   lp.includes('{canMove && blocks.length > 0 && <button type="button" className="btn-sec" aria-pressed={moving ? "true" : "false"} onClick={() => setMoving(m => !m)} data-lp-move-toggle="1">{moving ? "Done" : "Move trips"}</button>}\n              <button type="button" className="btn-sec" onClick={() => download("pdf")}'));
+   lp.includes('{canMove && blocks.length > 0 && <button type="button" className="btn-sec" aria-pressed={moving ? "true" : "false"} onClick={() => setMoving(m => !m)} data-lp-move-toggle="1">{moving ? "Done" : "Move trips"}</button>}\n              <LpSheetsMenu blocks={blocks} total={sheetsN} busy={busy} onPick={(y) => download("pdf", y)} />'));   // NARROWED 26 Nov 2026 (C1): "Driver sheets ▾" is a menu
 ok("C-F6: the drag hint shows only while moving; the menu (keyboard) is there either way; the cursor is a pointer until then",
    lp.includes("{canMove && moving && blocks.length > 0 && <div className=\"clp-note\" data-lp-drag-hint=\"1\">")
    && trip.includes("const items = dnd.targets(trip);") && css.includes('.lp-trip:not([draggable="true"]) summary.lp-blk{cursor:pointer}'));
 
 // ------------------------------------------------------------------ C-F7: today
 ok("⭐ C-F7: the Look-ahead passes its today to the Lorry plan, which opens on it when it is in the week, marked ', today'",
-   la.includes("weekConfirmed={allConfirmed} today={today} />") && lp.includes("const todayIso = today || (data && data.today) || null;")
+   // NARROWED 26 Nov 2026 (C1): the mount also hands in show and the view switch
+   la.includes("weekConfirmed={allConfirmed} today={today} show={laBy === \"lorry\"}") && lp.includes("const todayIso = today || (data && data.today) || null;")
    && lp.includes("(days.includes(todayIso) ? todayIso : days[0])") && lp.includes('{lpDayWords(d)}{d === todayIso ? ", today" : ""}</button>'));
 
 // ------------------------------------------------------------------ C-F10 + C-F2: the Account
