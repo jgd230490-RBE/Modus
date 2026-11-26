@@ -17,5 +17,11 @@ Static files only. Nothing serves or references them yet; the rebrand session wi
   meaning "warning" in the app and blue keeps meaning control/link.
 
 The wordmark is set in Sora Medium and converted to outlines, so no font is loaded.
+
+24 Nov 2026: each file's frame (its `viewBox`) now holds the whole drawing. The tight files' frame started 9 units
+below the top of the first dot, so a page cut about a pixel off it; the frame was moved up, same size, and the mark sits
+in its middle. The tall files' frame is 6 units taller, for the tails of the "y" and the "p". No shape was changed.
+`backend/tests/test_bulletin.py` checks every file draws inside its frame. The brand kit's generator was not changed:
+files made from it again need the same check.
 Masters (SVG/PDF/PNG), social covers and business-card artwork are in the brand kit zip
 (`wayscope-brand-final-0929.zip`), not in the repo.

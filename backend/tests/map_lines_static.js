@@ -149,8 +149,10 @@ ok("C9 the shared sections: the same one width, at creation and on every repaint
 ok("C6 the band is still told by colour: Volume paints the routes by f_avg on the route stops",
    acm.includes("vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS)"));
 ok("C7 ...and Carbon by f_co2 on the carbon stops", acm.includes("co2 ? carbonColor('f_co2', stops)"));
-ok("C10 the amber diversion edge keeps the casing's place at the casing's width",
-   acm.includes("if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);"));
+// NARROWED 24 Nov 2026 (card 5, claude/map-lines-diversions): the edge is two amber rails OUTSIDE the line, their gap the
+// line's own width (one width since 25 Nov), set again at a mode change instead of taking the casing's width
+ok("C10 the amber diversion edge keeps clear of the line: a mode change sets the rails' gap to the line's width",
+   acm.includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());") && !acm.includes("'diversion-edge', 'line-width', caseW"));
 ok("C11 the edge under every forecast line: white on a light ground, the 12 Nov pale edge on a dark one, heat map on or Off",
    fnSrc("heatEdgeColour").includes("return typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing;")
    && html.includes("const HEAT_EDGE_DARK = '#E7E5E4';"));
@@ -163,14 +165,16 @@ ok("C12 measured: the lightest blue on its white casing and on the Light basemap
 ok("C13 the sign blue (heat map Off) parts from its white casing at ≥ 4.5:1", contrast("#0B4EA2", "#FFFFFF") >= 4.5);
 
 // ---------------------------------------------------------------------------------------------------------------
-console.log("D. The flow's lanes (Group B replaces them): kept working, a lane on every band again");
-ok("D1 kept: the lanes, their widths and their light are as they were (Group B's task)",
-   html.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];") && html.includes("const FLOW_OFFSET = -1.75;")
-   && html.includes("const FLOW_STILL_OPACITY = 0.35;") && html.includes("const FLOW_PULSES = 3;"));
-// REVERSED 25 Nov 2026 (one width): no 3 px line any more, so the first band's lane is back and the heat map no longer re-sets it
-ok("D2 every band has its lane: flowWidthExpr as on main (no hideFirst), and the heat map leaves the lanes' width alone",
-   /function flowWidthExpr\(\)\{\s*const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], FLOW_WIDTHS\[0\]\];/.test(html)
-   && !html.includes("hideFirst") && !acm.includes("'forecast-flow', 'line-width'"));
+// (25 Nov 2026: static's one width took the lanes' first band back; moot here, the lanes are gone)
+// REVERSED 24 Nov 2026 (claude/map-lines-flow, card 3): Group B replaced the lanes with dots; the lanes' pins here are
+// reversed to "gone", the dots' own checks are in map_lines_flow.js
+console.log("D. The flow's lanes: replaced by the dots (Group B, map_lines_flow.js)");
+ok("D1 REVERSED 24 Nov 2026 (card 3): the lanes, their widths, their offset, their still opacity and their three lights are gone",
+   !html.includes("const FLOW_WIDTHS") && !html.includes("const FLOW_OFFSET")
+   && !html.includes("const FLOW_STILL_OPACITY") && !html.includes("const FLOW_PULSES") && html.includes("const FLOW_MARK_GAP = 90;"));   // NARROWED 24 Nov 2026 (Q14, card 3b): arrowheads, not dots
+ok("D2 REVERSED 24 Nov 2026 (card 3): no lane width to fit to a line, so the heat map sets none (flowWidthExpr and hideFirst gone)",
+   !/function flowWidthExpr/.test(html) && !/hideFirst/.test(html)
+   && !acm.includes("'forecast-flow'") && !acm.includes("flowWidthExpr"));
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("E. Card 9: the alternatives, a thinner neutral grey");

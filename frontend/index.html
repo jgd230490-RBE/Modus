@@ -16384,7 +16384,7 @@ function ZoneDiversions({ zoneId, periods, routes, prof, wayRound, canEdit, busy
         <button type="button" className="text-xs text-slate-500 hover:underline" onClick={onClose}>Hide</button>
       </div>
       {stuck.length > 0 && (
-        <div className="mt-2 text-[13px] rounded-md px-3 py-2" style={{ background: "rgba(180,83,9,.10)", color: "var(--warn-text)" }}>
+        <div className="mt-2 text-[13px] rounded-md px-3 py-2" style={{ background: "var(--st-warn-bg)", color: "var(--warn-text)" }}>
           {stuck.join(", ")}: no way round yet. Until you find one they keep their route, flagged on the Look-ahead.
           {canEdit && wayRound && wayRound.legs > 0 && <div className="mt-1.5">
             <button type="button" className="btn-pri btn-sm" disabled={busy} onClick={onFind}>
@@ -17590,7 +17590,7 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
                 <div key={"u" + u.from} className="text-[13px] mt-2" data-busy-in-use={u.from} data-busy-status={u.status}>
                   <p className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                      style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
+                      style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "var(--st-warn-bg)", color: "var(--warn-text)" }}>
                       Busy hours: Alt {u.alt}{u.status === "paused" ? " · paused" : ""}</span>
                     <span>{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}{since ? ` since ${since}` : ""}{u.decided_by ? `, by ${u.decided_by}` : ""}.</span>
                     {busy.can_use && u.status === "paused" && <button className="btn-sec" disabled={busyWorking} onClick={(e) => { e.stopPropagation(); busyPost({ alt: u.alt, from: u.from, to: u.to }, "It was not put back in use."); }}>Use again</button>}
@@ -21218,13 +21218,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           : hr.state === "skip" ? "Does not call off" : hr.state === "exempt" ? "Straight to the gate" : "Not routed yet";
                         return <span data-route-holding={hr.state} title={hr.state === "route_again" ? "Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)" : undefined}
                           className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                          style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
+                          style={hr.state === "route_again" ? { background: "var(--st-warn-bg)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
                       })()}
                       {(busyUses || []).filter(u => u.route_id === r.id && u.status !== "stopped").map(u => (
                         // 5 Nov 2026 (task 0d-2): "Busy hours: Alt 2", hover for the hours; amber while paused
                         <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}${u.status === "paused" ? " · paused: the road changed" : ""}`}
                           className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                          style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
+                          style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "var(--st-warn-bg)", color: "var(--warn-text)" }}>
                           Busy hours: Alt {u.alt}</span>))}
                       {(() => {
                         // 8 Nov 2026 (v2.1): the return journey the route's carbon charges; muted while it is the guess
@@ -21239,6 +21239,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       })()}
                       {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
+                        // 26 Nov 2026: amber chips sit on the solid var(--st-warn-bg) (4.84:1); the 12 % tint read 4.25:1 (axe, Routes at 1366 px)
                         const ps = (divPeriods || []).filter(p => p.route_id === r.id);
                         if(!ps.length) return null;
                         const used = ps.filter(p => p.status === "in_use"), bad = ps.filter(p => p.status !== "in_use");
@@ -21247,7 +21248,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         return (
                           <span data-route-diverted={r.id}
                             className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                            style={used.length ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }
+                            style={used.length ? { background: "var(--st-warn-bg)", color: "var(--warn-text)" }
                                                : { background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                             {used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}{more > 0 ? ` +${more}` : ""}
                           </span>);
