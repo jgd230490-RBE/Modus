@@ -339,11 +339,19 @@ if (hasCard) {
   // 5. The route in use is not the main route: a diversion (R027), a busy-hours road (R013), a limit on the line in use (Q9)
   {
     const r = route({ route: "R027", options: [Object.assign(opt(1), { chosen: true })],
-      in_use: { loaded: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" }, return: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" } } });
+      in_use: { loaded: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" }, return: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" } },
+      closures: [{ zone: "Z003", name: "A47 at the new Tilton junction", state: "in_force", whose: "in_use", alts: [], labels: [], legs: "both",
+                   starts_on: "2026-10-05", ends_on: "2027-12-17", dates: "until 17 Dec 2027", does: "the diversion is in use",
+                   head: "Closure in force", line: "A47 at the new Tilton junction · until 17 Dec 2027 · the diversion is in use" }], closures_more: null });
     const m = mount(B(r));
-    ok("⭐ DIVERSION: 'In use: Alt 2, the diversion, until 17 Dec 2027. Compared with it.' and no Make primary even on a suggestion (Q4)",
-       m.host.querySelector('[data-bo-in-use="diversion"]').textContent === "In use: Alt 2, the diversion, until 17 Dec 2027. Compared with it."
-       && !btnText(m.host, "Use Alt 1 as the main route") && !btnText(m.host, "Make Alt 1 primary"));
+    // REVERSED 25 Nov 2026 (the Routes page rethink, card 3, Q5): the rule's closure line replaces "In use: Alt 2, the
+    // diversion, until 17 Dec 2027. Compared with it." (ui_fix_routes_closures.js holds the line's checks)
+    ok("⭐ DIVERSION: the rule's closure line 'Closure in force · A47 at the new Tilton junction · until 17 Dec 2027 · the diversion is in use' and no Make primary even on a suggestion (Q4)",
+       m.host.querySelector('[data-bo-closure="in_force"]').textContent === "Closure in forceA47 at the new Tilton junction · until 17 Dec 2027 · the diversion is in use"
+       && !btnText(m.host, "Use Alt 1 as the main route") && !btnText(m.host, "Make Alt 1 primary"),
+       (m.host.querySelector("[data-bo-closure]") || {}).textContent);
+    ok("GONE (25 Nov, Q5): no 'In use: …, the diversion' line and no 'Compared with it.' on the card",
+       !m.host.querySelector('[data-bo-in-use="diversion"]') && !m.text().includes("Compared with it.") && !m.text().includes("In use: Alt 2"));
     m.done();
     const m2 = mount(B(route({ options: [Object.assign(opt(1), { chosen: true })] })), { busyUses: [{ alt: 2, from: "16:00", to: "19:00", status: "in_use" }, { alt: 1, from: "07:00", to: "09:00", status: "stopped" }] });
     ok("⭐ BUSY HOURS: 'Busy hours: Alt 2 is in use on weekdays 16:00–19:00.' (a stopped use is not said)",
