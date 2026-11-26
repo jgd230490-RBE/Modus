@@ -244,27 +244,57 @@ ok("⭐ 3: the supplier's sheet holds the same rows, unchanged, only in site ord
 ok("⭐ 3: its grand total is unchanged to the last digit (the Tonnes and Trips columns' sums)",
    round(sum(float(r[ci["Tonnes"]] or 0) for r in rows_n), 6) == round(sum(float(r[ci["Tonnes"]] or 0) for r in rows_o), 6)
    and sum(int(r[ci["Trips"]] or 0) for r in rows_n) == sum(int(r[ci["Trips"]] or 0) for r in rows_o))
-ok("3: the sheets: Commit week, By site, Fuel, Clashes, About; an ungrouped page has no By site sheet",
+ok("3: five sheets: Commit week, By site, Fuel, Clashes, About; an ungrouped page has no By site sheet",
    WBN.sheetnames == ["Commit week", "By site", "Fuel", "Clashes", "About"]
    and openpyxl.load_workbook(io.BytesIO(xb_old)).sheetnames == ["Commit week", "Fuel", "Clashes", "About"], str(WBN.sheetnames))
 wb_s = WBN["By site"]
+hs = [c.value for c in wb_s[1]]
+cs = {h: i for i, h in enumerate(hs)}
 rows_s = [[c.value for c in r] for r in wb_s.iter_rows(min_row=2)]
-lines_s = [r for r in rows_s if r[ci["Route"]]]
-heads = [r for r in rows_s if not r[ci["Route"]] and not str(r[0] or "").startswith("Sub-total")]
-subs = [r for r in rows_s if str(r[0] or "").startswith("Sub-total")]
-ok("⭐ 3: By site: one heading and one sub-total a site, the headings in the order of Data → Locations, the same line rows",
-   len(heads) == len(subs) == 7 and [str(h[0]).split(" · ")[0] for h in heads] == ORDER
-   and sorted(map(repr, lines_s)) == sorted(map(repr, rows_o)), str([h[0] for h in heads]))
-ok("⭐ 3: By site: the sub-totals add up to the grand total (tonnes, trips) and each equals the screen's site week",
-   abs(sum(float(s[ci["Tonnes"]] or 0) for s in subs) - sum(float(r[ci["Tonnes"]] or 0) for r in rows_o)) < 0.01
-   and sum(int(s[ci["Trips"]] or 0) for s in subs) == sum(int(r[ci["Trips"]] or 0) for r in rows_o)
-   and all(abs(float(sb[ci["Tonnes"]]) - s["week"]["t"]) < 0.01 for sb, s in zip(subs, SITES)))
+kind = lambda r: ("sub" if str(r[0] or "").startswith("Sub-total") else "total" if str(r[0] or "").startswith("Total ·")
+                  else "line" if r[cs["Route"]] else "site")
+heads = [r for r in rows_s if kind(r) == "site"]
+subs = [r for r in rows_s if kind(r) == "sub"]
+lines_s = [r for r in rows_s if kind(r) == "line"]
+tot = [r for r in rows_s if kind(r) == "total"]
+ok("3: By site's columns: the site or line, the route and its ends, the week's figures (no Date: a row is a week)",
+   hs[:4] == ["Site / line", "Route", "Origin", "Destination"] and "Date" not in hs and "Vehicles on the busiest day" in hs, str(hs))
+ok("⭐ 3: By site: one heading and one sub-total a site, the headings in the order of Data → Locations, ONE row a line",
+   len(heads) == len(subs) == 7 and [str(h[0]).split(" · ")[0] for h in heads] == ORDER and len(lines_s) == 22,
+   str([h[0] for h in heads]))
+ok("⭐ 3: By site: a line row reads \"From <origin>\" (the out line \"Out, to <destination>\", last under its site)",
+   sum(1 for r in lines_s if str(r[0]).startswith("From ")) == 21
+   and [str(r[0]) for r in lines_s if str(r[0]).startswith("Out, to ")] == ["Out, to " + str(r[cs["Destination"]]) for r in lines_s if str(r[0]).startswith("Out, to ")]
+   and len([r for r in lines_s if str(r[0]).startswith("Out, to ")]) == 1)
+_csum = lambda col, rs=rows_o: sum(float(r[ci[col]] or 0) for r in rs)
+ok("⭐ 3: By site: ONE Total row at the foot, \"Total · 7 sites\"", len(tot) == 1 and rows_s[-1] is tot[0] and tot[0][0] == "Total · 7 sites", str(tot[:1]))
+T = tot[0] if tot else [None] * len(hs)
+for col, nd in (("Tonnes", 3), ("Trips", 0), (export.xlsx_cols()[16][0], 3), (export.xlsx_cols()[17][0], 2), (export.xlsx_cols()[19][0], 2)):
+    ok(f"⭐ 3: By site's Total {col} is Commit week's column sum to the last digit",
+       # a column no row fills (t·km and BAF with no fuel index here) is a blank Total over a blank column
+       (T[cs[col]] is None and all(r[ci[col]] is None for r in rows_n))
+       or (T[cs[col]] is not None and round(float(T[cs[col]]), nd) == round(_csum(col, rows_n), nd) == round(_csum(col), nd)),
+       f"{T[cs[col]]} vs {round(_csum(col, rows_n), nd)}")
+ok("⭐ 3: By site: each line's week figures add its own day rows on Commit week (tonnes, trips)",
+   all(abs(float(r[cs["Tonnes"]] or 0) - sum(float(d[ci["Tonnes"]] or 0) for d in rows_n if d[ci["Route"]] == r[cs["Route"]]
+       and d[ci["WS"]] == r[cs["WS"]] and d[ci["Material"]] == r[cs["Material"]] and d[ci["Origin"]] == r[cs["Origin"]])) < 0.01
+       for r in lines_s if sum(1 for x in lines_s if (x[1], x[5], x[6], x[2]) == (r[1], r[5], r[6], r[2])) == 1))
+ok("⭐ 3: By site: the sub-totals add to the Total (tonnes, trips) and each equals the screen's site week",
+   abs(sum(float(s[cs["Tonnes"]] or 0) for s in subs) - float(T[cs["Tonnes"]] or 0)) < 0.01
+   and sum(int(s[cs["Trips"]] or 0) for s in subs) == int(T[cs["Trips"]] or 0)
+   and all(abs(float(sb[cs["Tonnes"]]) - s["week"]["t"]) < 0.01 for sb, s in zip(subs, SITES)))
+ok("3: By site: a site's lines add up to its sub-total",
+   all(abs(sum(float(x[cs["Tonnes"]] or 0) for x in rows_s[rows_s.index(h) + 1:rows_s.index(sb)]) - float(sb[cs["Tonnes"]] or 0)) < 0.01
+       for h, sb in zip(heads, subs)))
+ok("3: By site: Vehicles is the busiest day's (never more than the week's days added)",
+   all(r[cs["Vehicles on the busiest day"]] is None or isinstance(r[cs["Vehicles on the busiest day"]], int) for r in lines_s + subs + tot))
 ok("3: the out part is said on the sending site's sub-total", any(" t out" in str(s[0]) and "Tilton Viaduct site" in str(s[0]) for s in subs))
 _rs = list(wb_s.iter_rows(min_row=2))
-_hrow = next(r for r in _rs if r[0].value and not r[ci["Route"]].value and not str(r[0].value).startswith("Sub-total"))
-_srow = next(r for r in _rs if str(r[0].value or "").startswith("Sub-total"))
-ok("3: a heading row is bold with a rule over it; a sub-total bold on its grey",
-   _hrow[0].font.bold and _hrow[0].border.top.style == "medium" and _srow[0].font.bold and _srow[0].fill.fgColor.rgb.endswith(export.SITE_SUB_HEX))
+_hrow = next(r for r in _rs if kind([c.value for c in r]) == "site")
+_srow = next(r for r in _rs if kind([c.value for c in r]) == "sub")
+ok("3: a heading row is bold with a rule over it; a sub-total bold on its grey; the Total bold and ruled",
+   _hrow[0].font.bold and _hrow[0].border.top.style == "medium" and _srow[0].font.bold and _srow[0].fill.fgColor.rgb.endswith(export.SITE_SUB_HEX)
+   and _rs[-1][0].font.bold and _rs[-1][0].border.top.style == "medium")
 
 # --------------------------------------------------------------------------- 4. the Day sheet
 DAY = "2026-11-25"

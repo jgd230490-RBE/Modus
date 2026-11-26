@@ -344,17 +344,56 @@ XLSX_COLS = XLSX_COLS_EUR   # the EUR-labelled reference set (tests read it); sh
 SITE_SUB_HEX = "F3F4F6"        # 25 Nov 2026 (task C2): a site's sub-total row in the XLSX, a neutral grey
 
 
+BY_SITE_COLS = [("Site / line", "label"), ("Route", "route_id"), ("Origin", "origin"), ("Destination", "dest"),
+                ("IPT", "ipt"), ("WS", "ws"), ("Material", "material"), ("Vehicle", "vehicle"), ("Qty", "qty"),
+                ("Unit", "unit"), ("Tonnes", "tonnes"), ("Trips", "trips"), ("Vehicles on the busiest day", "veh"),
+                ("t·km", "tonne_km"), ("€", "eur"), ("€ + BAF", "eur_adj")]
+SUM_KEYS = (("tonnes", 3), ("trips", 0), ("tonne_km", 3), ("eur", 2), ("eur_adj", 2))
+
+
+def by_site_cols():
+    """BY_SITE_COLS with the tenant's currency, team label and distance unit, as xlsx_cols()."""
+    cur, team, du = _cur(), _tenant().get("team_label") or "Team", _du()
+    def hd(h):
+        if h == "IPT":
+            return team
+        h = h.replace("€", cur)
+        return "t·mi" if (du == "mi" and h == "t·km") else h
+    return [(hd(h), k) for h, k in BY_SITE_COLS]
+
+
+def _sums(rows):
+    """Tonnes, trips, t·km and money added over day rows, None where no row has the figure; vehicles = the busiest
+    day's (routed rows only), never a sum of days."""
+    out = {}
+    for k, nd in SUM_KEYS:
+        vals = [r.get(k) for r in rows if r.get(k) is not None]
+        if not vals:
+            out[k] = None
+        elif nd == 0:
+            out[k] = int(sum(int(v) for v in vals))
+        else:
+            out[k] = round(sum(float(v) for v in vals), nd)
+    by_day = {}
+    for r in rows:
+        if r.get("baked"):
+            by_day[r["date"]] = by_day.get(r["date"], 0) + int(r.get("veh") or 0)
+    out["veh"] = max(by_day.values()) if by_day else None
+    return out
+
+
 def xlsx_site_rows(rows):
     """
-    25 Nov 2026 (the Look-ahead rethink, task C2, Q6): the "By site" sheet: the Commit week rows (one a weekday a line, `_line_rows`)
-    under their SITE in the order of Data → Locations: a heading row ("Melton Compound · Compound · 3 lines" in the
-    first cell), the site's line rows (its lines in, then its out lines), and a sub-total row (tonnes, trips and money
-    added from the rows above it; Vehicles = the site's busiest day, as the screen's week figure; the part going out
-    said in the first cell). The line rows themselves are unchanged. An older page with no sites: the rows as they were.
+    25 Nov 2026 (the Look-ahead rethink, task C2, Q6; the mother session's word on the XLSX, 26 Nov): the "By site"
+    sheet. Under each SITE in the order of Data → Locations: a heading row ("Melton Compound · Compound · 3 lines"), ONE
+    row a line with its WEEK figures added from its day rows ("From <origin>", an out line "Out, to <destination>",
+    last), and a sub-total row ("N t out" in its first cell when the site sends some out); at the foot a Total row. The
+    Total's tonnes, trips, t·km and money are the "Commit week" sheet's column sums to the last digit (added from the
+    same day rows); Vehicles is the busiest day's, never a sum of days. An older page with no sites: None.
     """
     groups = site_groups(rows, line_of=lambda r: r["line"])
     if groups is None:
-        return rows
+        return None
     team = _team_namer()
     out = []
     for site, srows in groups:
@@ -362,24 +401,21 @@ def xlsx_site_rows(rows):
         for r in srows:
             if not any(x is r["line"] for x in lines):
                 lines.append(r["line"])
-        out.append({"_kind": "site", "date": f"{site_name(site)} · {site_heading_words(site, lines, team)}"})
-        out += srows
-        by_day = {}
-        for r in srows:
-            if r.get("baked"):
-                by_day[r["date"]] = by_day.get(r["date"], 0) + int(r.get("veh") or 0)
+        out.append({"_kind": "site", "label": f"{site_name(site)} · {site_heading_words(site, lines, team)}"})
+        for ln in lines:
+            lr = [r for r in srows if r["line"] is ln]
+            f = lr[0]
+            is_out = site_is_out(ln)
+            qty = [r.get("qty") for r in lr if r.get("qty") is not None]
+            out.append({"_kind": "line",
+                        "label": ("Out, to " + str(f.get("dest") or "")) if is_out else ("From " + str(f.get("origin") or "")),
+                        **{k: f.get(k) for k in ("route_id", "origin", "dest", "ipt", "ws", "material", "vehicle", "unit")},
+                        "qty": round(sum(float(q) for q in qty), 3) if qty else None, **_sums(lr)})
         out_t = sum(float(r.get("tonnes") or 0) for r in srows if site_is_out(r["line"]))
-        eur = [float(r["eur"]) for r in srows if r.get("eur") is not None]
-        adj = [float(r["eur_adj"]) for r in srows if r.get("eur_adj") is not None]
         n = len(lines)
-        out.append({"_kind": "sub",
-                    "date": f"Sub-total · {site_name(site)} · {n} line{'' if n == 1 else 's'}"
-                            + (f" · {_n(out_t)} t out" if out_t > 0 else ""),
-                    "tonnes": round(sum(float(r.get("tonnes") or 0) for r in srows), 3),
-                    "trips": sum(int(r.get("trips") or 0) for r in srows),
-                    "veh": max(by_day.values()) if by_day else None,
-                    "tonne_km": round(sum(float(r.get("tonne_km") or 0) for r in srows), 3),
-                    "eur": round(sum(eur), 2) if eur else None, "eur_adj": round(sum(adj), 2) if adj else None})
+        out.append({"_kind": "sub", "label": f"Sub-total · {site_name(site)} · {n} line{'' if n == 1 else 's'}"
+                                             + (f" · {_n(out_t)} t out" if out_t > 0 else ""), **_sums(srows)})
+    out.append({"_kind": "total", "label": f"Total · {len(groups)} site{'' if len(groups) == 1 else 's'}", **_sums(rows)})
     return out
 
 
@@ -397,7 +433,7 @@ def build_xlsx(page):
             c.alignment = Alignment(horizontal="center")
         for i, r in enumerate(rows, 2):
             # 25 Nov 2026 (task C2): on the "By site" sheet a site's heading (bold, its words in the first cell, an ink rule
-            # over the row) and its sub-total (bold on a grey fill) are rows of their own among the lines' rows
+            # over the row), its sub-total (bold on a grey fill) and the foot's Total (bold, ruled) are rows of their own
             kind = r.get("_kind")
             for j, (_, key) in enumerate(cols, 1):
                 v = r.get(key)
@@ -410,6 +446,8 @@ def build_xlsx(page):
                         c.font = Font(bold=True, size=12)
                 elif kind == "sub":
                     c.font, c.fill = Font(bold=True), PatternFill("solid", fgColor=SITE_SUB_HEX)
+                elif kind == "total":
+                    c.font, c.border = Font(bold=True), Border(top=Side(style="medium", color=NAVY))
         for j, (title, _) in enumerate(cols, 1):
             ws.column_dimensions[get_column_letter(j)].width = max(10, min(28, len(title) + 6))
         ws.freeze_panes = "A2"
@@ -420,12 +458,13 @@ def build_xlsx(page):
     # 25 Nov 2026 (the Look-ahead rethink, task C2): the supplier's sheet stays one row a weekday a line, nothing added
     # among them (a column's sum and an import still read lines only), the lines in site order; the sites' headings and
     # sub-totals are the next sheet, "By site"
-    grouped = xlsx_site_rows(rows)
-    sheet(ws, xlsx_cols(), [r for r in grouped if not r.get("_kind")])
-    if grouped is not rows:
+    groups = site_groups(rows, line_of=lambda r: r["line"])
+    sheet(ws, xlsx_cols(), [r for _, rs in groups for r in rs] if groups else rows)
+    by_site = xlsx_site_rows(rows)
+    if by_site is not None:
         ws_s = wb.create_sheet("By site", 1)
-        sheet(ws_s, xlsx_cols(), grouped)
-        ws_s.column_dimensions["A"].width = 44
+        sheet(ws_s, by_site_cols(), by_site)
+        ws_s.column_dimensions["A"].width = 46
     # no Stock sheet (10 Sep): the sheet is for the supplier; stock is the planner's
     # 10 Sep evening: the fuel index and settings every € + BAF above was computed from
     ws_f = wb.create_sheet("Fuel")
