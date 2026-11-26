@@ -13444,7 +13444,8 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
         <>
           {/* 10 Sep evening: the diesel index and the two fuel settings, top of the strip */}
           <FuelWidget mode="strip" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
+          {/* 26 Nov 2026 (own look B1): the Account view's four figures are a ruled strip like the commit week's (LaKpi has no box) */}
+          <div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">
             {/* 10 Nov 2026 (16 Oct item 24, mockup card 2): the cards in words: the band as "within 2 % of plan", one verb (add) */}
             <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week, within 2 % of plan" />
             <LaKpi value={`${grp(account.actual_t)} t`} caption={`moved · ${account.reported || 0} of ${account.lines || 0} lines reported`} />
