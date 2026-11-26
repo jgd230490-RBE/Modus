@@ -95,7 +95,8 @@ ok("...a row is washed (amber) only when it is short past the share", acct.inclu
 
 // the gate charts
 ok("⭐ 5: a gate chart's Copy / Download sit in its title row: ChartCanvas takes `head` and draws the buttons in the flow beside it",
-   code.includes("function ChartCanvas({ config, height, size, title, scope, notools, head }){")
+   // NARROWED 26 Nov 2026 (the Dashboard rethink, B): ChartCanvas also takes `htmlKey` (a key as a line under the plot)
+   /function ChartCanvas\(\{ config, height, size, title, scope, notools, head(, htmlKey)? \}\)\{/.test(code)
    && code.includes('return head ? <><div className="gw-head" data-chart-head="1"><div className="min-w-0">{head}</div>{tools}</div>{chart}</> : chart;')
    && /\.gw-head\{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;\}/.test(css));
 ok("...the gate's name, closed note and capacity sentence are that head (no sentence left above the chart for the buttons to cover)",

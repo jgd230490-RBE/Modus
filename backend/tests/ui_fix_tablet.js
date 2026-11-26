@@ -169,7 +169,8 @@ ok("...the day columns narrow (Mon–Fri and Week fit at 768 with the rail folde
    && css.includes('[data-la-tab="1"] .tbl .la-stick{min-width:200px !important;}') && css.includes(".la-st-under{display:block;margin-top:4px;font-weight:400;}"));
 ok("🔴 6: the desk's grid is as it was (the Route column 280 px, one Status column, 96 px a day)",
    la.includes('<th className="la-stick" style={{ minWidth: 280 }}>Route</th>') && la.includes('firstStyle={{ minWidth: 280 }}'));
-ok("...the eight cards stay two rows of four from 768 (md:grid-cols-4), as approved on 9 Nov", la.includes('<div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3">'));
+// NARROWED 24 Nov 2026 (own look, B1 stage 4): the same grid, now one ruled strip (.fig-strip)
+ok("...the eight cards stay two rows of four from 768 (md:grid-cols-4), as approved on 9 Nov", la.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">'));
 
 // ---------------------------------------------------------------- card 7: Configuration → Vehicles
 const cfg = between(code, "function ConfigPage(", "\nfunction ");

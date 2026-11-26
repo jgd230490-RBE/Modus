@@ -46,12 +46,24 @@ share of the forecast. Totals: `actual_tonnes`, `actual_eur`, `reported_lines`,
 `delivered_pct` (reported tonnes over ALL visible tonnes — the programme's progress, so
 an unreported month counts as not yet delivered, which is what it is). ONE statement,
 no materialisation (a read that writes would be wrong here — weeks.list_weeks does).
+
+TO THE LAST COMPLETE WEEK (25 Nov 2026, the Dashboard rethink A1; John: "Yes, complete week")
+---------------------------------------------------------------------------------------------
+"Delivered against plan" compares like with like: both sides to the latest COMPLETE week (its Sunday before today)
+with an actual typed on one of the caller's visible lines (`totals.delivered_to`: month_index, week_index, the
+week's Sunday). Each line-month carries `planned_to_cut_t` (all of an earlier month; the cut month's weeks 1..cut
+shared as its weeks share their planned quantity, else evenly; nothing of a later month) and `actual_to_cut_t` (the
+typed actuals of the weeks up to the cut, None when none). A week typed day by day (this week) no longer pulls the
+share down, and the 1st of a month no longer adds a whole month's plan. CLP monitoring keeps its own rule (D-I4,
+clp.py), so the two can name different weeks.
 """
+import datetime
 import access
 import conversions
 import db
 import derived
 import limits
+import weeks
 
 
 def _num(v):
@@ -97,6 +109,52 @@ def _actuals():
     return out
 
 
+def _week_rows():
+    """{(route, month, discipline, section): {week_index: (planned_qty, actual_qty)}}: every stored week, one read
+    (25 Nov 2026: the cut for Delivered against plan)."""
+    out = {}
+    for w in db.query("SELECT route_id, month_index, discipline, section_id, week_index, planned_qty, actual_qty "
+                      "FROM forecast_weeks WHERE tenant_id = ?", (db.current_tenant(),)):
+        k = (w["route_id"], int(w["month_index"]), w.get("discipline") or "", w.get("section_id") or "")
+        out.setdefault(k, {})[int(w["week_index"])] = (_num(w.get("planned_qty")), _num(w.get("actual_qty")))
+    return out
+
+
+def _cut_week(keys, week_rows, today):
+    """(month_index, week_index, sunday) of the latest COMPLETE week (its Sunday before today) with an actual typed on
+    one of these line-months; None when there is none."""
+    best = None
+    for k in keys:
+        for wi, (_pq, aq) in (week_rows.get(k) or {}).items():
+            if aq is None:
+                continue
+            try:
+                _mon, sun = weeks.week_span(k[1], wi)
+            except (TypeError, ValueError):
+                continue
+            if sun < today and (best is None or sun > best[2]):
+                best = (k[1], wi, sun)
+    return best
+
+
+def _to_cut(tonnes, month_index, wk, cut, tonnes_of):
+    """(planned tonnes, actual tonnes or None) of one line-month up to the cut week."""
+    if cut is None:
+        return 0.0, None
+    cm, cw = cut[0], cut[1]
+    wk = wk or {}
+    if month_index < cm:
+        acts = [aq for (_pq, aq) in wk.values() if aq is not None]
+        return float(tonnes or 0.0), (tonnes_of(sum(acts)) if acts else None)
+    if month_index > cm:
+        return 0.0, None
+    tot = sum((pq or 0.0) for (pq, _aq) in wk.values())
+    upto = sum((pq or 0.0) for wi, (pq, _aq) in wk.items() if wi <= cw)
+    share = (upto / tot) if tot > 0 else min(1.0, cw / float(max(1, weeks.weeks_in_month(cm))))
+    acts = [aq for wi, (_pq, aq) in wk.items() if wi <= cw and aq is not None]
+    return float(tonnes or 0.0) * share, (tonnes_of(sum(acts)) if acts else None)
+
+
 def _limit(stored_entry, vehicle_type, baked):
     """{count, text, kind, checked_at} when this line's vehicle is over a limit its route runs
     along; None otherwise. Only a routed line is checked (clashes.limit's rule)."""
@@ -119,7 +177,7 @@ def _busy_line(r, ctx, f, cost, factors, cache):
         return None
 
 
-def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, pre=None):
+def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, pre=None, today=None):
     """
     {lines: [...], totals: {...}, costing: {...}} for the caller's visible forecast rows.
     One derived.costing_context() (two statements), one route map, one cycle per
@@ -134,6 +192,10 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, p
     cost = derived.costing_context()
     cache = {} if pre is None else {"__route_analysis_pre__": pre}
     actuals = _actuals()
+    # 25 Nov 2026 (the Dashboard rethink A1): the cut for Delivered against plan, the latest complete reported week
+    week_rows = _week_rows()
+    _key = lambda r: (r["route_id"], int(r["month_index"]), r.get("discipline") or "", r.get("section_id") or "")
+    cut = _cut_week({_key(r) for r in rows}, week_rows, today or datetime.date.today())
     plan = factors.get("planning", {}) or {}
     work_days = float(plan.get("working_days_per_month") or 22)
     # 13 Oct 2026 (W6): the stored lorry-limits check, ONE read for every route in view — the same
@@ -146,7 +208,7 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, p
            "co2_t": 0.0, "planned_eur": 0.0, "planned_lines": 0, "planned_target_lines": 0,
            "fair_eur": 0.0, "fair_lines": 0, "planned_tonnes": 0.0, "planned_km": 0.0,
            "fair_tonnes": 0.0, "fair_km": 0.0, "fair_trips": 0, "planned_trips": 0,
-           "actual_t": None, "actual_eur": None, "reported_lines": 0}
+           "actual_t": None, "actual_eur": None, "reported_lines": 0, "planned_cut_t": 0.0, "actual_cut_t": None}
     for r in rows:
         line = {"route_id": r["route_id"], "unit": r.get("unit"), "material_type": r.get("material_type"),
                 "vehicle_type": r.get("vehicle_type"), "ipt": r.get("ipt"), "discipline": r.get("discipline"),
@@ -179,6 +241,8 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, p
         act = actuals.get((r["route_id"], int(r["month_index"]), r.get("discipline") or "", r.get("section_id") or ""),
                           {"qty": None, "eur": None, "weeks": 0})
         actual_t = (round(derived.tonnes_of(act["qty"], ctx, factors), 3) if act["qty"] is not None else None)
+        p_cut, a_cut = _to_cut(f["tonnes"], int(r["month_index"]), week_rows.get(_key(r)), cut,
+                               lambda q: derived.tonnes_of(q, ctx, factors))
         out.append({
             "route_id": r["route_id"], "discipline": r.get("discipline") or "", "section_id": r.get("section_id") or "",
             "ipt": ctx.get("ipt") or r.get("ipt"), "month_index": int(r["month_index"]), "status": r.get("status"),
@@ -203,6 +267,8 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, p
             "planned": planned, "fair": fair,
             "actual_qty": act["qty"], "actual_tonnes": actual_t, "actual_eur": act["eur"],
             "weeks_reported": act["weeks"],
+            # 25 Nov 2026: both sides up to the latest complete reported week (totals.delivered_to)
+            "planned_to_cut_t": round(p_cut, 3), "actual_to_cut_t": (round(a_cut, 3) if a_cut is not None else None),
             "flags": list(ctx.get("flags") or []),
             "limit": _limit(stored_limits.get(r["route_id"]), r.get("vehicle_type"), baked),
             # 5 Nov 2026 (task 0d-2, Q17): the trips on a busy-hours road and what they save (negative) or add
@@ -210,6 +276,9 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, p
         })
         if actual_t is not None:
             tot["actual_t"] = (tot["actual_t"] or 0.0) + actual_t; tot["reported_lines"] += 1
+        tot["planned_cut_t"] += p_cut
+        if a_cut is not None:
+            tot["actual_cut_t"] = (tot["actual_cut_t"] or 0.0) + a_cut
         if act["eur"] is not None:
             tot["actual_eur"] = (tot["actual_eur"] or 0.0) + act["eur"]
         tot["lines"] += 1
@@ -244,6 +313,10 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, p
         "actual_tonnes": (round(tot["actual_t"], 3) if tot["actual_t"] is not None else None),
         "actual_eur": (round(tot["actual_eur"], 2) if tot["actual_eur"] is not None else None),
         "reported_lines": tot["reported_lines"],
+        # 25 Nov 2026: the cut and both sides to it (the Dashboard's Delivered against plan)
+        "delivered_to": ({"month_index": cut[0], "week_index": cut[1], "ends": cut[2].isoformat()} if cut else None),
+        "planned_to_cut_t": round(tot["planned_cut_t"], 3),
+        "actual_to_cut_t": (round(tot["actual_cut_t"], 3) if tot["actual_cut_t"] is not None else None),
         "delivered_pct": (round(tot["actual_t"] * 100.0 / tot["tonnes"], 1)
                           if tot["actual_t"] is not None and tot["tonnes"] > 0 else None),
     }

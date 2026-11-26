@@ -295,7 +295,11 @@ async function carbonTargetDom(){
   await settle(50);
   const e1 = d1.el.querySelector('[data-carbon-target="error"]');
   ok("⭐ CARBON DOM: the Dashboard's own read of the target fails: one line says so, the programme figures stay",
-     !!e1 && e1.textContent === "The carbon target did not load." && d1.el.textContent.includes("Transport carbon"));
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): Transport carbon left the strip (task B shows it in the carbon section)
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B): the section keeps its title row and its transport figure in this state;
+     // its one sentence is the failure's
+     !!e1 && e1.querySelector('[data-ct-fig="state"]') && e1.querySelector('[data-ct-fig="state"]').textContent === "The carbon target did not load."
+     && !!e1.querySelector('[data-ct-fig="transport"]') && d1.el.textContent.includes("Material in view"));
   d1.done();
   const f1 = mount(w.Forecasts, { meta: dMeta, who: "t", access: plannerAcc, onEdit(){}, onChanged(){} });
   await settle(50);
@@ -319,7 +323,9 @@ async function carbonTargetDom(){
   const go3 = byText(d3.el, "button", "Open the Carbon planner");
   if (go3) act(() => { go3.click(); });
   ok("CARBON DOM: with a target set, the strip reads it and still offers the Carbon planner",
-     !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 41.4 tCO2e, on target")
+     // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10): the verdict is the figure "With the agreed decisions" and its status
+     !!d3.el.querySelector('[data-carbon-target="set"]') && !!d3.el.querySelector('[data-ct-fig="decisions"]')
+     && /With the agreed decisions\s*41\.4 t\s*On target/.test(d3.el.querySelector('[data-ct-fig="decisions"]').textContent)
      && opened.length === 2 && opened[1] === "carbon");
   d3.done();
 
@@ -476,13 +482,24 @@ async function infoTipDom(){
   const CTX = FIX("carbon_target.json");
   const box2 = w.document.createElement("div"); w.document.body.appendChild(box2);
   const root2 = w.ReactDOM.createRoot(box2);
-  act(() => { root2.render(h(w.CarbonTargetStrip, { ct: CTX, err: false, onOpen(){} })); });
-  const bt = box2.querySelector('button[aria-label="About: Transport in this target"]');
+  // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q10): the transport part is in the "i" of the section's fourth figure,
+  // "Transport carbon, in view" (the strip is given the Dashboard's transport figures), not a "Transport in this target" box
+  act(() => { root2.render(h(w.CarbonTargetStrip, { ct: CTX, err: false, onOpen(){}, transport: { t: 864.04, intensity: 1.8, loaded: 595.2, empty: 268.8 } })); });
+  const bt = box2.querySelector('button[aria-label="About: Transport carbon, in view"]');
   if (bt) { click(bt); await tick(); }
   const p2 = w.document.querySelector(".info-pop");
   ok("INFO BOX: the carbon target's transport part (once a hover title) opens in its info box with the figure",
-     !!bt && !!p2 && /Transport is \d[\d ]*\.\d tCO2e of the approved plan as forecast/.test(p2.textContent)
-     && !box2.querySelector(".ct-note[title]"), p2 ? p2.textContent.slice(0, 160) : "no panel");
+     !!bt && !!p2 && /Transport is \d[\d ,]*\.\d tCO2e of the approved plan as forecast/.test(p2.textContent)
+     && /Exactly 864\.0 tCO2e on the routed lines in view, transport only/.test(p2.textContent)
+     && !box2.querySelector(".ct-note[title]") && !box2.querySelector('button[aria-label="About: Transport in this target"]'), p2 ? p2.textContent.slice(0, 160) : "no panel");
+  act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  // 25 Nov 2026 (the Dashboard rethink, B; Q10): the all-in sentence (and the target's own line) is the title's "i"
+  const bt2 = box2.querySelector('button[aria-label="About: Carbon target"]') || [...box2.querySelectorAll(".ct-h button")][0];
+  if (bt2) { click(bt2); await tick(); }
+  const p3 = w.document.querySelector(".info-pop");
+  ok("⭐ INFO BOX: the carbon target's title 'i' carries the all-in sentence and the target line, and no 'card above'",
+     !!bt2 && !!p3 && /All-in: making the material, transport and waste disposal, on the whole approved plan\. Target: /.test(p3.textContent)
+     && !/card above/.test(box2.textContent + p3.textContent), p3 ? p3.textContent.slice(0, 200) : "no panel");
   act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
   act(() => { root2.unmount(); }); box2.remove();
 }
@@ -879,7 +896,8 @@ async function gateArrivalsDom(){
   await settle(50);
   const e1 = d1.el.querySelector('[data-gate-arrivals="error"]');
   ok("⭐ GATE DOM: the panel's own read fails: one line says so, the carbon strip and the programme figures stay",
-     !!e1 && e1.textContent === "The gate arrivals did not load." && d1.el.textContent.includes("Transport carbon")
+     // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the programme figures are read by their first card's name
+     !!e1 && e1.textContent === "The gate arrivals did not load." && d1.el.textContent.includes("Material in view")
      && !!d1.el.querySelector('[data-carbon-target="set"]') && !d1.el.querySelector("[data-ga-gate]"));
   ok("GATE DOM: ...it asked for this month, once, as a GET",
      gaCalls().length === 1 && gaCalls()[0].url === `/api/gates/arrivals?month=${thisMonth}` && gaCalls()[0].method === "GET");
@@ -971,7 +989,12 @@ async function gateArrivalsDom(){
   // answered a month-9 fixture to whatever month was asked, so the two differ on purpose
   ok("GATE DOM: ...the month select holds the month that was asked for, and the header line carries the server's label",
      d2.el.querySelector("select.ga-sel") && d2.el.querySelector("select.ga-sel").value === String(thisMonth)
-     && d2.el.textContent.includes("Sep 2026: lorries a day at each gate"));
+     // NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the sentence under the header left; the server's label is the
+     // "i"'s value now, read when the "i" opens (and the saved picture's scope)
+     && !d2.el.textContent.includes("Sep 2026: lorries a day at each gate")
+     && (() => { const ib = d2.el.querySelector('[data-guide="dash-gates"] button.ibtn'); if(!ib) return false;
+       act(() => { ib.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+       const t = w.document.body.textContent.includes("Sep 2026"); act(() => { ib.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); return t; })());
 
   // (3) picking another month re-reads with that month and nothing else
   const other = thisMonth === 3 ? 4 : 3;
@@ -1464,7 +1487,7 @@ async function rowDetailsDom(){
   const kinds0 = new Set(LA.clashes.flags.filter(f => `${f.route_id}|${f.discipline || ""}|${f.section_id || ""}|${f.month_index}` === lk0).map(f => f.code)).size;
   const st0 = r0.querySelector("td.rd-status .row-st");
   ok("⭐ ROW DETAILS · Look-ahead: a lorry over a road limit is the row's ONE status, ahead of the line's other flags, with their count (decision 1)",
-     norm(st0.textContent) === `!Road limit+${kinds0}` /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
+     norm(st0.textContent) === `Road limit+${kinds0}` /* NARROWED 24 Nov 2026 (own look, B1 stage 2): the shape has no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
   const d0 = la3.el.querySelector(`[data-rd-details="la-${lk0}"]`);
   ok("ROW DETAILS · ...and the details spell it out first, the limit sentence in full, then each other flag",
      d0.querySelector(".rd-i.rd-wide dt").textContent === "Road limit" && d0.textContent.includes(limText) && d0.querySelectorAll(".rd-i.rd-wide.rd-bad").length >= kinds0 + 1);
@@ -1603,10 +1626,10 @@ async function rowDetailsDom(){
   const limKey = `${limLine.route_id}|${limLine.discipline || ""}|${limLine.section_id || ""}`;
   const limRow = d3.el.querySelector(`tr[data-rd="dash-${limKey}"]`);
   ok("⭐ ROW DETAILS · Dashboard: a line whose lorry is over a road limit reads ROAD LIMIT in its status, the sentence in its details (decision 3)",
-     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "!Road limit" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
+     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "Road limit" /* NARROWED 24 Nov 2026 (own look): no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
      && rowText(limRow).includes(limText) && rowText(limRow).includes("Checked 13 Oct 2026"));
   const others = [...d3.el.querySelectorAll('table[data-rd-table="dashboard"] tr.rd-row')].filter(tr => tr !== limRow).map(tr => norm(tr.querySelector(".row-st").textContent));
-  ok("ROW DETAILS · ...the other lines read Clear or Not routed, nothing else", others.length > 0 && others.every(x => x === "✓Clear" || x === "!Not routed"), others.join("|"));
+  ok("ROW DETAILS · ...the other lines read Clear or Not routed, nothing else", others.length > 0 && others.every(x => x === "Clear" || x === "Not routed" /* NARROWED 24 Nov 2026 (own look): no glyph */), others.join("|"));
   d3.done();
 
   // ============================== 3. Forecasts ==============================
@@ -1643,14 +1666,14 @@ async function rowDetailsDom(){
   const stOf = (k) => norm(fT.querySelector(`tr[data-fc-line="${k}"] .row-st`).textContent);
   const rej = Object.keys(fg).find(k => k.startsWith("R3|"));
   ok("ROW DETAILS · Forecasts: a rejected line's status reads Rejected (red), its reason in full in the details",
-     stOf(rej) === "!Rejected" && rowText(fT.querySelector(`tr[data-fc-line="${rej}"]`)).includes("Wrong month: move it to November"));
+     stOf(rej) === "Rejected" /* NARROWED 24 Nov 2026 (own look): no glyph */ && rowText(fT.querySelector(`tr[data-fc-line="${rej}"]`)).includes("Wrong month: move it to November"));
   f.done();
   const f2 = mount(w.Forecasts, { meta: dMeta, who: "tester", access: plannerAcc, onEdit(){}, onChanged(){}, initialRows: rowsFix, initialCost: CLL, initialTarget: CTX });
   const fT2 = tableOf(f2.el, "forecasts");
   const limFk = [limLine.route_id, limLine.discipline || "", limLine.section_id || ""].join("|");
   const limFr = fT2.querySelector(`tr[data-fc-line="${limFk}"]`);
   ok("⭐ ROW DETAILS · Forecasts: the same line reads ROAD LIMIT before Pending or Approved, so an approver sees it first; the sentence in the details",
-     norm(limFr.querySelector(".row-st").textContent) === "!Road limit" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
+     norm(limFr.querySelector(".row-st").textContent) === "Road limit" /* NARROWED 24 Nov 2026 (own look): no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
   f2.done();
   ok("ROW DETAILS · the nothing-lost checks covered every table: Look-ahead, gates, Today, the route table and Forecasts each with ten fields or more",
      [nLa, nGa, nTd, nDash, nFc].every(n => n >= 10), [nLa, nGa, nTd, nDash, nFc].join(" / "));
@@ -1949,9 +1972,9 @@ async function abnormalDom(){
      && !p.el.querySelector(".al-holidays"), [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|"));   // NARROWED 27 Oct 2026 (the final UI pass): the holidays' words live in the Settings card now (asserted there)
   ok("⭐ AL DOM: a row a movement with the team's NAME, the class chip from the server's advice, the notify-by date and the flag with its tone, the apply-by line",
      !!rowOf(p.el, "AL001") && rowOf(p.el, "AL001").textContent.includes("Central Team") && rowOf(p.el, "AL001").querySelector(".al-chip.al-stgo").textContent === "STGO Cat 1"
-     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-flag .row-st.rs-bad").textContent === "!Notice late" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
+     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-flag .row-st.rs-bad").textContent === "Notice late" /* NARROWED 24 Nov 2026 (own look): no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
      && rowOf(p.el, "AL002").querySelector(".al-chip.al-so").textContent === "Special Order" && rowOf(p.el, "AL002").textContent.includes("apply by 1 Feb 2027")
-     && rowOf(p.el, "AL002").querySelector(".al-flag .row-st.rs-bad").textContent === "!SO lead time" && !/IPT[12]/.test(p.el.textContent));
+     && rowOf(p.el, "AL002").querySelector(".al-flag .row-st.rs-bad").textContent === "SO lead time" && !/IPT[12]/.test(p.el.textContent));
   ok("AL DOM: the window reads as one span (8–12 Mar 2027, day, 3 movements) and the size line as the figures typed",
      rowOf(p.el, "AL001").textContent.includes("8–12 Mar 2027") && rowOf(p.el, "AL001").textContent.includes("day · 3 movements")
      && rowOf(p.el, "AL001").textContent.includes("Low-loader · 4.6 × 3.9 × 16.5 m · 40 t · 6 axles · 9 t axle"));
@@ -3425,8 +3448,8 @@ async function todayFitDom(){
        [...tv.el.querySelectorAll("tr.rd-details")].every(d => d.hidden) && tv.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
        && w.sessionStorage.getItem("modus_rows_today") === JSON.stringify(OPEN));
     ok("UI FIX 6 card 5 (the user: keep the progress bars): the two bars and their headings are still there, above the list",
-       tv.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
-       && (tv.el.querySelector(".h-2.rounded-full.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
+       tv.el.querySelectorAll(".h-2.rounded-sm.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
+       && (tv.el.querySelector(".h-2.rounded-sm.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
     // 2b. 22 Oct 2026 (UI fix 6, card 5, review): a scroll left over from "All sections" (40 px down) is reset before
     // measuring, so the count is the unscrolled one (without the reset the rows sit 40 px higher and four would "fit")
     { let st = 40; const lbx = list();
@@ -3464,7 +3487,7 @@ async function todayFitDom(){
       ok("UI FIX 6 card 4: in All sections every row is drawn closed (the desk opened the busiest), and both progress bars stay above the list",
          [...m.el.querySelectorAll("tr.rd-details")].every(d => d.hidden)
          && m.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
-         && m.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
+         && m.el.querySelectorAll(".h-2.rounded-sm.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
       m.done();
     }
     {
