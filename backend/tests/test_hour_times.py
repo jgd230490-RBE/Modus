@@ -448,8 +448,9 @@ _ra = _fe.split("function RouteAnalysis(")[1].split("\nfunction ")[0]
 ok("⭐ 6. the Routes table: a column a screen hour, the quicker cell green and bold, the note under the table",
    "{hourCols.map(h => <th key={h} className={head} data-hour-col={h}>{h}</th>)}" in _ra
    and 'data-quick={q ? "1" : undefined}' in _ra and 'color: "var(--ok-text)", fontWeight: 700' in _ra
-   and "= the cycle for a lorry setting off then on a weekday. Green, bold: the quicker option at" in _ra
-   and "Other lorries scaled from the Artic Tipper." in _ra)
+   # REVERSED 26 Nov 2026 (routes rethink C3, Q1): the note under the table left the screen; its words are in the "i" box's guide paragraph
+   and "= the cycle for a lorry setting off then on a weekday" not in _ra and "data-hour-note" not in _ra
+   and "the cycle for a lorry setting off then on a weekday: " in open("frontend/help/index.html", encoding="utf-8").read())
 ok("6. a cell is marked quicker only where another option of the same lorry has a time at that hour",
    "data.rows.filter(x => x.profile === r.profile && x.hours && x.hours[h] != null).length > 1" in _ra)
 ok("⭐ 6. 0d's busy-hours line gains the time difference at 08:00 and 17:00 (the tipper's)",
@@ -469,12 +470,12 @@ ok("6. the header's buttons wrap as whole buttons; the new one keeps its words o
    and 'data-hour-bake style={{ whiteSpace: "nowrap" }}' in _fe and "<RoutingMenu busy={routeBusy}>" in _fe)
 _shown = (re.findall(r"setRouteMsg\(`([^`]*)`\)", _dm) + re.findall(r"confirm\(`([^`]*)`", _dm)
           + re.findall(r"` It takes [^`]*`", _ra)
-          + [_ra.split("data-hour-note>")[1].split("</p>")[0], "Busy-hour times · calls"])
+          + ["Busy-hour times · calls"])   # the hour note left the screen (26 Nov 2026, C3)
 # NARROWED 23 Nov 2026 (claude/working-list): the run's own line while it runs ("Busy-hour times: 240 of 854 worked out")
 # is made on the server now (working.line; its words are checked in test_working.py §11), so one message fewer is a
 # template here: 5 -> 4
 ok("6. the words the screen shows name no supplier and no back end",
-   len(_shown) >= 4 and not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b", " ".join(_shown)),
+   len(_shown) >= 3 and not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b", " ".join(_shown)),
    str(_shown))
 ok("6. the table is registered five times (schema, key, tenanted, package order, audit)",
    "route_hour_times" in db.TENANTED_TABLES and "route_hour_times" in db._TENANT_DDL and "route_hour_times" in db._TENANT_PK

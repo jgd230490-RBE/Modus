@@ -2057,6 +2057,7 @@ const INFO = {
     how: "Balance = the opening balance + what came in − what went out. In: the week actuals delivered there, or the approved plan where nothing was recorded. Out: the figure typed on Look-ahead → Account, or the planned use (Plan → Stockpiles).", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "dash.chart.demand": { title: "Material demand over time", text: "The planned quantity in each month, stacked by material, for the lines in view." },
   "dash.rc.planned": { title: "Planned, not measured", text: "Planned from the approved loads, so far from recorded loads. A trip's figures are those saved on the day of the choice.", guide: "route-choices-record", tech: "t1-route-choices-record" },
+  "ro.figures": { title: "How these are worked out", text: "A trip is out, back and the time at each end. Trips a day are those that fit the shift with the legal break and 9 h driving.", guide: "ug-route-figures" },
   "dash.rc.places": { title: "Community", text: "Community: schools, hospitals and health centres within 250 m. Both legs of a trip.", guide: "route-choices-record" },
   "dash.rc.collisions": { title: "Collisions", text: "Injury collisions the police recorded on each road. A record of the road, never multiplied by loads.", guide: "route-choices-record" },
   "dash.chart.top": { title: "Top routes by tonnage", text: "The ten route lines with the most planned tonnes. Click a bar to narrow the page to that line; click it again to show every line." },
@@ -18036,28 +18037,17 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
               </tbody>
             </table>
             </div>
-            <p className="text-[13px] text-slate-400 mt-2">
-              Cycle = out + back + turnaround (load, unload and gate time ‡). Trips/day = round trips that fit a{" "}
-              {data.planning.shift_hours_per_day} h shift with the legal break and at most 9 h driving (§ = fewer; hover for why;
-              0 = one lorry a trip). A planning figure.{data.planning.shift_note ? " " + data.planning.shift_note : ""}{" "}
-              t/month at {data.planning.working_days_per_month} working days.
-              {data.rows.some(r => r.return_estimated) && " * return leg assumed to mirror the outbound."}
+            {/* 26 Nov 2026 (Routes rethink, C3; John: "Yes, as recommended" to Q1): the four footnote paragraphs (127 words)
+                are one short line, the marks' legend and one line about the rows; the rest is in the "i" box and the guide */}
+            <p className="text-[13px] text-slate-400 mt-2" data-fig-note="1">
+              Cycle = out + back + turnaround. A planning figure.{data.planning.shift_note ? " " + data.planning.shift_note : ""}
+              <InfoTip id="ro.figures" />
             </p>
-            {data.rows.some(r => r.haul_speed_applied) && (
-              // 22 Oct 2026 (UI fix 6, card 6): the note reads var(--haul-text) (5.05:1 on the expanded row)
-              <p className="text-[13px] mt-1" style={{ color: "var(--haul-text)" }}>
-                † includes a haul road timed at its set speed. Hover the cycle for the time without it.
-              </p>
-            )}
-            {ht && (
-              <p className="text-[13px] text-slate-400 mt-1" data-hour-note>
-                {hourCols.join(" · ")} = the cycle for a lorry setting off then on a weekday. Green, bold: the quicker option at
-                that hour.{data.rows.some(r => r.hours_scaled) ? " Other lorries scaled from the Artic Tipper." : ""}
-              </p>
-            )}
-            <p className="text-[13px] text-slate-400 mt-1">
-              Click a row to show that option on the map. “Use … as the main route” makes an alternative the route the plan uses.
+            <p className="text-[13px] text-slate-400 mt-1" data-fig-marks="1">
+              {data.rows.some(r => r.haul_speed_applied) && <span style={{ color: "var(--haul-text)" }}>† haul road at its set speed · </span>}§ fewer trips than the shift allows
+              {data.rows.some(r => r.return_estimated) ? " · * return leg assumed to mirror the outbound" : ""}
             </p>
+            <p className="text-[13px] text-slate-400 mt-1">Click a row to show it on the map.</p>
             </>}
             {busy && busy.shown && (busy.offers || []).map(o => (
               <p key={o.alt} className="text-[13px] mt-2" data-busy-hours={o.alt}>
@@ -20472,8 +20462,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const routeDiversions = (id) => (divPeriods || []).some(p => p.route_id === id) ? (
     <div data-route-diversions={id} className="mt-3">
       <p className="text-xs font-semibold text-slate-700">Diversions</p>
-      <DivRows rows={(divPeriods || []).filter(p => p.route_id === id)} prof={showProfile} canEdit={canEdit}
-        busy={divBusy} onKeep={keepMain} routes={status} />
+      {/* 26 Nov 2026 (C3, Q2 option A): the table scrolls sideways in a named box the keyboard reaches, as All figures does */}
+      <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="Diversions" data-div-scroll="1">
+        <DivRows rows={(divPeriods || []).filter(p => p.route_id === id)} prof={showProfile} canEdit={canEdit}
+          busy={divBusy} onKeep={keepMain} routes={status} />
+      </div>
     </div>) : null;
   // Q3: full screen for this route (the list, the map, the chosen route side by side)
   const besideMap = (id) => { if(selected !== id) selectRoute(id); roBeside.current = true; enterFull(); };
