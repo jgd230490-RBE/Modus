@@ -43,7 +43,7 @@ import db
 MISSING = {}
 try:
     import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 except Exception as e:                                   # pragma: no cover
     openpyxl = None
@@ -341,6 +341,83 @@ def xlsx_cols():
 
 XLSX_COLS = XLSX_COLS_EUR   # the EUR-labelled reference set (tests read it); sheets use xlsx_cols()
 
+SITE_SUB_HEX = "F3F4F6"        # 25 Nov 2026 (task C2): a site's sub-total row in the XLSX, a neutral grey
+
+
+BY_SITE_COLS = [("Site / line", "label"), ("Route", "route_id"), ("Origin", "origin"), ("Destination", "dest"),
+                ("IPT", "ipt"), ("WS", "ws"), ("Material", "material"), ("Vehicle", "vehicle"), ("Qty", "qty"),
+                ("Unit", "unit"), ("Tonnes", "tonnes"), ("Trips", "trips"), ("Vehicles on the busiest day", "veh"),
+                ("t·km", "tonne_km"), ("€", "eur"), ("€ + BAF", "eur_adj")]
+SUM_KEYS = (("tonnes", 3), ("trips", 0), ("tonne_km", 3), ("eur", 2), ("eur_adj", 2))
+
+
+def by_site_cols():
+    """BY_SITE_COLS with the tenant's currency, team label and distance unit, as xlsx_cols()."""
+    cur, team, du = _cur(), _tenant().get("team_label") or "Team", _du()
+    def hd(h):
+        if h == "IPT":
+            return team
+        h = h.replace("€", cur)
+        return "t·mi" if (du == "mi" and h == "t·km") else h
+    return [(hd(h), k) for h, k in BY_SITE_COLS]
+
+
+def _sums(rows):
+    """Tonnes, trips, t·km and money added over day rows, None where no row has the figure; vehicles = the busiest
+    day's (routed rows only), never a sum of days."""
+    out = {}
+    for k, nd in SUM_KEYS:
+        vals = [r.get(k) for r in rows if r.get(k) is not None]
+        if not vals:
+            out[k] = None
+        elif nd == 0:
+            out[k] = int(sum(int(v) for v in vals))
+        else:
+            out[k] = round(sum(float(v) for v in vals), nd)
+    by_day = {}
+    for r in rows:
+        if r.get("baked"):
+            by_day[r["date"]] = by_day.get(r["date"], 0) + int(r.get("veh") or 0)
+    out["veh"] = max(by_day.values()) if by_day else None
+    return out
+
+
+def xlsx_site_rows(rows):
+    """
+    25 Nov 2026 (the Look-ahead rethink, task C2, Q6; the mother session's word on the XLSX, 26 Nov): the "By site"
+    sheet. Under each SITE in the order of Data → Locations: a heading row ("Melton Compound · Compound · 3 lines"), ONE
+    row a line with its WEEK figures added from its day rows ("From <origin>", an out line "Out, to <destination>",
+    last), and a sub-total row ("N t out" in its first cell when the site sends some out); at the foot a Total row. The
+    Total's tonnes, trips, t·km and money are the "Commit week" sheet's column sums to the last digit (added from the
+    same day rows); Vehicles is the busiest day's, never a sum of days. An older page with no sites: None.
+    """
+    groups = site_groups(rows, line_of=lambda r: r["line"])
+    if groups is None:
+        return None
+    team = _team_namer()
+    out = []
+    for site, srows in groups:
+        lines = []
+        for r in srows:
+            if not any(x is r["line"] for x in lines):
+                lines.append(r["line"])
+        out.append({"_kind": "site", "label": f"{site_name(site)} · {site_heading_words(site, lines, team)}"})
+        for ln in lines:
+            lr = [r for r in srows if r["line"] is ln]
+            f = lr[0]
+            is_out = site_is_out(ln)
+            qty = [r.get("qty") for r in lr if r.get("qty") is not None]
+            out.append({"_kind": "line",
+                        "label": ("Out, to " + str(f.get("dest") or "")) if is_out else ("From " + str(f.get("origin") or "")),
+                        **{k: f.get(k) for k in ("route_id", "origin", "dest", "ipt", "ws", "material", "vehicle", "unit")},
+                        "qty": round(sum(float(q) for q in qty), 3) if qty else None, **_sums(lr)})
+        out_t = sum(float(r.get("tonnes") or 0) for r in srows if site_is_out(r["line"]))
+        n = len(lines)
+        out.append({"_kind": "sub", "label": f"Sub-total · {site_name(site)} · {n} line{'' if n == 1 else 's'}"
+                                             + (f" · {_n(out_t)} t out" if out_t > 0 else ""), **_sums(srows)})
+    out.append({"_kind": "total", "label": f"Total · {len(groups)} site{'' if len(groups) == 1 else 's'}", **_sums(rows)})
+    return out
+
 
 def build_xlsx(page):
     if openpyxl is None:
@@ -355,11 +432,22 @@ def build_xlsx(page):
             c.font, c.fill = head, fill
             c.alignment = Alignment(horizontal="center")
         for i, r in enumerate(rows, 2):
+            # 25 Nov 2026 (task C2): on the "By site" sheet a site's heading (bold, its words in the first cell, an ink rule
+            # over the row), its sub-total (bold on a grey fill) and the foot's Total (bold, ruled) are rows of their own
+            kind = r.get("_kind")
             for j, (_, key) in enumerate(cols, 1):
                 v = r.get(key)
                 if isinstance(v, bool):
                     v = "yes" if v else ""
-                ws.cell(row=i, column=j, value=v)
+                c = ws.cell(row=i, column=j, value=v)
+                if kind == "site":
+                    c.border = Border(top=Side(style="medium", color=NAVY))
+                    if j == 1:
+                        c.font = Font(bold=True, size=12)
+                elif kind == "sub":
+                    c.font, c.fill = Font(bold=True), PatternFill("solid", fgColor=SITE_SUB_HEX)
+                elif kind == "total":
+                    c.font, c.border = Font(bold=True), Border(top=Side(style="medium", color=NAVY))
         for j, (title, _) in enumerate(cols, 1):
             ws.column_dimensions[get_column_letter(j)].width = max(10, min(28, len(title) + 6))
         ws.freeze_panes = "A2"
@@ -367,7 +455,16 @@ def build_xlsx(page):
     ws = wb.active
     ws.title = "Commit week"
     rows = _line_rows(page)
-    sheet(ws, xlsx_cols(), rows)
+    # 25 Nov 2026 (the Look-ahead rethink, task C2): the supplier's sheet stays one row a weekday a line, nothing added
+    # among them (a column's sum and an import still read lines only), the lines in site order; the sites' headings and
+    # sub-totals are the next sheet, "By site"
+    groups = site_groups(rows, line_of=lambda r: r["line"])
+    sheet(ws, xlsx_cols(), [r for _, rs in groups for r in rs] if groups else rows)
+    by_site = xlsx_site_rows(rows)
+    if by_site is not None:
+        ws_s = wb.create_sheet("By site", 1)
+        sheet(ws_s, by_site_cols(), by_site)
+        ws_s.column_dimensions["A"].width = 46
     # no Stock sheet (10 Sep): the sheet is for the supplier; stock is the planner's
     # 10 Sep evening: the fuel index and settings every € + BAF above was computed from
     ws_f = wb.create_sheet("Fuel")
@@ -729,6 +826,62 @@ class _MapFlowable(Flowable):
         self.kind = draw_route_map(self.canv, self.page, 0, 0, self.width, self.height, routes=routes)
 
 
+# ------------------------------------------------------------------ the week's papers by SITE (25 Nov 2026)
+# The Look-ahead rethink, task C2 (John's "Yes, as recommended" to Q6): the week's PDF, the week's XLSX and the Day sheet
+# list the lines under their SITE, as the Look-ahead does: in the order of Data → Locations, a ruled heading a site, its
+# lines under it ("From <origin>", an out line "Out, to <destination>" and last), a sub-total a site. The site is task A's
+# ONE rule (`la_sites.site_of`, already on every line as `line["site"]`); the order is `la_sites.places()`'s. Nothing here
+# works a site out a second way. A page whose lines carry no `site` (an older read) prints as it did, one list.
+SITE_OTHER = "Other lines"      # the name of the group of lines whose two ends are no longer places (task A's word)
+SITE_SUB_RGB = (0.955, 0.96, 0.965)     # a site's sub-total row: a neutral grey a step under the BAND of the grand total
+
+
+def _site_order():
+    """{location id: its place in Data → Locations} (la_sites.places(): ORDER BY id), {} when it cannot be read."""
+    try:
+        import la_sites
+        return {pid: p.get("order", 0) for pid, p in la_sites.places().items()}
+    except Exception:
+        return {}
+
+
+def site_groups(items, line_of=None):
+    """
+    `items` grouped by their forecast line's `site`, in the order of Data → Locations: [(site or None, [items])], each
+    site's lines INTO it first in the order given and its out lines last. None when no line carries a `site` key (an
+    older page: the caller prints its one list as before). A line with no site goes in a last group, site None.
+    """
+    line_of = line_of or (lambda x: x)
+    if not any("site" in (line_of(x) or {}) for x in items or []):
+        return None
+    order = _site_order()
+    groups = {}
+    for x in items:
+        s = (line_of(x) or {}).get("site")
+        g = groups.setdefault(s["id"] if s else None, {"site": s, "in": [], "out": []})
+        (g["out"] if s and s.get("dir") == "out" else g["in"]).append(x)
+    ranked = sorted(groups.values(), key=lambda g: (g["site"] is None,
+                                                    order.get((g["site"] or {}).get("id"), 10 ** 6),
+                                                    (g["site"] or {}).get("name") or ""))
+    return [(g["site"], g["in"] + g["out"]) for g in ranked]
+
+
+def site_is_out(line):
+    return bool(((line or {}).get("site") or {}).get("dir") == "out")
+
+
+def site_heading_words(site, lines, team_of):
+    """The words under a site's name: its type, "n lines" and its team when every line is one team's (as the screen)."""
+    teams = {((l or {}).get("context") or {}).get("ipt") or (l or {}).get("ipt") or "" for l in lines}
+    team = team_of(next(iter(teams))) if len(teams) == 1 and next(iter(teams)) else None
+    n = len(lines)
+    return " · ".join(x for x in ((site or {}).get("type") or "", f"{n} line{'' if n == 1 else 's'}", team or "") if x)
+
+
+def site_name(site):
+    return (site or {}).get("name") or SITE_OTHER
+
+
 def _coord(lat, lon):
     return f"{lat:.5f}, {lon:.5f}" if lat is not None and lon is not None else "no coordinates"
 
@@ -736,7 +889,8 @@ def _coord(lat, lon):
 def _pdf_rows(page):
     """One entry per line: the context, the five weekday cells (Mon..Fri in order), and
     the week's totals. Sorted by origin, then route, then WS — the supplier reads by
-    where the material leaves from."""
+    where the material leaves from. 25 Nov 2026 (task C2): build_pdf then puts them under their site (site_groups),
+    keeping this order within each site."""
     import lookahead
     lines = page.get("commit", {}).get("lines", [])
     ends = {g["route_id"]: g for g in lookahead.week_geometry(
@@ -823,13 +977,21 @@ def build_pdf(page):
     data = [head]
     tot = {"t": 0.0, "trips": 0, "tkm": 0.0, "eur": 0.0, "eur_any": False}
     _nm_rows = _team_namer()
-    for r in rows:
+    # 25 Nov 2026 (task C2, Q6): the lines under their site (site_groups), a ruled heading and a sub-total a site; None on
+    # an older page, which prints its one list by origin as before
+    groups = site_groups(rows, line_of=lambda r: r["line"])
+    site_rows, sub_rows = [], []        # the table's row numbers of the headings and the sub-totals, for the style
+
+    def line_row(r):
         c, g, wk, l = r["ctx"], r["geo"], r["wk"], r["line"]
         o, d = g.get("origin") or {}, g.get("dest") or {}
         by_date = {x["day_date"]: x for x in r["days"]}
+        # under a site a line says where it comes from, an out line where it goes (the screen's words)
+        fw = ("<font color='#64748B'>From</font> " if groups is not None and not site_is_out(l) else "")
+        tw = ("<font color='#64748B'>Out, to</font> " if groups is not None and site_is_out(l) else "")
         row = [P(f"<b>{E(l.get('route_id'))}</b>", st),
-               P(f"<b>{E(r['origin'])}</b><br/><font size=6.5 color='#64748B'>{_coord(o.get('lat'), o.get('lon'))}</font>", st),
-               P(f"<b>{E(r['dest'])}</b><br/><font size=6.5 color='#64748B'>{_coord(d.get('lat'), d.get('lon'))}</font>", st),
+               P(f"{fw}<b>{E(r['origin'])}</b><br/><font size=6.5 color='#64748B'>{_coord(o.get('lat'), o.get('lon'))}</font>", st),
+               P(f"{tw}<b>{E(r['dest'])}</b><br/><font size=6.5 color='#64748B'>{_coord(d.get('lat'), d.get('lon'))}</font>", st),
                P(f"{E(_nm_rows(c.get('ipt')) or '—')}<br/>{E(c.get('section_id') or '')}", st),
                P(E(c.get("material_type") or "—"), st),
                P(f"{E(_vehicle_name(c) or '—')}"
@@ -856,7 +1018,53 @@ def build_pdf(page):
                 if wk.get("eur_adj") is not None:
                     tail += f"<br/><font size=6.5 color='#64748B'>+BAF {_n(wk['eur_adj'])}</font>"
                 row.append(P(_n(wk.get("eur")) + tail, st_c))
-        data.append(row)
+        return row
+
+    def site_sub(site, srows):
+        """A site's sub-total row: its tonnes, loads and lorries a day and for the week (lorries: its busiest day, as the
+        screen's), its tonne-miles and money, and the part going out. Added from the very rows printed above it."""
+        n = len(srows)
+        cells = [P(f"<b>{E(site_name(site))}</b> · {n} line{'' if n == 1 else 's'}", st), "", "", "", "", ""]
+        day_lor = []
+        for iso in dates:
+            t = tr = v = 0.0
+            for r in srows:
+                x = next((y for y in r["days"] if y["day_date"] == iso), None)
+                f = (x or {}).get("derived") or {}
+                t += float(f.get("tonnes") or 0)
+                tr += int(f.get("trips") or 0)
+                v += int(f.get("vehicles") or 0) if r["ctx"].get("baked") else 0
+            day_lor.append(v)
+            cells.append(P(f"<b>{_n(t)} t</b><br/><font size=6.5 color='#64748B'>{_n(tr)} tr · {_n(v)} veh</font>", st_c))
+        wt = sum(float(r["wk"].get("tonnes") or 0) for r in srows)
+        wtr = sum(int(r["wk"].get("trips") or 0) for r in srows)
+        wtk = sum(float(_dist(r["wk"].get("tonne_km")) or 0) for r in srows)
+        out_t = sum(float(r["wk"].get("tonnes") or 0) for r in srows if site_is_out(r["line"]))
+        cells.append(P(f"<b>{_n(wt)} t</b><br/><font size=6.5 color='#64748B'>{_n(wtr)} tr · {_n(wtk)} {_tkm()}<br/>"
+                       f"{_n(max(day_lor or [0]))} veh on the busiest day</font>"
+                       + (f"<br/><font size=6.5 color='#64748B'>{_n(out_t)} t out</font>" if out_t > 0 else ""), st_c))
+        cells.append("")
+        if priced:
+            eur = [float(r["wk"]["eur"]) for r in srows if r["wk"].get("eur") is not None]
+            adj = [float(r["wk"]["eur_adj"]) for r in srows if r["wk"].get("eur_adj") is not None]
+            cells.append(P((f"<b>{_n(sum(eur))}</b>" + (f"<br/><font size=6.5 color='#64748B'>+BAF {_n(sum(adj))}</font>"
+                                                       if adj else "")) if eur else "—", st_c))
+        return cells
+
+    if groups is None:
+        data += [line_row(r) for r in rows]
+    else:
+        for site, srows in groups:
+            site_rows.append(len(data))
+            data.append([P(f"<b><font size=9>{E(site_name(site))}</font></b>   "
+                           f"<font color='#64748B'>{E(site_heading_words(site, [r['line'] for r in srows], _nm_rows))}</font>", st)]
+                        + [""] * (len(head) - 1))
+            data += [line_row(r) for r in srows]
+            sub_rows.append(len(data))
+            data.append(site_sub(site, srows))
+    # the grand total, added over the lines in the same order as before the sites: unchanged to the last digit
+    for r in rows:
+        wk = r["wk"]
         tot["t"] += float(wk.get("tonnes") or 0)
         tot["trips"] += int(wk.get("trips") or 0)
         tot["tkm"] += float(_dist(wk.get("tonne_km")) or 0)
@@ -897,6 +1105,14 @@ def build_pdf(page):
         if today in dates:
             ci = n_fixed + dates.index(today)
             style.append(("BACKGROUND", (ci, 1), (ci, -2), colors.Color(0.94, 0.97, 1.0)))
+        # 25 Nov 2026 (task C2): a site's heading is one ruled row across the table (the ink rule, no fill), kept with its
+        # first line; its sub-total a quiet grey row, its name over the six fixed columns
+        for i in site_rows:
+            style += [("SPAN", (0, i), (-1, i)), ("BACKGROUND", (0, i), (-1, i), colors.white),
+                      ("LINEABOVE", (0, i), (-1, i), 0.8, colors.Color(*NAVY_RGB)),
+                      ("TOPPADDING", (0, i), (-1, i), 5), ("NOSPLIT", (0, i), (-1, i + 1))]
+        for i in sub_rows:
+            style += [("SPAN", (0, i), (n_fixed - 1, i)), ("BACKGROUND", (0, i), (-1, i), colors.Color(*SITE_SUB_RGB))]
         t.setStyle(TableStyle(style))
         story.append(t)
     else:
@@ -1026,6 +1242,8 @@ def day_sheet_rows(page, day):
             # 5 Nov 2026 (task 0d-2): the busy-hours road the line's lorries take, setting off in those hours
             "busy": day_sheet_busy(c),
         })
+        if "site" in l:          # 25 Nov 2026 (task C2): the line's site (task A's rule), for the sheet's grouping
+            out[-1].update(site=l.get("site"), ipt=c.get("ipt"))
     out.sort(key=lambda r: (-(r["tonnes"] or 0), str(r["route_id"])))
     return out
 
@@ -1187,10 +1405,51 @@ def build_day_sheet_pdf(page, day):
         head += [P("PLAN", st_hr)] if plan_col else []
         head += [P("TONNES", st_hr), P("LOADS", st_hr), P("LORRIES", st_hr), P("FLAG", st_h)]
         data = [head]
-        for r in rows:
+        # 25 Nov 2026 (task C2, Q6): the day's lines under their site, heaviest first within it, the out lines last; a
+        # ruled heading and a sub-total a site, so a gatehouse reads its own block. An older page: one list as before.
+        groups = site_groups(rows)
+        name_of = _team_namer()
+        site_rows, sub_rows = [], []
+        ncol = len(head)
+
+        def ends(r):
+            if groups is None:
+                return f"<b>{E(r['origin'])}</b> to <b>{E(r['dest'])}</b>"
+            if site_is_out(r):
+                return f"<font color='#64748B'>Out, to</font> <b>{E(r['dest'])}</b>"
+            return f"<font color='#64748B'>From</font> <b>{E(r['origin'])}</b>"
+
+        def site_sub(site, srows):
+            n = len(srows)
+            routed = [r for r in srows if r["routed"]]
+            out_t = sum(r["tonnes"] or 0 for r in srows if site_is_out(r))
+            return ([P(f"<b>{E(site_name(site))}</b> · {n} line{'' if n == 1 else 's'}"
+                       + (f" · {_n(out_t)} t out" if out_t > 0 else "")), "", ""]
+                    + ([""] if plan_col else [])
+                    + [P(f"<b>{_n(sum(r['tonnes'] or 0 for r in srows))}</b>", st_r),
+                       P(f"<b>{_n(sum(r['loads'] for r in srows))}</b>", st_r),
+                       P(f"<b>{_n(sum(r['lorries'] or 0 for r in routed)) if routed else '—'}</b>", st_r), ""])
+
+        ordered = []
+        for site, srows in (groups or [(None, rows)]):
+            if groups is not None:
+                site_rows.append(len(data) + len(ordered))
+                ordered.append(("site", site, srows))
+            ordered += [("line", None, r) for r in srows]
+            if groups is not None:
+                sub_rows.append(len(data) + len(ordered))
+                ordered.append(("sub", site, srows))
+        for kind, site, r in ordered:
+            if kind == "site":
+                data.append([P(f"<b><font size=10>{E(site_name(site))}</font></b>   <font color='#64748B'>"
+                               f"{E(site_heading_words(site, r, name_of))}</font>")] + [""] * (ncol - 1))
+                continue
+            if kind == "sub":
+                data.append(site_sub(site, r))
+                continue
             plan = f"{_n(r['qty'], 1 if r['unit'] != 't' else 0)} {E(r['unit'])}".strip()
             sub = " · ".join(x for x in (r["route_id"], r["section"]) if x)
-            row = [P(f"<b>{E(r['origin'])}</b> to <b>{E(r['dest'])}</b>"
+            row = [P(ends(r)
                      + (f"<br/><font size=6.5 color='#1D4ED8'>{E(r['busy'])}</font>" if r.get("busy") else "")),
                    P(E(r["team"]) + (f"<br/><font size=6.5 color='#64748B'>{E(sub)}</font>" if sub else "")),
                    P(E(r["material"]) + f"<br/><font size=6.5 color='#64748B'>{E(r['vehicle'])}</font>")]
@@ -1217,7 +1476,12 @@ def build_day_sheet_pdf(page, day):
             ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
             ("BACKGROUND", (0, -1), (-1, -1), colors.Color(*BAND)),
             ("LINEABOVE", (0, -1), (-1, -1), 0.8, colors.Color(*NAVY_RGB)),
-        ]))
+        ]
+            # 25 Nov 2026 (task C2): a site's heading one ruled row across the sheet, kept with its first line; its
+            # sub-total a quiet grey row
+            + [x for i in site_rows for x in (("SPAN", (0, i), (-1, i)), ("LINEABOVE", (0, i), (-1, i), 0.8, colors.Color(*NAVY_RGB)),
+                                               ("TOPPADDING", (0, i), (-1, i), 5), ("NOSPLIT", (0, i), (-1, i + 1)))]
+            + [x for i in sub_rows for x in (("SPAN", (0, i), (2, i)), ("BACKGROUND", (0, i), (-1, i), colors.Color(*SITE_SUB_RGB)))]))
         story.append(t)
     else:
         story.append(P("Nothing is planned on this day: no approved line has a quantity or a load on it.", st_grey))

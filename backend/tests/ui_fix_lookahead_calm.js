@@ -210,11 +210,14 @@ ok("⭐ 24: the column is \"Difference\" (its info box too); one verb: Delivered
    && acct.includes('{tab === "sofar" ? "Add to next week" : "Add to this week"}</button>') && acct.includes('<span className="text-[13px] text-slate-500">Waiting</span>')
    && !/>held<|applied · |spread on this week|>waiting</.test(acct));
 const hz = la.slice(la.indexOf("const hl = Object.values(g)"), la.indexOf('data-horizon-stock="1"'));
-ok("⭐ 24: Account and Horizon name a line by its route's two ends, the code moving to the second line",
+// REVERSED 25 Nov 2026 (the Look-ahead rethink, task C2, Q6): under a site a line is named by where it comes from
+// ("From <origin>", an out line "Out, to <destination>": LaFromWords); the route's two ends stay only where a row has no
+// site grouping (mode null); the code stays on the second line
+ok("⭐ 24: Account and Horizon name a line by where it comes from under its site (the two ends only without one), the code on the second line",
    la.includes("const ends = useMemo(() => laEnds(meta), [meta]);")
-   && acct.includes('<div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{ends[r.route_id] || r.route_id}</div>')
+   && acct.includes('<div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{mode ? <LaFromWords row={r} endNames={endNames} /> : (ends[r.route_id] || r.route_id)}</div>')
    && acct.includes("{ends[r.route_id] && <span>{r.route_id}</span>}<IptPill ipt={r.ipt} />")
-   && hz.includes('<div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={line.route_id}>{ends[line.route_id] || line.route_id}</div>')
+   && hz.includes('<div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={line.route_id}>{mode ? <LaFromWords row={line} endNames={endNames} /> : (ends[line.route_id] || line.route_id)}</div>')
    && hz.includes("{ends[line.route_id] && <span>{line.route_id}</span>}<IptPill ipt={line.ipt} />"));
 const endsSrc = grab("function laEnds(meta){");
 try {
