@@ -237,6 +237,23 @@ ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account
    (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
      return opens.length >= 11 && opens.every(t => /className="fig-strip /.test(t)); })()
    && code.includes('<div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">'));
+// 26 Nov 2026 (own look B1, after): full screen (Routes, a site's layout) is on the page white with hairlines between its
+// columns, not cards on grey (design language, Sections); each open column is 25 px wider so what is inside keeps its width
+ok("4 full screen: the backdrop is the page white with no gap or frame (the grey and the 8 px gaps are gone)",
+   html.includes(".sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:0;gap:0 !important;background:var(--bg);align-content:stretch;}")
+   && !/\.sl-full\{[^}]*surface-3/.test(html));
+ok("4 full screen: the columns are divided by a hairline (--line) on the side facing the map, and lose their ink top rule",
+   html.includes(".sl-full>.card,.sl-full>.space-y-4,.sl-full>.space-y-3{border-top:0 !important;padding-left:12px !important;padding-right:12px !important;}")
+   && html.includes(".sl-full>[data-route-full-list],.sl-full>[data-site-layout-palette]{border-right:1px solid var(--line) !important;}")
+   && html.includes(".sl-full>[data-route-full-details],.sl-full>[data-site-layout-side],.sl-full>.space-y-4{border-left:1px solid var(--line) !important;}")
+   && html.includes(".sl-full>[data-site-layout-draw]{border-bottom:1px solid var(--line) !important;}")
+   && html.includes(".sl-full>.dm-map,.sl-full>.card.overflow-hidden{padding:0 !important;}"));
+ok("4 full screen: an open column is 25 px wider (Routes 325 | map | 405, drawing 257 | map | 325, a site 405); a folded strip stays 44 px with 7 px each side",
+   code.includes("gridTemplateColumns: `${fold.l ? 44 : 325}px minmax(0, 1fr) ${fold.r ? 44 : 405}px`")
+   && code.includes("gridTemplateColumns: `${fold.l ? 44 : 257}px minmax(0, 1fr) ${fold.r ? 44 : 325}px`")
+   && code.includes('{ gridTemplateColumns: "minmax(0, 1fr) 405px", gridTemplateRows: "minmax(0, 1fr)" }')
+   && !/fold\.r \? 44 : 380\}px|fold\.l \? 44 : 232\}px/.test(code)
+   && html.includes('.sl-full>:has(.sl-fold[aria-expanded="false"]){padding-left:7px !important;padding-right:7px !important;}'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
