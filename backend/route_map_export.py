@@ -188,9 +188,13 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
 # drawn as the public map draws it — the laden leg out green, the empty return amber, each left of its own travel with a
 # white edge — plus the alternatives in use: the busy-hours roads (thin plan blue) and the dated ways round a closure
 # (the legs with the map's soft amber edge), each named in the key with when it applies. No movement figures.
-LEG_LADEN = "#059669"            # the public map's "Laden (out)"
-LEG_EMPTY = "#f59e0b"            # …and "Empty (return)"
-BUSY_ROAD = "#3B82F6"            # the map's busy-hours road (BUSY_ROAD_COLOR = the plan blue)
+# 26 Nov 2026 (the printed maps' route lines, notes/map-lines-prints-mockup-1125 card 3b; John, Q10: "Go with blue",
+# against the recommendation of ink and grey): every exported map draws the laden leg in a dark band blue and the empty
+# return in a light band blue (two of VOLUME_RAMP's five), while the public map and Data → Routes draw ink and grey. The
+# amber edge round a closure is the ONLY amber left on paper; the busy-hours road goes to ink (Q6), out of the blues.
+LEG_LADEN = "#0051C4"            # dark blue out (was the public map's "Laden (out)" green #059669)
+LEG_EMPTY = "#72A7FF"            # light blue back (was its "Empty (return)" amber #f59e0b)
+BUSY_ROAD = "#3A3C41"            # the busy-hours road in ink (was the plan blue #3B82F6)
 DIVERSION_EDGE = "#F59E0B"       # the map's soft amber edge round a diverted stretch (DIV_EDGE.colour)
 NO_MONTH_WORDS = "approved routes, no month"
 ALTERNATIVES_MAX = 12            # the key lists this many alternatives, then "and N more"

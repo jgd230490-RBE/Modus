@@ -123,10 +123,13 @@ ok("...each route listed is a button that selects it and opens the Routes page; 
 ok("⭐ 17: a deployment with no forecast line at all (the unfiltered read is empty) opens on its first steps: firstRun, not a filter message",
    code.includes("const firstRun = !wall && !!data && rows.length === 0;")
    && code.includes("{firstRun && <DashFirstSteps locCount={locList ? locList.length : null} routeCount={(meta.routes || []).length} onOpen={onOpen} />}")
-   && code.includes("{!firstRun && <>\n          <div className=\"dash-cards\" data-guide=\"dash-figures\">"));
+   // NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the strip opens with its size container, a comment above it
+   && /\{!firstRun && <>\n(\s*\{\/\*[\s\S]*?\*\/\}\n)?\s*<div className="dash-cards-box"><div className="dash-cards" data-guide="dash-figures">/.test(code));
 ok("...on its first steps the header drops the date kicker, the filters, the coverage line and the 'plan lines in view' count",
-   code.includes("kicker={firstRun ? undefined : `${rangeLabel} ·") && code.includes("actions={firstRun ? null : <div className=\"flex flex-wrap gap-2 items-center\">")
-   && code.includes("{!firstRun && <div className=\"text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1\">") && code.includes("count={firstRun ? null :"));
+   code.includes("kicker={firstRun ? undefined : `${rangeLabel} ·") && /* NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q14): the row carries dash-filt (its own gaps) */ code.includes("actions={firstRun ? null : <div className=\"flex flex-wrap items-center dash-filt\">")
+   && code.includes("{!firstRun && <div className=\"text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1\">")
+   // NARROWED 25 Nov 2026 (the Dashboard rethink, B; Q14): nor while no filter chip shows
+   && code.includes("count={firstRun || !applied.length ? null :"));
 if (!fnSrc("DashFirstSteps")) ok("17: DashFirstSteps exists (the Dashboard's first steps)", false);
 else {
   const mk = compile(["DashFirstSteps"], "const TEAM = () => 'Team'; const isAdminLogin = (a) => !!(a && a.via === 'login' && a.role === 'admin');");
@@ -149,7 +152,9 @@ else {
   ok("🔴 17: no currency sign, no id and no back-end word on the first steps", !/[€£$]/.test(admin0) && !/\bL\d{3}\b|\bR\d{3}\b/.test(admin0) && !/(endpoint|server|API|token|geometry)/i.test(admin0));
 }
 ok("⭐ 17: with lines but a filter that shows none, the Dashboard draws NO empty chart and says one thing with a working control: 'Clear the filters'; with lines but none approved it opens Forecasts",
-   code.includes("{!D.empty && <div className=\"dash-charts\" data-dash-charts=\"1\">") && code.includes("const pendingOnly = !firstRun && rows.length > 0 && !rows.some(r => r.status === \"Approved\");")
+   // NARROWED 25 Nov 2026 (the Dashboard rethink, B): two chart rows, each in its size container, both drawn only with lines in view
+   code.includes("{!D.empty && <div className=\"dash-charts-box\"><div className=\"dash-charts\" data-dash-charts=\"1\">")
+   && code.includes("{!D.empty && <div className=\"dash-charts-box\"><div className=\"dash-charts2\" data-dash-charts=\"2\">") && code.includes("const pendingOnly = !firstRun && rows.length > 0 && !rows.some(r => r.status === \"Approved\");")
    && code.includes('title="No approved lines yet" body="The plan is drawn from approved forecast lines."') && code.includes('data-dash-empty-go="forecasts" onClick={() => onOpen && onOpen("forecasts")}>Open Forecasts')
    && code.includes('title="No forecast lines match these filters" body="Clear the filters to see the plan."') && code.includes('data-dash-empty-go="clear" onClick={() => { clearAll(); setFromM(1); setToM(months.count); }}>Clear the filters')
    && !code.includes("Widen the month range or clear a filter"));

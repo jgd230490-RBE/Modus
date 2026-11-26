@@ -1876,7 +1876,7 @@ def _plan_leg_colour(kind):
 
 def _draw_plan_legs(c, legs, P):
     """The no-month plan's legs, bottom to top: the soft amber edge under each way round a closure, every white edge,
-    the laden (green) and empty (amber) legs and the diversions' legs, each left of its own travel, then the busy-hours
+    the laden (dark blue) and empty (light blue) legs and the diversions' legs, each left of its own travel, then the busy-hours
     roads (thin plan blue with a white edge) on top."""
     import route_map_export as rme
 
@@ -3304,8 +3304,8 @@ def route_map_png(pdf_bytes, dpi=ROUTE_MAP_PNG_DPI):
 # mile beside "Arriving" / "Leaving" / "Lorry limits"; then the typed words (why this route,
 # the permitted diversions, the site rules at B and A) in two columns; the footer. The body text steps down a size
 # until the page fits, so the longest typed words (network.SHEET_TEXT_MAX each) still make ONE page.
-RS_LOADED = "#059669"            # 23 Oct 2026 (the route line redesign): the public map's loaded green
-RS_RETURN = "#f59e0b"            # …and its empty amber, solid (it was slate, dashed)
+RS_LOADED = "#0051C4"            # 26 Nov 2026 (Q10, John: "Go with blue"): dark blue out (green #059669 since 23 Oct)
+RS_RETURN = "#72A7FF"            # …and light blue back, solid (amber #f59e0b since 23 Oct; slate, dashed, before)
 RS_CASING = "#ffffff"            # the white edge under each leg
 RS_W, RS_CASING_EXTRA = 2.8, 1.6  # pt: the leg and how much wider its edge is
 RS_HAUL_W, RS_HAUL_GAP = 1.7, 4.4 # pt: a haul-road stretch is dots (zero-length dashes, round caps), thinner, 4.4 pt apart
@@ -3615,7 +3615,7 @@ def route_sheet_lines(S):
                 else "No-delivery windows: none typed for the scheme"]
     leaving = [f"Gate out: {x_['name'] or 'the site (no gate typed)'}"
                + (f" (shut {x_['shut']})" if x_.get("shut") and x_.get("at") != e.get("at") else ""),
-               "Then follow the amber route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
+               "Then follow the light blue route back to A" + (f": {S['return_words']}." if S.get("return_words") else ".")]
     if li.get("name"):
         # 17 Oct 2026 (review): A's gate in, with its hours or the default (said so), closed days and shut times
         hw = ("open " + li["hours"]) if li.get("hours") else (
@@ -3943,6 +3943,12 @@ CE_INK = "#27272A"               # the collision symbol: one ink, size by severi
 # is drawn as a square in its own ink — an identifying colour, not a status colour (no red / amber / green)
 CE_LORRY = "#6D28D9"
 CE_ALT = "#71717A"               # an alternative route: grey under the route (solid since 23 Oct 2026, as on the map)
+# 26 Nov 2026 (notes/map-lines-prints-mockup-1125, Q7 and Q8): the collision map draws the route itself in two light
+# greys under the ink marks (its OWN pair, not RS_*: the marks are what the page is about), and the two charts keep the
+# route's green bars and line through their own constant, so a change to the route sheet's legs moves neither.
+CE_ROUTE_OUT = "#A9ABB0"         # the route out on the collision map (the public map's quiet grey)
+CE_ROUTE_BACK = "#C6C8CC"        # …and back, lighter
+CE_ROUTE_CHART = "#059669"       # the route's own series on the time-of-day and cycle-by-hour charts
 CE_BUSY = CE_INK                  # 28 Oct 2026 (0d): the busy hours' mark under the hour axis (no hue claims a meaning)
 CE_RADIUS = {1: 4.4, 2: 3.2, 3: 2.2}
 CE_MAP_H_MM = 92.0
@@ -4290,7 +4296,7 @@ def _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h):
         for h_, n_ in enumerate(col["weekday"]):
             if n_:
                 bh_ = n_ / top * (ch - 9)
-                c.setFillColorRGB(*(_hex_rgb(RS_LOADED) if not col["alt"] else _hex_rgb(CE_ALT)))
+                c.setFillColorRGB(*(_hex_rgb(CE_ROUTE_CHART) if not col["alt"] else _hex_rgb(CE_ALT)))
                 c.rect(x0 + h_ * bw + 0.6, base, bw - 1.2, bh_, stroke=0, fill=1)
                 c.setFillColorRGB(*GREY); c.setFont(R, 5.2); c.drawCentredString(x0 + (h_ + 0.5) * bw, base + bh_ + 1.4, str(n_))
         for a_, b_ in nod:                                 # the scheme's no-delivery bands, hatched over the bars
@@ -4366,7 +4372,7 @@ def _ce_cycle_by_hour(c, S, m, y, cw, R, B, para, new_page, footer_h):
         v += step
     for hh in hrs:
         c.drawCentredString(X(hh), base - 9, hh)
-    cols = [_hex_rgb(RS_LOADED), _hex_rgb(CE_ALT), _hex_rgb(CE_HOUR_ALT2)]
+    cols = [_hex_rgb(CE_ROUTE_CHART), _hex_rgb(CE_ALT), _hex_rgb(CE_HOUR_ALT2)]
     dashes = [[], [3, 2], [1, 1.6]]
     ends = []
     for i, s_ in enumerate(series):
@@ -4638,8 +4644,8 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
             _rs_line(c, P, cl_line, _cm.KIND_BY_KEY["cycle"]["colour"], 1.1)
         for _lab, al in S.get("alt_lines") or []:            # ...the alternatives, grey (solid since 23 Oct 2026)
             _rs_line(c, P, al, CE_ALT, 1.8)
-        _rs_line(c, P, S["loaded"], RS_LOADED, 2.6)
-        _rs_line(c, P, S["return"], RS_RETURN, 2.2, offset=3.0)     # amber, solid, beside the loaded leg (was dashed slate)
+        _rs_line(c, P, S["loaded"], CE_ROUTE_OUT, 2.6)
+        _rs_line(c, P, S["return"], CE_ROUTE_BACK, 2.2, offset=3.0)  # light grey, solid, beside the out leg (26 Nov 2026)
         for sev in (3, 2, 1):            # slight first, so the KSI sit on top
             for r in drawn:
                 if r["severity"] == sev and not r["goods"]:
@@ -4719,8 +4725,8 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
                     c.drawImage(ImageReader(io.BytesIO(ipng)), ix, iy, width=iw, height=ihm)
                 else:
                     c.setFillColorRGB(0.975, 0.977, 0.98); c.rect(ix, iy, iw, ihm, stroke=0, fill=1)
-                _rs_line(c, Q, S["loaded"], RS_LOADED, 3.2)
-                _rs_line(c, Q, S["return"], RS_RETURN, 2.6, offset=3.6)
+                _rs_line(c, Q, S["loaded"], CE_ROUTE_OUT, 3.2)
+                _rs_line(c, Q, S["return"], CE_ROUTE_BACK, 2.6, offset=3.6)
                 for sev in (3, 2, 1):
                     for r in in_on:
                         if r["severity"] == sev:
@@ -4766,7 +4772,7 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
         _ce_dot(c, lx + 5, y - 4, sev)
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, word)
         lx += 12 + c.stringWidth(word, R, 7.6) + 12
-    for colour, words in ((RS_LOADED, "Loaded, A to B"), (RS_RETURN, "Empty, back to A")):
+    for colour, words in ((CE_ROUTE_OUT, "Loaded, A to B"), (CE_ROUTE_BACK, "Empty, back to A")):
         c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(2.6)
         c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 20, y - 6.6, words)
