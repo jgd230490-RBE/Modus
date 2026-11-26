@@ -1307,7 +1307,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      tinted pill: dot = ok, diamond = warning, square = bad, ring = none; the shapes 10 px, the ring a 2 px stroke in the
      second-text grey. A CLP draft (rs-draft, on no mockup) is the ring with its word. The word keeps its tone's text colour. */
   .row-st{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;line-height:1.35;color:var(--st-none);white-space:nowrap;}
-  .row-st i{flex:none;box-sizing:border-box;width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var(--st-none);}
+  .row-st i{flex:none;display:inline-block;vertical-align:middle;box-sizing:border-box;width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var(--st-none);}
   .row-st.rs-ok{color:var(--ok-text);} .row-st.rs-ok i{background:var(--green);border:0;}
   .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate(45deg);}
   .row-st.rs-bad{color:var(--bad-text);} .row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}
@@ -1434,6 +1434,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .tab-cards>tbody>tr.clp-kid td:first-child{padding-left:0;}
     .tab-cards .row-st{white-space:normal;text-align:left;}
     .tab-cards>tbody>tr>td>span:not(.block){display:inline-block;max-width:100%;white-space:normal;}   /* a chip in a card cell wraps inside its column (Zones' "Routed through @ 12 mph" ran into From) */
+    .tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}   /* 26 Nov 2026 (own look B1): the status chip keeps its row (shape, 7 px, word) in a card cell */
     .tab-cards>tbody>tr>td>span.block{display:block;max-width:100%;white-space:normal;}   /* 12 Nov 2026 (batch 5): a second line keeps its own line in a card, as at a desk ("2 Nov 2026Approver Name" ran together under Last issue) */
     .tab-cards .tc-only{display:inline-block !important;margin-left:10px;}
     /* 25 Nov 2026 (found by task A): the rule above made a status chip (td>span.row-st) inline-block, so its shape's <i>
@@ -22042,6 +22043,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       })()}
                       {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
+                        // 26 Nov 2026 (PR #331): amber chips moved to the solid warning background (4.84:1); the 12 % tint read 4.25:1 (axe, Routes at 1366 px)
+                        // 26 Nov 2026 (own look B1, taking main bbf9c7e in): then the status chip took them with NO background at all, the
+                        // word on the page itself: --warn-text #B45309 on white 5.02:1 (Dark #FBBF24), so the tint's fault cannot occur
                         const ps = (divPeriods || []).filter(p => p.route_id === r.id);
                         if(!ps.length) return null;
                         const used = ps.filter(p => p.status === "in_use"), bad = ps.filter(p => p.status !== "in_use");

@@ -221,6 +221,21 @@ ok("4 strip: the first figure of every row takes the 2 px start, at every column
    css.includes(".dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}")
    && css.includes("@media (min-width:900px){.dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
    && css.includes("@media (min-width:1280px){.dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}}"));
+// 26 Nov 2026 (an independent read of the diff): the status shape has its own display, so no cell rule can turn it into a 0 px
+// inline box again (the tablet cards made it 0 x 17 px at 900 px), and a card cell keeps the chip a flex row (the 7 px gap)
+ok("2 status: the shape is an inline block of its own; a tablet card cell keeps the chip a flex row",
+   /\n  \.row-st i\{[^}]*display:inline-block;[^}]*width:10px;height:10px;/.test(css)
+   && css.includes(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}")
+   && css.indexOf(".tab-cards>tbody>tr>td>span.row-st{display:inline-flex;}") > css.indexOf(".tab-cards>tbody>tr>td>span:not(.block){display:inline-block;"));
+// 26 Nov 2026 (an independent read of the diff): LaKpi has no box of its own, so every row of them must be a ruled strip
+// (the Account view's four figures had no rule at all)
+ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account view's too",
+   (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
+     // NARROWED 26 Nov 2026 (the Look-ahead rethink batch): 11 -> 10 rows of figures, B1 turned the eight tiles into one seven-figure strip
+     return opens.length >= 10 && opens.every(t => /className="fig-strip /.test(t)); })()
+   // NARROWED 26 Nov 2026 (the Look-ahead rethink batch, claude/la-rethink): B1 (card 2's second table) made the Last week
+   // figures its own labelled strip, so the Account row is that strip, not the shape branch's "account" wrapper
+   && code.includes('<div className="fig-strip la-figs la-figs-4" data-fig-strip="lookahead-last">'));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
