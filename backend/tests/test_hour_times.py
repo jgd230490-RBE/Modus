@@ -492,7 +492,8 @@ ok("6. the user guide says it in plain words; the technical guide has the detail
 # 29 Oct 2026 (John: "please ensure full outline of this is in user and tech guide. try and include how here exactly ranks")
 _why = _ug.split('<li id="ug-why-primary">')[1].split("</li>")[0] if 'id="ug-why-primary"' in _ug else ""
 ok("⭐ 7. the user guide says why the Primary is not always the quickest, in plain words, naming no supplier",
-   "it prefers main roads" in _why and "That is a preference, not a restriction" in _why and "Make primary" in _why
+   # REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Use Alt 1 as the main route" (it read "Make primary")
+   "it prefers main roads" in _why and "That is a preference, not a restriction" in _why and "Use Alt 1 as the main route" in _why
    and "nothing re-ranks the options by time or distance" in _why and not re.search(r"\bHERE\b", _why))
 ok("7. ...and what a — in a busy-hour column means", "means that road was not one of its options at that hour" in _ug)
 _rk = _tg.split('<li id="t2-ranking">')[1].split("</li>")[0] if 'id="t2-ranking"' in _tg else ""
@@ -504,7 +505,8 @@ ok("7. the request really sends no routingMode (so HERE's default applies, as th
    "routingMode" not in read("backend/here_routing.py").split("def routes(")[1].split(chr(10) + "def ")[0])
 ok("8. (16 Nov 2026) the technical guide says a run redoes only rows no longer trusted, and Make primary keeps the times",
    "<code>hour_times._to_do</code>" in _tg and "<code>to_do</code> beside the whole run" in _tg
-   and "Make primary, which renumbers the options and keeps their times" in _tg)
+   # REVERSED 25 Nov 2026 (the Routes page rethink, Q9: "Make primary" gone where a person reads; John: "Yes, as recommended"): it read "Make primary, which renumbers …"
+   and "a main route change, which renumbers the options and keeps their times" in _tg)
 _dm2 = _fe.split("const hourBake = async")[1].split("const bulkBake = async")[0]
 ok("⭐ 9. (16 Nov, the mockup's card 1) the menu line shows the calls still due, or the whole run again when none are",
    "var hourDue = (p) => (p && p.to_do && p.to_do.leg_hours > 0) ? p.to_do : null;" in _fe

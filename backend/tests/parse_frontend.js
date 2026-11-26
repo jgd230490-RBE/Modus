@@ -2742,9 +2742,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
     // RE-PINNED 29 Oct 2026 (its own page): SimulationPage (+ PhoneSimulation, SimDashLine); the player takes the page's controls and site; the map `wall`
     simSrc.length > 20000 && ["function SimulationPage({ meta, months, phone, initial })", "function PhoneSimulation({ meta, months })", "function SimDashLine({ ga, month, months, onOpen })",
-      "function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+      // RE-PINNED 24 Nov 2026 (the Simulation's full screen): the player takes full / onLeave / bar, the map `full` (sim_full_screen.js)
+      "function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt, full, onLeave, bar })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
       // RE-PINNED 28 Oct 2026 (simulation v2): the map and the timeline take the chosen site
-      "function SimMap({ meta, D, store, frame, site, wall })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
+      "function SimMap({ meta, D, store, frame, site, wall, full })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
       "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f))
     && !code.includes("function SimulationPanel("));
   // RE-PINNED 29 Oct 2026 (the Simulation's own page, card 1): the Dashboard keeps ONE line under Gate arrivals (the busiest gate from the
@@ -2870,7 +2871,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ SIM ONE SCREEN: from 1024 px the map and its timeline sit left, the clock / Gates now / scenario beside them; the table and the haul roads fold away (closed)",
     // RE-PINNED 28 Oct 2026 (v2): the site select sits above the map; the map and the timeline take the chosen site
     // RE-PINNED 29 Oct 2026 (the page, card 2): the timeline is FULL WIDTH under the grid, the scenario a band under it; the map the app's height
-    fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
+    // RE-PINNED 24 Nov 2026 (full screen): the one map takes `full`
+    fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} full={!!full} />')
     && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side kb-scroll" tabIndex=\{0\}/.test(fn("SimPlayer", "const SimScenario"))
     && /<\/div>\s*<\/div>\s*<div className="sim-tl-top">\s*<div className="sim-tl-head"[^\n]*\n\s*<ChartTools [\s\S]*?<\/div>\s*<div data-sim-tl-wrap="1"><SimTimeline D=\{D\} t=\{t\}[^\n]*<\/div>\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
     && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:62vh;min-height:360px;max-height:720px;\}\}/.test(html)
@@ -2914,7 +2916,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ SIM V2: the site view — a named Site select (Whole scheme first), the map and the timeline take the site, Stations now replaces Gates now for it, 'on site' in the now line",
     // RE-PINNED 29 Oct 2026 (the page, card 4): the Site select is in the page's controls row (scale → period → site), the player takes the site
     panelSrc.includes('aria-label="Simulation site" data-sim-site="1">') && panelSrc.includes('<option value="">Whole scheme</option>') && panelSrc.includes("site={site} controls={controls}")
-    && playerSrc.includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />') && playerSrc.includes('<SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} />')
+    && playerSrc.includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} full={!!full} />') && playerSrc.includes('<SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} />')
     && playerSrc.includes('data-sim-stations-now="1"') && playerSrc.includes('<div className="sim-card-h">Stations now · {site.d.name}</div>')
     && playerSrc.includes('` · ${f.onSite} on site`'));
   ok("🔴 SIM V2: the browser draws the server's chain on site and works out no figure: hops along the server's paths at the parts' speeds, waiting lorries back along the path 25 m apart, a served lorry at its station; the stations' figures are printed, never computed",
@@ -3099,7 +3101,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 3
      && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 3
      // RE-PINNED 29 Oct 2026 (the page, card 5): the Simulation map's style follows the look (dark-v11 in the Dark look, light-v11 otherwise)
-     && /function SimMap\(\{ meta, D, store, frame, site, wall \}\)\{[\s\S]{0,900}new window\.mapboxgl\.Map\(\{ container: div\.current, style: styleNow, center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html)
+     // RE-PINNED 24 Nov 2026 (full screen): the map takes `full`
+     && /function SimMap\(\{ meta, D, store, frame, site, wall, full \}\)\{[\s\S]{0,1100}new window\.mapboxgl\.Map\(\{ container: div\.current, style: styleNow, center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html)
      && html.includes('const simMapStyle = () => (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark") ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";')
      && html.includes("let m, styleNow = simMapStyle();") && html.includes("THEME.subs.add(onLook);") && html.includes("THEME.subs.delete(onLook);")
      && html.includes('m.on("style.load", () => {\n      if(m.getSource("sim-routes")) return;'));
@@ -4139,7 +4142,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
-     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#edeeef", "var(--st-none)"]') /* NARROWED 24 Nov 2026 (own look, B1 stage 3): a token, so the plain word reads in Dark too */   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
+     /* NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the one status chip (RowStatus: --ok-text / --bad-text
+        words through .row-st), no tint pairs left */
+     && code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />') && !code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') /* NARROWED 24 Nov 2026 (own look, B1 stage 3): a token, so the plain word reads in Dark too */   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
      && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
@@ -4160,7 +4165,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _ipt.includes('<span className="tg tg-plain text-xs font-semibold">{ws}</span>')
      && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
      && _cat.includes('<span key={c} className="tg tg-plain text-xs whitespace-nowrap">{c}</span>')
-     && code.includes('className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     // NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the status chip now (a shape and a word), its title kept
+     && code.includes('<span key={k} title={tip} className="veh-st" data-veh-tone={tone}>') && !code.includes('style={{ background: bg, color: fg }}>')
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
      && code.includes('className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
@@ -4170,7 +4176,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
      // NARROWED 10 Nov 2026 (UI critique 23): the five chips moved under "From → to" (a flex row with a gap, data-route-notes), so they lose ml-1.5
      && (() => { const _rn = code.slice(code.indexOf("data-route-notes={r.id}"), code.indexOf("data-route-near-cell={r.id}"));
-        return (_rn.match(/className="tg text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
+        // NARROWED 26 Nov 2026 (own look B1): 5 -> 4, the "Diverted" chip is the one status chip (RowStatus, no tint); the
+        // holding area's "Route again" and a paused busy hours chip are too, their other states keep the house chip
+        return (_rn.match(/className="tg text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 4 && !/ml-1\.5/.test(_rn)
+          && _rn.includes('tone={used.length ? "warn" : "bad"} />') && !/rgba\(180,83,9,\.12\)/.test(_rn); })()
      && code.includes('className={"tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
@@ -4873,7 +4882,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // the link is named by its visible words: an aria-label that said something else failed axe (label-content-name-mismatch)
      && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
-     src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
+     // NARROWED 26 Nov 2026 (own look B1): the chip is the one status chip (amber Diverted, red Not diverted), the same words
+     src.includes("data-route-diverted={r.id}") && src.includes('<RowStatus word={`${used.length ? "Diverted" : "Not diverted"} ${divMonths(p.starts_on, p.ends_on)}${more > 0 ? ` +${more}` : ""}`} tone={used.length ? "warn" : "bad"} />'));
   // NARROWED 17 Nov 2026 (routes-card-room, Option B): the open route is a panel under the list, not rows of its table;
   // its Diversions are one block (routeDiversions) handed to RouteAnalysis, on the page and in full screen
   ok("0c: the opened route lists its Diversions (DivRows)", src.includes("<div data-route-diversions={id} className=\"mt-3\">")
@@ -5365,7 +5375,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("{sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan"));
   ok("BUSY HOURS: the Routes row's chip 'Busy hours: Alt N' (hover: the hours; amber while paused) from the diversions read; the Look-ahead's chip from the line context",
      code.includes("setBusyUses(dv.busy || [])") && code.includes('data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}')
-     && code.includes("Busy hours: Alt {u.alt}</span>))}") && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
+     // NARROWED 26 Nov 2026 (own look B1): paused is the one status chip (amber, a shape and the same words), in use the house chip
+     && code.includes("Busy hours: Alt {u.alt}</span>") && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" /></span>))}') && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
   ok("BUSY HOURS: the Carbon planner's 'Route choices' block reads /api/busy-hours, shows nothing with no use, sums them, and says it is already in the total (Q17)",
      code.includes("function CarbonRouteChoices(){") && code.includes("fetch(`${API}/busy-hours`)") && code.includes("if(!uses.length) return null;")
      && code.includes("All route choices") && code.includes("Planned, to the end of the approved plan. Already inside the carbon total and the target.")
@@ -5652,8 +5663,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("🔴 ROUTES PAGE: the box, the popups and the full screen columns print no back-end word and no status number",
      ![box, pop, lst, det].some(s => /\b(api|endpoint|server|token|cached|geometry|bake[ds]?|HERE)\b/.test(s.replace(/data-[a-z-]+=|\/\/[^\n]*/g, "")))
      && !/r\.status/.test(dmr.slice(dmr.indexOf("const rlRead"), dmr.indexOf("const toggleRLayer"))));
-  ok("⭐ ROUTES PAGE (2.1-7): out green, back amber, solid, each left of its travel, white arrows on the leg's colour; the picked route a blue halo",
-     code.includes('const LEG_OUT = "#059669", LEG_BACK = "#F59E0B", SEL_HALO = "#1D4ED8";')
+  // REVERSED 24 Nov 2026 (Routes rethink, Q3 and Q4; John: "Yes, as recommended"): out ink, back grey (the public map's pair), the
+  // sign blue for a pick (was out green #059669, back amber #F59E0B, the halo #1D4ED8)
+  ok("⭐ ROUTES PAGE (2.1-7, REVERSED 24 Nov): out ink, back grey, solid, each left of its travel, white arrows on the leg's colour; the sign blue for a pick",
+     code.includes('const LEG_OUT = "#3A3C41", LEG_BACK = "#8E9197", SEL_HALO = "#0B4EA2";') && !code.includes('const LEG_OUT = "#059669"')
      && code.includes('const LEG_COLOR_EXPR = ["match", ["get", "leg"], "return", LEG_BACK, LEG_OUT];')
      && code.includes('const LEG_OFFSET = ["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5];')
      && dmr.includes('id: "route-arrows", type: "symbol"') && dmr.includes('"icon-halo-color": LEG_COLOR_EXPR'));

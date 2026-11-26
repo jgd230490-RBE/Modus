@@ -72,8 +72,11 @@ function evalExpr(e, props) {
     return ctx.out;
   };
   let e2 = null, e1 = null, em = null, err = "";
-  try { e2 = run("vehicles", 2); e1 = run("vehicles", 1); em = run("m3", 2); } catch (x) { err = String(x); }
-  ok("A-F5 the label runs in a sandbox", !!e2 && !!e1 && !!em, err);
+  // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6, card 4): no words along the lines;
+  // the label's field is GONE, so the sandbox below is not run (its checks stay, for the day a label comes back)
+  if (src) { try { e2 = run("vehicles", 2); e1 = run("vehicles", 1); em = run("m3", 2); } catch (x) { err = String(x); } }
+  ok("A-F5 the route label is gone from the public map (REVERSED 24 Nov 2026: it ran in a sandbox)",
+     !src && !html.includes("forecastLabelField") && !html.includes("'forecast-labels'"), err);
   if (e2) {
     ok("⭐ A-F5 a route of 66 visits a day reads 'R050 · 132 a day' (movements: the road card's figure), not 'R050 · 66'",
        evalExpr(e2, { route_id: "R050", f_avg: 66 }) === "R050 · 132 a day", evalExpr(e2, { route_id: "R050", f_avg: 66 }));
@@ -83,7 +86,10 @@ function evalExpr(e, props) {
        && evalExpr(e2, { route_id: "R9", f_avg: null }) === "");
     ok("A-F5 a scheme counting another unit keeps its unit and figure: 'R1 · 12 m³ / day'", evalExpr(em, { route_id: "R1", f_avg: 12 }) === "R1 · 12 m³ / day");
   }
-  ok("A-F5 the user guide says what the label's number is", guide.includes("&quot;R050 · 132 a day&quot;") && /a road’s card adds up every route on that road|a road's card adds up every route on that road/.test(guide));
+  // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6): no words along a route's line, so the
+  // guide no longer explains the label's number; it says there are none and where the figures are
+  ok("A-F5 the user guide says no words are drawn along a route's line (REVERSED 24 Nov 2026: it explained 'R050 · 132 a day')",
+     !guide.includes("&quot;R050 · 132 a day&quot;") && guide.includes("No words are drawn along a route's line: click it for its name and figures."));
 }
 
 // ---------------------------------------------------------------------------------------------- the road card sandbox
@@ -145,7 +151,10 @@ console.log("A-X2 small words");
   ok("A-X2 ...and for visits: 'under 1 lorry visit a day'", !!cv && cv("under 1") === "under 1 lorry visit a day");
   ok("A-X2 every place that joined a count to its words goes through cwN (the shared road popup, its hover tip, the card, the timeline line)",
      html.includes("cwN(f ? f.properties.rl_mv_text : '0')") && html.includes("fig: cwN(p.rl_mv_text != null ? p.rl_mv_text : '0')")
-     && html.includes("escHtml(cwN(secN(v.aday)))") && html.includes("const parts = [cwN(trips), routes")
+     // NARROWED 24 Nov 2026 (card 7): the card's headline reads the rows' whole total through secTot ("under 1" over a route that runs),
+     // and the road's hover tip, which joined its count to CW().short, takes the singular through secShort (seen on live: "under 1 movements a day")
+     && html.includes("escHtml(cwN(secTot(v, 'aday', 'a_day')))") && html.includes("return t + ' ' + secShort(t) + ' · ' + secRoutes(v.n);")
+     && !html.includes("secN(v.aday) + ' ' + CW().short") && html.includes("const parts = [cwN(trips), routes")
      && !/rl_mv_text : '0'\) \+ ' ' \+ CW\(\)\.lower/.test(html) && !html.includes("secN(v.aday) + ' ' + escHtml(CW().lower)"));
   ok("⭐ A-X2 the figures bar's label is 'Movements a day' (two lines at 1422 px, not three); the lorry stays in its tip",
      html.includes('title="A lorry coming and going is 2 movements, as councils count them.">Movements a day</div>')

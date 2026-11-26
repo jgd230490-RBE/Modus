@@ -76,6 +76,15 @@ How each decision of John's is held (section numbers of the 16 Nov note):
       - `trade_also`: the labels of the OTHER options that are trade-offs too (the card: "Alt 2 trades too: All
         figures."); the answer and the option named are unchanged.
 
+  * 24 Nov 2026 (the Routes page rethink, notes routes-rethink-mockup-1124 card 6; John: "Yes, as recommended", Q7 to
+    Q9). The rule decides as before; only its WORDS changed, checked against the CLOCS Standard v5 and the TfL and
+    CLOCS CLP guidance v1.2 (neither says "trade-off"): the answer "A trade-off" reads "Planner to decide" (TRADE_OFF
+    keeps its name); `trade_short` is said as facts ("Alt 1: fewer collisions; more places and carbon; slower; cycle
+    routes mixed."); the long `trade` joins gains and losses with ";" ("Alt 1: …; …", it read "Alt 1 has …, but …");
+    a goods vehicle over 3.5 t is "an HGV" ("involving an HGV"); "left-hand turns"; a line baked round a closure is
+    "Diversion" (it read "Way round"). The words above that say "ahead", "behind" or "A trade-off" describe the rule's
+    working, never a sentence.
+
 Every threshold is a named constant below: STARTING VALUES that John has not set (he sets them on the all-50 table, Q9).
 
 WHAT IS NOT VERIFIED: run on stubbed and local lines only; never on live's figures (local worktree databases hold stand-in
@@ -123,8 +132,20 @@ SHOWN_KINDS = tuple(k for k in route_compare.KINDS if k not in DECIDING_KINDS)
 PLACES_M = 250                                          # = route_compare.NEAR_M for the three (asserted)
 BUSY_HOURS = ("08:00", "17:00")
 MAX_HERE_ALT = route_compare.MAX_HERE_ALT
-SUGGESTED, TRADE_OFF, KEEP = "Suggested", "A trade-off", "Keep the route in use"
+#: 24 Nov 2026 (the Routes page rethink, Q7; John: "Yes, as recommended"): the second answer reads "Planner to decide"
+#: (it read "A trade-off", a word in neither the CLOCS Standard v5 nor the TfL and CLOCS CLP guidance). The NAME
+#: TRADE_OFF stays (the table's keys, `traded`, `trade`, `trade_short`, `trade_also` are internal); no word a person
+#: reads says "trade". The decision is unchanged: only the words.
+SUGGESTED, TRADE_OFF, KEEP = "Suggested", "Planner to decide", "Keep the route in use"
 ANSWERS = (SUGGESTED, TRADE_OFF, KEEP)
+#: the answers' older words, for anything that holds one (nothing stores the rule's answer today: every read works it
+#: out again; kept so a reader can reword an older copy, `answer_words`)
+OLD_ANSWERS = {"A trade-off": TRADE_OFF}
+
+
+def answer_words(a):
+    """An answer in today's words: an older copy's "A trade-off" reads "Planner to decide"."""
+    return OLD_ANSWERS.get(a, a)
 NOT_FETCHED_WORDS = ("Cycle routes and community places are shown, not counted: they have not been fetched along every "
                      "option yet.")
 STALE_WORDS = ("Collision history out of date: this route was routed again after the last collision fetch, so a road "
@@ -191,14 +212,19 @@ def pct(opt, use, base_min):
     return int(round((opt - use) / use * 100))
 
 
+#: a line baked round a closed road (24 Nov 2026, Q9: it read "Way round"; CLOCS's and the road authorities' word is
+#: "diversion")
+DIVERSION_LABEL = "Diversion"
+
+
 def label(alt):
-    """'The main route' (option 0), 'Alt 2', 'Way round' (a line baked round a closed zone)."""
+    """'The main route' (option 0), 'Alt 2', 'Diversion' (a line baked round a closed zone; 'Diversion 2' the next)."""
     a = int(alt or 0)
     if not a:
         return "The main route"
     if a >= route_choice.WAY_ROUND_BASE:
         n = a - route_choice.WAY_ROUND_BASE + 1
-        return "Way round" + (f" {n}" if n > 1 else "")
+        return DIVERSION_LABEL + (f" {n}" if n > 1 else "")
     return f"Alt {a}"
 
 
@@ -690,69 +716,86 @@ def in_use_limits(use_legs, lorry, ctx):
     return out
 
 
-#: trade_short: the trade in one line naming the HEADS only, in the words John said yes to on the card's third draft
-#: (16 Nov evening, card 10): "Alt 2 is ahead on cycle routes and carbon, behind on places and time." The long `trade`
-#: (with its counts) stays for "All figures" and the file. Collisions keep his plain-words decision (R5, 16 Oct): never
-#: "ahead" or "behind", said first as a fact where the test says clearly ("Alt 1 had fewer collisions and is ahead on
-#: ..."). No counts, no "but". Levels, the first that keeps the line within SHORT_MAX words: 0 everything; 1 the busy hours
-#: left out where they go the same way as time; 2 as 1, and goods-vehicle collisions left out where all collisions are
-#: said; 3 as 2, and the mixed heads left out (they are in the long line).
+#: trade_short: the "Planner to decide" answer's reason in one line, said as FACTS (24 Nov 2026, the Routes page rethink,
+#: Q8; John: "Yes, as recommended"): "Alt 1: fewer collisions; more places and carbon; slower; cycle routes mixed." The
+#: option's name, a colon, then the parts joined by "; " in this order: collisions (the rule's own "fewer collisions" /
+#: "more collisions", "involving an HGV" where it is the HGV count that is clear), what is fewer or less, what is more,
+#: "quicker" or "slower" (and the busy hours where they go another way), the measures that are mixed, then the N5 words.
+#: It bends the 16 Nov third draft's "Alt 2 is ahead on cycle routes and carbon, behind on places and time." ("ahead on",
+#: "behind on" and "trades" are in no line now). Collisions keep John's plain-words decision (R5, 16 Oct): a fact, never
+#: better or worse. The long `trade` (with its counts) stays for "All figures" and the file. No counts, no "but". Levels,
+#: the first that keeps the line within SHORT_MAX words: 0 everything; 1 the HGV collisions left out where all
+#: collisions are said; 2 as 1, and the mixed measures left out (they are in the long line). The busy hours are said
+#: only where they go another way from time (the 16 Nov level 1, now always: "slower; slower in the busy hours" said it
+#: twice).
 SHORT_MAX = 25
-#: the plain head names, in the order they are listed
+#: the plain measure names, in the order they are listed
 SHORT_HEADS = (("cycle", "cycle routes"), ("community", "places"), ("time", "time"), ("busy", "busy hours"),
                ("carbon", "carbon"))
-#: a head with a part each way is in neither list and is said last, "; mixed on cycle routes" (the mother session's
-#: recommendation, NOT yet seen by John: change these words here, or set "" to leave mixed heads out)
-SHORT_MIXED = "mixed on"
+#: the measures that go both ways are said last, "; cycle routes mixed" (John's yes to Q8, 24 Nov): change the word
+#: here, or set "" to leave mixed measures out
+SHORT_MIXED = "mixed"
+#: the HGV words of a collision count (24 Nov 2026, Q9: it read "goods-vehicle"; CLOCS's "collision involving an HGV")
+HGV_WORDS = "involving an HGV"
 
 
 def _short_line(o, level):
     pt, hd = o["parts"], o["heads"]
     v_of = {"cycle": pt.get("cycle"), "community": pt.get("community"), "time": hd.get("time"),
             "busy": hd.get("busy"), "carbon": hd.get("carbon")}
-    ahead, behind, mixed = [], [], []
+    fewer, more, mixed = [], [], []
+    less_carbon = False
     for key, name in SHORT_HEADS:
         v = v_of[key]
-        if key == "busy" and level >= 1 and v is not None and v == v_of["time"]:
-            continue            # "ahead on time" already says it
+        if key in ("time", "busy"):
+            if v == MIXED and not (key == "busy" and v_of["time"] == MIXED):
+                mixed.append(name)
+            continue
         if v == 1:
-            ahead.append(name)
+            if key == "carbon":
+                less_carbon = True
+            else:
+                fewer.append(name)
         elif v == -1:
-            behind.append(name)
+            more.append(name)
         elif v == MIXED:
             mixed.append(name)
-    facts = []
+    parts = []
     c, g = pt.get("collisions"), pt.get("goods")
+    coll = []
     if c in (1, -1):
-        facts.append("fewer collisions" if c == 1 else "more collisions")
-    if g in (1, -1) and g != c and not (level >= 2 and c in (1, -1)):
-        facts.append("fewer goods-vehicle collisions" if g == 1 else "more goods-vehicle collisions")
-    side = ", ".join(x for x in (("ahead on " + _join(ahead)) if ahead else "",
-                                 ("behind on " + _join(behind)) if behind else "") if x)
-    name = o["label"]
-    if facts and side:
-        line = f"{name} had {_join(facts)}{',' if len(facts) > 1 else ''} and is {side}"
-    elif facts:
-        line = f"{name} had {_join(facts)}"
-    elif side:
-        line = f"{name} is {side}"
-    else:
-        line = ""
-    tail = []
-    if mixed and SHORT_MIXED and level < 3:
-        tail.append(f"{SHORT_MIXED} {_join(mixed)}")
+        coll.append("fewer collisions" if c == 1 else "more collisions")
+    if g in (1, -1) and g != c and not (level >= 1 and c in (1, -1)):
+        word = "fewer" if g == 1 else "more"
+        coll.append(f"{word} {HGV_WORDS}" if coll else f"{word} collisions {HGV_WORDS}")
+    if coll:
+        parts.append(_join(coll))
+    less = ", ".join(x for x in (("fewer " + _join(fewer)) if fewer else "", "less carbon" if less_carbon else "") if x)
+    if less:
+        parts.append(less)
+    if more:
+        parts.append("more " + _join(more))
+    t, b = v_of["time"], v_of["busy"]
+    tw = {1: "quicker", -1: "slower"}
+    time_words = [tw[t]] if t in tw else []
+    if b in tw and b != t:
+        time_words.append(f"{tw[b]} in the busy hours")
+    if time_words:
+        parts.append(", ".join(time_words))
+    if mixed and SHORT_MIXED and level < 2:
+        parts.append(f"{_join(mixed)} {SHORT_MIXED}")
     if o.get("n5") and hd.get("time") not in (-1, MIXED):
-        tail.append(N5_WORDS)
-    if not line:
-        # nothing clearly ahead or behind (a trade-off always has both; kept so the line is never empty)
-        return f"{name} is " + ("; ".join(tail) if tail else "level on every measure") + "."
-    return line + "".join("; " + x for x in tail) + "."
+        parts.append(N5_WORDS)
+    name = o["label"]
+    # nothing clearly better or worse (a "Planner to decide" option always has both; kept so the line is never empty)
+    return f"{name}: " + ("; ".join(parts) if parts else "the same on every measure") + "."
 
 
 def trade_short(o):
-    """'Alt 2 is ahead on cycle routes and carbon, behind on places and time.' Heads only, no counts, no "but", at most
-    SHORT_MAX words: the first of the levels that fits (the last is returned whatever its length; the harness pins it)."""
-    for level in (0, 1, 2, 3):
+    """'Alt 1: fewer collisions; more places and carbon; slower; cycle routes mixed.' Facts only, no counts, no "but",
+    at most SHORT_MAX words: the first of the levels that fits (the last is returned whatever its length; the harness
+    pins it)."""
+    for level in (0, 1, 2):
         line = _short_line(o, level)
         if len(line.split()) <= SHORT_MAX:
             return line
@@ -805,7 +848,7 @@ def sentences(o, use, ctx, hist):
     """The fixed sentences for one option against the line in use (Q2: the rule writes, fixed words)."""
     name, p, out = o["label"], o["pct"], []
     if hist == "current" and o["searched"]:
-        for key, tail in (("collisions", ""), ("goods", " involving a goods vehicle over 3.5 t")):
+        for key, tail in (("collisions", ""), ("goods", " " + HGV_WORDS)):
             v = o["parts"].get(key)
             a, u = o["counts"][key], use[key]
             if v == 1:
@@ -820,7 +863,7 @@ def sentences(o, use, ctx, hist):
     elif hist == "not_fetched":
         out.append(NO_HISTORY_WORDS)
     c = o["counts"]
-    cyc = [f"makes {c['left_turns']} left turns against {use['left_turns']}{_pct_words(p['left_turns'])}"]
+    cyc = [f"makes {c['left_turns']} left-hand turns against {use['left_turns']}{_pct_words(p['left_turns'])}"]
     if c["cycle_meets"] is not None:
         cyc.append(f"meets a cycle route {c['cycle_meets']} times against {use['cycle_meets']}"
                    f"{_pct_words(p['cycle_meets'])}")
@@ -854,12 +897,12 @@ def _gains_losses(o, use, with_time=True):
     round-trip time out (the why says it first, so it is said once)."""
     c, gains, losses = o["counts"], [], []
     pt = o["parts"]
-    for key, what in (("collisions", "collisions"), ("goods", "goods-vehicle collisions")):
+    for key, what in (("collisions", "collisions"), ("goods", "collisions " + HGV_WORDS)):
         if pt.get(key) == 1:
             gains.append(f"fewer {what} on it ({c[key]} against {use[key]})")
         elif pt.get(key) == -1:
             losses.append(f"more {what} on it ({c[key]} against {use[key]})")
-    for key, what in (("left_turns", "left turns"), ("cycle_meets", "cycle routes met")):
+    for key, what in (("left_turns", "left-hand turns"), ("cycle_meets", "cycle routes met")):
         v = o["detail"]["cycle_measures"].get(key)
         if pt.get("cycle") is None or v is None:
             continue
@@ -1143,7 +1186,8 @@ def _answer(out, use, ctx, hist):
         o = sorted(trade, key=lambda x: (-ahead(x), behind(x), x["alt"]))[0]
         o["traded"] = True
         gains, losses = _gains_losses(o, use)
-        line = f"{o['label']} has " + (_join(gains) or "nothing clearly ahead") + (", but " + _join(losses) if losses else "")
+        # 24 Nov 2026 (Q8): said as facts, the gains and the losses joined by ";" (it read "Alt 1 has …, but …")
+        line = f"{o['label']}: " + (_join(gains) or "nothing clearly better") + ("; " + _join(losses) if losses else "")
         # 17 Nov 2026 (Q6): the other options that are trade-offs too, by number. The card names the first and says
         # the rest trade too (on R013 the card named Alt 1 while an older line under it advised Alt 2)
         also = [x["label"] for x in sorted(trade, key=lambda x: x["alt"]) if x is not o]
