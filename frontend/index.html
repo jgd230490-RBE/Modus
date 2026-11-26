@@ -492,6 +492,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   @container (min-width:1000px){.fig-strip.la-figs:not(.la-figs-4){grid-template-columns:repeat(7,minmax(0,1fr));}}
   .la-fig-label{display:flex;align-items:center;gap:4px;font-size:13px;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .la-fig-num{font-family:var(--f-head);margin-top:2px;}
+  .la-fig-num.la-fig-wrap{white-space:normal;line-height:20px;min-height:32px;padding-top:6px;overflow-wrap:break-word;}
   .la-fig-unit{font-family:var(--f-text);font-size:13px;font-weight:400;letter-spacing:0;color:var(--muted);margin-left:4px;}
   .la-fig-sub{font-size:12px;line-height:16px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .la-fig-sub.warn-line{color:var(--warn-text);font-weight:600;}
@@ -13084,7 +13085,9 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     return (
       <div className="px-4 py-3 min-w-0" data-fuel-widget="compact" data-la-fig="Diesel, per litre" title={hasIndex ? String(price) : ""}>
         <div className="la-fig-label">Diesel, per litre<InfoTip id="la.fig_diesel" /></div>
-        <div className="kpi-num la-fig-num leading-8 font-semibold tabular-nums truncate text-2xl" style={{ color: "var(--navy-deep)" }}>
+        {/* 26 Nov 2026: "Index unavailable" WRAPS in a narrow cell (seven across with the rail folded, 152 px: it was cut to
+            "Index unavail…"); a price stays one line */}
+        <div className={"kpi-num la-fig-num font-semibold tabular-nums text-2xl " + (hasIndex ? "leading-8 truncate" : "la-fig-wrap")} style={{ color: "var(--navy-deep)" }}>
           {hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)}` : <span className="text-base" style={{ color: "var(--warn-text)" }}>Index unavailable</span>}
         </div>
         {hasIndex && idx.stale ? <div className="la-fig-sub warn-line" data-la-fig-sub="warn"><span>stale · {typed ? "typed " : ""}{laDay(idx.bulletin_date)}</span></div>

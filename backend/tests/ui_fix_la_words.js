@@ -276,6 +276,10 @@ try {
      && html.includes("@container (min-width:560px){.fig-strip.la-figs{grid-template-columns:repeat(4,minmax(0,1fr));}}")
      && html.includes(".fig-strip.la-figs{grid-template-columns:repeat(2,minmax(0,1fr));")
      && html.includes('.fig-strip.la-figs>.la-fig-warn::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--gold);}'));
+  // 26 Nov 2026: seven across with the rail folded (cells 152 px) cut "Index unavailable" to "Index unavail…" in Chrome
+  ok("🔴 CSS: \"Index unavailable\" wraps in a narrow cell (never truncated); a price stays one line",
+     html.includes(".la-fig-num.la-fig-wrap{white-space:normal;") && FW.includes('(hasIndex ? "leading-8 truncate" : "la-fig-wrap")')
+     && !FW.includes('className="kpi-num la-fig-num leading-8 font-semibold tabular-nums truncate text-2xl"'));
 } catch (e) {
   fail.push("CRASH " + (e && e.stack || e));
 }
