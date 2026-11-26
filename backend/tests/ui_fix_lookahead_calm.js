@@ -76,15 +76,21 @@ ok("...the amber is the text-grade warning colour; the grey the muted one", /\.l
    && /\.la-carry\.is-short\{color:var\(--warn-text\);font-weight:600;\}/.test(css));
 
 // the cards: every number with its noun and unit
-ok("⭐ 5: the shortfall card is in tonnes and amber, \"short last week\" (no \"+296\", no red)",
-   la.includes('<LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week" />')
-   && !la.includes("last week shortage") && !la.includes("`+${grp(account.shortfall)}`"));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2, Q8, Q9): the shortfall card and the delivered card are ONE figure, "Delivered
+// last week", whose second line is "3 short · 575 t" (the amber diamond and words) only past the share, a grey "575 t to carry"
+// below it; the status is the cell's 4 px amber edge, not an amber figure. Still tonnes; still no "+296", no red.
+ok("⭐ 5: the shortfall is in tonnes and amber, on \"Delivered last week\" (no \"+296\", no red)",
+   la.includes('sub={shortN > 0 ? `${shortN} short · ${grp(shortT)} t` : shortT > 0 ? `${grp(shortT)} t to carry` : null} warn={shortN > 0} edge={shortN > 0 ? "warn" : null}')
+   && la.includes("const shortT = laShortT(account), shortN = account.short_flagged || 0;")
+   && !la.includes("last week shortage") && !la.includes("`+${grp(account.shortfall)}`") && !la.includes('caption="short last week"'));
 if (F.laShortT) ok("...it reads the server's tonnes (shortfall_t), the old own-unit sum only from an older page",
    F.laShortT({ shortfall: 295.5, shortfall_t: 356.4 }) === 356.4 && F.laShortT({ shortfall: 12 }) === 12 && F.laShortT(null) === 0);
 ok("...LaKpi has the amber tone (--warn-text)", code.includes('tone === "warn" ? "var(--warn-text)"'));
-ok("⭐ 5 (card 5): the cards say loads, vehicles a day at the peak, t·mi on the routes, lines delivered last week",
-   la.includes('caption="loads"') && la.includes('"vehicles a day at the peak"') && la.includes("caption={`${TKM()} on the routes`}")
-   && la.includes('caption="lines delivered last week"') && !la.includes('caption="trips"') && !la.includes("· route basis"));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2, Q8, Q9): the noun moves up into a LABEL over each figure ("Loads", "Lorries,
+// busiest day", "Tonne-miles", "Delivered last week"); "vehicles a day at the peak" and "on the routes" are gone
+ok("⭐ 5 (card 5): the figures are labelled Loads, Lorries, busiest day, Tonne-miles, Delivered last week",
+   la.includes('label="Loads"') && la.includes('label="Lorries, busiest day"') && la.includes('label={DU() === "mi" ? "Tonne-miles" : "Tonne-km"}')
+   && la.includes('"Delivered last week"') && !la.includes("vehicles a day at the peak") && !la.includes("on the routes`}") && !la.includes('caption="trips"') && !la.includes("· route basis"));
 
 // Account
 ok("⭐ 5: Account's Variance in words — \"45.0 t short\" / \"40.0 t over\" / \"on plan\" — amber only past the share, grey otherwise",
@@ -92,7 +98,8 @@ ok("⭐ 5: Account's Variance in words — \"45.0 t short\" / \"40.0 t over\" / 
    && acct.includes('style={{ color: r.short_flag ? "var(--warn-text)" : "var(--muted)" }}'));
 ok("🔴 ...no green for over, no red for short, no bare \"+45.0\" left in the Variance cell",
    !acct.includes('r.variance > 0 && !r.held ? "var(--bad-text)" : "var(--ok-text)"') && !acct.includes('(r.variance > 0 ? "+" : "") + grp(r.variance, 1)'));
-ok("...Account's shortfall card is the same tonnes, amber", acct.includes('<LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet added to this week" />'));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2, Q8, Q9): "Short · 575 t · not yet added"
+ok("...Account's shortfall card is the same tonnes, amber", acct.includes('<LaKpi label="Short" value={grp(laShortT(account))} unit="t" tone={laShortT(account) > 0 ? "warn" : undefined} sub={laShortT(account) > 0 ? "not yet added" : null} />'));
 ok("...a row is washed (amber) only when it is short past the share", acct.includes('const short = r.action === "spread" && !!r.short_flag;')
    && acct.includes('style={short ? { background: "rgba(217,119,6,.06)" } : {}}'));
 
@@ -186,16 +193,21 @@ ok("⭐ 24: the Account's fuel line is a titled Fuel card — the price with its
 ok("🔴 24: no \"BAF:\", \"no base locked\", \"Yard £/L\" or \"Fuel share %\" on the Account's card (Config's own row is not this page's)",
    !/BAF|no base locked|Yard \$\{CUR\(\)\}\/L|Fuel share %|Index unavailable/.test(fwStrip) && fwStrip.length > 500
    && la.includes('<FuelWidget mode="strip" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />'));
-ok("⭐ 24: the Account's cards in words — \"within 2 % of plan\", \"lines reported\", \"not yet added to this week\", \"can add their shortfall\"",
-   acct.includes('caption="lines delivered last week, within 2 % of plan"') && acct.includes('caption={`moved · ${account.reported || 0} of ${account.lines || 0} lines reported`}')
-   && acct.includes('"line can add its shortfall to this week" : "lines can add their shortfall to this week"')
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2, Q8, Q9): Last week's four as "Delivered · 19 of 22 lines · within 2 % of plan",
+// "Moved · 7,891 t · 22 of 22 reported", "Short · 575 t · not yet added", "Can be added · 3 lines"
+ok("⭐ 24: the Account's cards in words — \"within 2 % of plan\", \"reported\", \"not yet added\", \"Can be added\"",
+   acct.includes('<LaKpi label="Delivered" value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} unit={account.lines ? "lines" : null} sub="within 2 % of plan" />')
+   && acct.includes('<LaKpi label="Moved" value={grp(account.actual_t)} unit="t" sub={`${account.reported || 0} of ${account.lines || 0} reported`} />')
+   && acct.includes('<LaKpi label="Can be added" value={String(account.open_to_calibrate || 0)} unit={account.open_to_calibrate === 1 ? "line" : "lines"} />')
+   && !acct.includes("can add their shortfall to this week")
    && !/98% band|open to calibrate|not auto|not yet carried/.test(acct));
 ok("⭐ 24: the column is \"Difference\" (its info box too); one verb: Delivered, Added n t, Add to this week, Waiting",
    acct.includes('>Difference<InfoTip id="la.variance" /></th>') && code.includes('"la.variance": { title: "Difference",')
    && code.includes('"la.spread": { title: "Add to this week",')
    && acct.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
    && acct.includes('{r.action === "applied" && <RowStatus word={`Added ${grp(r.carried, 1)} ${unitLbl(r.unit)}`} tone="none" />}')
-   && acct.includes('>Add to this week</button>') && acct.includes('<span className="text-[13px] text-slate-500">Waiting</span>')
+   // NARROWED 25 Nov 2026 (B1, John's yes): "Add to next week" on This week so far, "Add to this week" on Last week
+   && acct.includes('{tab === "sofar" ? "Add to next week" : "Add to this week"}</button>') && acct.includes('<span className="text-[13px] text-slate-500">Waiting</span>')
    && !/>held<|applied · |spread on this week|>waiting</.test(acct));
 const hz = la.slice(la.indexOf("const hl = Object.values(g)"), la.indexOf('data-horizon-stock="1"'));
 ok("⭐ 24: Account and Horizon name a line by its route's two ends, the code moving to the second line",

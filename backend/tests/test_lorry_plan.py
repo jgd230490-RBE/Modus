@@ -586,7 +586,8 @@ ok("7: one row a lorry, its trips as blocks across the day, the break hatched, t
 ok("7: the panel sits under Gates this week; the KPI caption gains the chained figure; the phone reads it",
    # NARROWED 11 Nov 2026 (CLOCS card C-F7): the Look-ahead passes its today
    "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} />" in APP
-   and "with each yard's lorries chained` : \"\")} />" in APP and 'data-ph-lorry-plan={shown}' in APP and 'data-ph-lorry-list="1"' in APP)
+   # NARROWED 26 Nov 2026 (the Look-ahead rethink, B1, card 2): the figure "Lorries, busiest day" carries "19 if chained"
+   and "chainN != null ? `${grp(chainN)} if chained` : null" in APP and 'data-ph-lorry-plan={shown}' in APP and 'data-ph-lorry-list="1"' in APP)
 ok("7: the Config rows: a day-hire rate per lorry type, optional, never seeded", 'function DayHireSection({ doc, upd })' in APP
    and 'data-day-hire-section="1"' in APP and "Blank = the saving in lorry-days only" in APP and "<DayHireSection doc={doc} upd={upd} />" in APP)
 ok("7: the info box", '"la.lorryplan": {' in APP and 'guide: "ug-lorry-plan", tech: "t1-lorry-plan"' in APP)

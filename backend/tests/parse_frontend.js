@@ -478,8 +478,11 @@ ok("⭐ the window comes from the server's horizon block, not the browser clock"
 ok("⭐ the commit week comes from the server's commit_week, through /lookahead?bucket=",
   _laBody.includes("fetch(`${API}/lookahead?bucket=${bucket}`)") && _laBody.includes("page.commit_week")
   && !_laBody.includes("payload.next_week"));
-ok("...and the bucket switch offers exactly this week and next week — the Thursday process",
-  /\[\["commit", "this week"\], \["next", "next week"\]\]/.test(_laBody));
+// REVERSED / NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17): the small "this week | next week" switch is GONE; the weeks are the
+// tabs, and "Next week" (the Thursday process) reads the next bucket, as the switch's "next week" did
+ok("...and the Thursday process is the Next week TAB: no bucket switch left, the bucket follows the tab",
+  !/\[\["commit", "this week"\], \["next", "next week"\]\]/.test(_laBody) && !_laBody.slice(0, _laBody.indexOf("function PhoneLookAhead(")).includes("setBucket(")
+  && _laBody.includes('const bucket = tab === "next" || tab === "sofar" ? "next" : "commit";') && _laBody.includes('{pill("next", "Next week")}'));
 // 10 Oct 2026 NARROWED: the day cell reads as a figure and is an input only once clicked (mockup 3) —
 // still editable exactly while the week is not confirmed, in this bucket or next
 // 13 Oct 2026 (W6, narrowed): the input sits behind the unit switch (typing is in Tonnes only: decision 2)
@@ -521,7 +524,8 @@ ok("⭐ and saveActual's own body never touches the calibrate endpoint",
 // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the button says "Add to this week" (one verb)
 ok("⭐ calibrate is reached only from the per-line 'spread on this week' button",
   (code.match(/\/forecast-weeks\/calibrate/g) || []).length === 1
-  && code.includes(">Add to this week</button>") && !code.includes("spread on this week</button>") && /const doSpread = \(row\) => send\("\/forecast-weeks\/calibrate", \{ \.\.\.wkBody\(row\), spread: true/.test(_laBody));
+  // NARROWED 25 Nov 2026 (B1, John's yes to "This week so far"): the one button reads "Add to next week" in that view
+  && code.includes('{tab === "sofar" ? "Add to next week" : "Add to this week"}</button>') && !code.includes("spread on this week</button>") && /const doSpread = \(row\) => send\("\/forecast-weeks\/calibrate", \{ \.\.\.wkBody\(row\), spread: true/.test(_laBody));
 ok("...and the button says the server refuses it when that week is confirmed",
   _laBody.includes("Refused if that week is confirmed"));
 // reversed: the calibrate DIALOG is gone with C18 — there is no typed override in the UI
@@ -542,9 +546,12 @@ ok("reopening a month is shown as a note, not by hiding its weeks",
   code.includes("month is now"));
 
 // ---- 4d2. Look-ahead v2 slices 3-6 — the page (09 Sep evening) ------------------
-ok("three pills, in the mock's order, and the page lands on Commit",
-  /pill\("account", "Account"\)/.test(_laBody) && /pill\("commit", /.test(_laBody) && /pill\("horizon", "Horizon"\)/.test(_laBody)
-  && /localStorage\.getItem\("modus_la_view"\) \|\| "commit"/.test(_laBody));
+// REVERSED / NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17): four tabs "Last week · This week · Next week · Weeks ahead" for
+// "Account · Commit · Horizon"; the page still lands on This week (the remembered tab first)
+ok("four tabs, in the card's order, and the page lands on This week",
+  _laBody.includes('{pill("account", "Last week")}\n        {pill("commit", "This week")}\n        {pill("next", "Next week")}\n        {pill("horizon", "Weeks ahead")}')
+  && !/pill\("account", "Account"\)/.test(_laBody) && !/pill\("horizon", "Horizon"\)/.test(_laBody)
+  && _laBody.includes('return LA_TABS.includes(v) && v !== "sofar" ? v : "commit";'));
 ok("the pills sit under PageHeader — the left rail stays (C18's unsettled point, decided)",
   /<PageHeader title="Look-ahead"/.test(_laBody) && !_laBody.includes("Dashboard · Submit Forecast"));
 // NARROWED (H1, 29 Sep): the t·km card reads TKM() — "t·km", or "t·mi" for a tenant that
@@ -552,8 +559,11 @@ ok("the pills sit under PageHeader — the left rail stays (C18's unsettled poin
 ok("the Commit KPI strip carries the mock's cards: planned, trips, vehicles peak, t·km (TKM()), last-week shortage, last-week delivered — and planned €",
   // NARROWED 10 Nov 2026 (wave 3, finding 5, card 5): every number with its noun and unit — "loads", "vehicles a day at the
   // peak", "t·mi on the routes", "short last week" (in tonnes), "lines delivered last week"
-  ["planned this week", 'caption="loads"', "vehicles a day at the peak", "caption={`${TKM()} on the routes`}", "short last week", "lines delivered last week", "planned ${CUR()}"]
-    .every(t => _laBody.includes(t)));
+  // REVERSED 25 Nov 2026 (the Look-ahead rethink, B1, card 2, Q8): SEVEN figures, a label over each: Planned · Loads · Lorries,
+  // busiest day · Tonne-miles (or -km) · Diesel, per litre · Planned cost · Delivered last week; the captions under them are gone
+  ['label="Planned"', 'label="Loads"', 'label="Lorries, busiest day"', 'label={DU() === "mi" ? "Tonne-miles" : "Tonne-km"}', '<FuelWidget mode="compact"', 'label="Planned cost"', '"Delivered last week"']
+    .every(t => _laBody.includes(t))
+  && !["planned this week", "vehicles a day at the peak", "on the routes`}", 'caption="short last week"', 'caption="lines delivered last week"'].some(t => _laBody.includes(t)));
 ok("H1 (HU5): distances are shown in the tenant's unit — helpers convert at the display boundary only, km stays stored",
   /const DU = \(\) => \(TENANT\.distance_unit === "mi" \? "mi" : "km"\);/.test(code)
   && /const dist = \(km\) =>/.test(code) && /const distRate = \(perKm\) =>/.test(code) && /const distInRate = \(perUnit\) =>/.test(code)
@@ -582,13 +592,17 @@ ok("🔴 the page never fetches the live provider — the refresh is a POST the 
   && _laBody.includes('fetch(`${API}/forecast-weeks/restrictions/refresh`, { method: "POST" })')
   && /fetch\(`\$\{API\}\/forecast-weeks\/restrictions\?bucket=\$\{bucket\}`\)/.test(_laBody)
   && _laBody.includes("setTimeout(tickPoll, 4000)") && !_laBody.includes("forecast-weeks/tark-tee"));
-ok("...the status line says checked-when, partial-with-names, or NOT checked — never a silent clean — in the provider's words",
-  _laBody.includes("${ttName}: checked") && _laBody.includes("not checked since the route was worked out")   // 13 Oct 2026 (W3, narrowed): was "since baking" 
-  && _laBody.includes("NOT checked for these routes") && _laBody.includes("check now")
-  && _laBody.includes('const ttName = ttSrc.restrictions_ui_label || "Road restrictions";')
-  && !_laBody.includes("Tark Tee)") && _laBody.includes("could not reach {ttShort}"));
-ok("H1: the status line names the week the flags are filtered to, and shows only when the tenant has a provider",
-  _laBody.includes("flags shown for the week ${ttSrc.restrictions_week[0]}") && _laBody.includes("&& ttSrc.restrictions_provider && ("));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q18): the line names NO source (the label up to its bracket), no ISO date,
+// no "UTC", and counts the routes not checked, never their codes; still never a silent clean
+ok("...the status line says checked-when, how many not checked since a re-route, or not checked — never a silent clean — in the provider's own first words",
+  _laBody.includes("${ttFirst} checked ${laWhen(ttSrc.restrictions_checked_at)}") && _laBody.includes("not checked since ${ttUnchecked === 1 ? \"it was\" : \"they were\"} re-routed")
+  && _laBody.includes("${ttFirst} not checked for these routes") && _laBody.includes('{ttSrc.restrictions === "ok" ? "Check again" : "Check now"}')
+  && _laBody.includes('const ttName = ttSrc.restrictions_ui_label || "Road restrictions";') && _laBody.includes('const ttFirst = ttName.split(" (")[0].trim() || "Road restrictions";')
+  && !_laBody.includes("Tark Tee)") && _laBody.includes("· the check could not be made: showing the last one")
+  && !_laBody.includes("could not reach {ttShort}") && !_laBody.includes("(ttSrc.restrictions_unchecked || []).join"));
+// REVERSED 25 Nov 2026 (B1): the week the flags are filtered to is the tab's own week: the line no longer prints it (no ISO dates)
+ok("H1: the status line no longer prints the week as ISO dates (the tab says the week), and shows only when the tenant has a provider",
+  !_laBody.includes("flags shown for the week") && !_laBody.includes(" UTC") && _laBody.includes("&& ttSrc.restrictions_provider && ("));
 ok("...and the rail's flags come from the page read alone (no second rail, no client-side merge)",
   /const rail = \(page && page\.clashes\) \|\| \{ flags: \[\], count: 0, sources: \{\} \};/.test(_laBody)
   && !_laBody.includes("...(tt.flags || [])"));
@@ -628,17 +642,20 @@ ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ah
   // (and the Horizon's stockpile cell's `bg` the same), and the eighth, the chosen week pill, keeps the 10 % --navy-soft
   // NARROWED 25 Nov 2026 (task A): + the site heading's today cell (eight column washes)
   && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 8 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
-  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
-  && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
+  // REVERSED 25 Nov 2026 (B1, Q17): the week switch, the one 10 % --navy-soft fill, is gone with the switch (the tabs are underlines)
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 0
+  && !_laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
   // NARROWED 24 Nov 2026 (own look, B1 stage 8): + warn-line, the not-checked line carries the warning's diamond
   _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700 warn-line")}>')
-  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}')
+  // NARROWED 25 Nov 2026 (B1): "Check again" / "Check now" (were "re-check" / "check now")
+  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "Check again" : "Check now"}')
   // 24 Nov 2026 (own look, stage 3; the independent review of the second mockup): the line's link is the sign blue, never amber
   && _laBody.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
-  _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
+  // NARROWED 25 Nov 2026 (B1): the chosen TAB (Last week stays chosen on "This week so far")
+  _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" data-la-tab-id={id} aria-current={tab === id || (id === "account" && tab === "sofar") ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
   && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}'));   /* NARROWED 24 Nov 2026 (own look, B1 stage 8): the chosen tab is an underline only, no tint, no outline */   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
 ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
   (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
@@ -657,11 +674,13 @@ ok("⭐ the honest-gap sentence for an unbaked line ships as written",
 // 13 Oct 2026 (W6, narrowed): the Lorries cell reads "—" and the details say why
 ok("an unbaked line shows trips and NO vehicle count (the human's rule), never a 1",
   _laBody.includes('(c.baked ? <span className="tabular-nums">{grp(f.vehicles)}</span> : <span className="text-amber-700">—</span>)')
-  && _laBody.includes('"Needs this line\'s route worked out for its vehicle"') && _laBody.includes('<td>{c.baked ? grp(f.vehicles) : "—"}</td>'));   // 13 Oct 2026 (W3, narrowed): plain words
+  // NARROWED 25 Nov 2026 (B1, Q18): lorries, not vehicles, on the Look-ahead
+  && _laBody.includes('"Needs this line\'s route worked out for its lorry"') && !_laBody.includes("worked out for its vehicle") && _laBody.includes('<td>{c.baked ? grp(f.vehicles) : "—"}</td>'));   // 13 Oct 2026 (W3, narrowed): plain words
 // 13 Oct 2026 (W6, narrowed): the trigger is RowDetails' chevron, a button with aria-expanded, open per row for the session
 ok("the expand trigger is the Routes table's ▶ toggle, reused",
   _laBody.includes('isOpen={laOpen(lk)} onToggle={() => laToggle(lk)}') && _laBody.includes('const [laOpen, laToggle] = useRowOpen("lookahead");'));
-ok("the empty state uses EmptyState", _laBody.includes("<EmptyState title={`No approved forecast line in the commit week"));
+// NARROWED 25 Nov 2026 (B1): "in this week" / "in next week" (no "commit week")
+ok("the empty state uses EmptyState", _laBody.includes("<EmptyState title={`No approved forecast line in ${bucket === \"next\" ? \"next week\" : \"this week\"}") && !_laBody.includes("in the commit week"));
 ok("planned days are saved through PUT /forecast-days with the day's key",
   /send\("\/forecast-days", \{ route_id: line\.route_id, month_index: line\.month_index,[\s\S]*?day_date: d\.day_date, planned_qty:/.test(_laBody)
   && _laBody.includes('"PUT"'));
@@ -703,15 +722,18 @@ ok("the demo package's band colours are the same hexes as the pills, so map and 
     const labels = Object.fromEntries(d.tables.ipts.map(i => [i.label, i.id]));
     return ov.bands.every(b => (_pageHex[labels[b.ipt]] || "").toUpperCase() === b.colour.toUpperCase()); } catch (e) { return false; } })());
 // the Horizon view
-ok("the Horizon columns carry a ROLE label — account · commit · make-ready · early warning",
-  ["ACCOUNT", "COMMIT", "MAKE-READY", "EARLY WARNING"].every(t => _laBody.includes(`"${t}"`)) && _laBody.includes("horizon.roles"));
+// NARROWED 25 Nov 2026 (B1, Q17): the roles in the tabs' words, Last week and This week (were ACCOUNT, COMMIT), shown in capitals
+ok("the Horizon columns carry a ROLE label — last week · this week · make-ready · early warning",
+  ["Last week", "This week", "Make-ready", "Early warning"].every(t => _laBody.includes(`"${t}"`)) && !_laBody.includes('"ACCOUNT"') && !_laBody.includes('"COMMIT"') && _laBody.includes("horizon.roles"));
 ok("...and no Confirm button lives on the Horizon view",
   (() => { const i = _laBody.indexOf("{horizon.rows.length === 0"); const j = _laBody.indexOf("{confirming && (", i);
            // 13 Oct 2026 (W3, narrowed): the "No day columns here" note moved to the Line header's info box (la.horizon)
            const h = i > 0 && j > i ? _laBody.slice(i, j) : ""; return h.length > 0 && !h.includes("Confirm week") && h.includes('<InfoTip id="la.horizon" />'); })());
 ok("the Horizon footer states the weeks-not-days rule and the blue-column rule",
   // 13 Oct 2026 (W3, narrowed): the footer's two rules are the Horizon info box's text and how
-  src.includes("Week totals for the weeks after the commit week, so hauliers are not sent a four-week daily spreadsheet") && src.includes("It is the only week with daily rows."));
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17): "after this week" (no "commit week")
+  src.includes("Week totals for the weeks after this week, so hauliers are not sent a four-week daily spreadsheet") && src.includes("It is the only week with daily rows.")
+  && !src.includes("or next week by the switch above"));
 
 let _dsBody;
 // ---- 4e. Task D2 — stock held (moved on 10 Sep) --------------------------------------
@@ -1277,20 +1299,26 @@ ok("...and it polls `refresh` while the server's background fetch runs — never
   _fwBody.includes("rf.running") && _fwBody.includes("setTimeout(() => load(false).then(poll), 3000)"));
 ok("🔴 nothing is seeded in the page: no 25 % share and no €1.9x price as a default",
   !/share_pct[^\n]{0,40}25\b/.test(_fwBody) && !/1\.9\d/.test(_fwBody) && !/1\.9\d/.test(_ctBody));
-ok("the Commit KPI strip is eight cards with the widget right of t·km, and the planned € caption counts target lines and shows + BAF",
-  _laBody.includes("xl:grid-cols-8") && _laBody.indexOf('caption={`${TKM()} · route basis`}') < _laBody.indexOf('<FuelWidget mode="compact"')
-  && _laBody.indexOf('<FuelWidget mode="compact"') < _laBody.indexOf("planned ${CUR()} · no rate typed")
-  && _laBody.includes("at target") && _laBody.includes("+ BAF ${CUR()}${grp(totals.eur_adj)}"));   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
+// REVERSED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): SEVEN figures (seven across from 1,000 px of the strip's own
+// width), the widget right of the tonne-miles; the target lines, the partial price and the fuel surcharge move into the
+// Planned cost "i" (its value), never on the strip; "BAF" is gone from the Look-ahead's screens
+ok("the Commit strip is seven figures with the widget right of the tonne-miles, and the Planned cost \"i\" counts target lines and gives the fuel surcharge",
+  !_laBody.includes("xl:grid-cols-8") && html.includes(".fig-strip.la-figs:not(.la-figs-4){grid-template-columns:repeat(7,minmax(0,1fr));}")
+  && _laBody.indexOf('label={DU() === "mi" ? "Tonne-miles" : "Tonne-km"}') < _laBody.indexOf('<FuelWidget mode="compact"')
+  && _laBody.indexOf('<FuelWidget mode="compact"') < _laBody.indexOf('label="Planned cost"')
+  && _laBody.includes("lines at the target rate.") && _laBody.includes("With the fuel surcharge: ${CUR()}${grp(totals.eur_adj)}.") && !_laBody.includes("+ BAF"));   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
 ok("...the expanded Commit row and the Account cell print '+ BAF' as a SECOND figure and mark a target-priced line",
   // 13 Oct 2026 (W6, narrowed): the Commit row's BAF is its own line in the details
-  _laBody.includes('<RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>') && _laBody.includes("+ BAF {CUR()}{grp(r.planned_eur_adj)}")   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
+  // NARROWED 25 Nov 2026 (B1, Q18): "fuel surcharge", never "BAF", on the Look-ahead's own screens
+  _laBody.includes('<RdItem t="Plus the fuel surcharge">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>') && _laBody.includes("+ fuel surcharge {CUR()}{grp(r.planned_eur_adj)}")   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
   && _laBody.includes('r.rate_source === "target"') && _laBody.includes('c.rate_source === "target"'));
 ok("...and the Account footer says the quote is never replaced and € var is against the quote",
   // 13 Oct 2026 (W3, narrowed): the Account footer moved to the Planned cost header's info box (la.cost_quote)
   src.includes("the quote is never replaced") && src.includes("The cost variance compares the actual against the quote") && _laBody.includes('<InfoTip id="la.cost_quote"'));
 ok("the Account strip is mounted above the KPI grid; the widget is passed the page's own costing block",
   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the first card's caption is in words
-  _laBody.indexOf('<FuelWidget mode="strip"') < _laBody.indexOf('caption="lines delivered last week, within 2 % of plan"')
+  // NARROWED 25 Nov 2026 (B1, card 2): the first figure is "Delivered" with its label over it
+  _laBody.indexOf('<FuelWidget mode="strip"') < _laBody.indexOf('<LaKpi label="Delivered"')
   && (_laBody.match(/initial=\{page && page\.costing\}/g) || []).length === 2);
 ok("Config has a 'Costing · fuel' tab whose target rate saves to PUT /admin/costing/target with the admin token — not inside the factors document",
   code.includes('["costing", "Costing · fuel"]') && _ctBody.includes("/admin/costing/target${qs}")
@@ -1322,14 +1350,16 @@ ok("...a live document without the block shows the file's values and says so",
   _fpBody.includes("const fp = (doc && doc.fair_price) || fileFp") && _fpBody.includes("These are the starting values. Save once to keep them."));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): plain words
 ok("the Look-ahead prints the fair figure as a THIRD figure, marked 'model': KPI caption, expanded row, Account column",
   // 13 Oct 2026 (W6, narrowed): the Commit row's fair figure is the details' "Fair cost (model)" line
-  _laBody.includes("fair ${CUR()}${grp(totals.fair_eur)} (model") && _laBody.includes('<RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}') && _laBody.includes("Fair {CUR()} <span")
+  // NARROWED 25 Nov 2026 (B1, card 2): the strip's second line "fair price £47,276" ("model" is in its "i")
+  _laBody.includes("`fair price ${CUR()}${grp(totals.fair_eur)}`") && _laBody.includes('<RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}') && _laBody.includes("Fair {CUR()} <span")
   && _laBody.includes("{CUR()}{grp(r.planned_fair_eur)}"));   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
 ok("...with the winter and thaw flags on the Account cell and the expanded row",
   _laBody.includes('(r.fair_flags || []).includes("WINTER")') && _laBody.includes('(r.fair_flags || []).includes("THAW")')
   // 13 Oct 2026 (W6, narrowed): the expanded row's flags are words through fairWords (winter, thaw)
   && _laBody.includes("fairWords(c.fair.flags)") && src.includes('(flags || []).includes("THAW") ? "thaw restrictions may apply"'));
 // 13 Oct 2026 (W3, narrowed): plain words
-ok("...an unbaked line prints — with the reason, never a number", _laBody.includes("No fair price: the route is not routed yet for this vehicle, or the diesel index is missing"));
+// NARROWED 25 Nov 2026 (B1, Q18): lorry, not vehicle
+ok("...an unbaked line prints — with the reason, never a number", _laBody.includes("No fair price: the route is not routed yet for this lorry, or the diesel index is missing"));
 // 13 Oct 2026 (W3, narrowed): the footer moved to the Fair column's info box (la.cost_fair)
 ok("...and the Fair column's info box calls it a floor for negotiation, never a quote", src.includes("A floor for negotiation, never a quote.") && _laBody.includes('<InfoTip id="la.cost_fair" />'));
 ok("the Config page hands the file document to the tab (for the fallback values)", code.includes("setFileDoc(j.file || null)"));
@@ -4153,7 +4183,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
      && code.includes('<span className="tg text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>') /* NARROWED 24 Nov 2026 (own look): + the tag class */
      // NARROWED 24 Nov 2026 (own look, B1 stage 4): the caption in sentence case (no small capitals), the words unchanged
-     && _fw.includes('<div className="text-xs text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     // REVERSED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the compact card is the strip's "Diesel, per litre" cell, its
+     // one second line the price's date ("23 Nov"); the country and the surcharge base left the strip (its "i", Last week's card)
+     && _fw.includes('<div className="la-fig-label">Diesel, per litre<InfoTip id="la.fig_diesel" /></div>') && !_fw.includes('title={bafTxt}>{bafTxt}</div>\n      </div>\n    );\n  }\n  return (')
      && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
   ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
      !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
@@ -4302,7 +4334,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ["la.variance", "la.cost_quote", "la.cost_fair", "la.cost_actual", "la.spread"].every(id => _acct.includes(`<InfoTip id="${id}"`)));
   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the same button, its words "Add to this week" and its title in the line's unit
   ok("⭐ UI FIX 6 card 2: 'spread on this week' is the app's standard small button (btn-pri btn-sm: 13 px on the accent), same words, same click, same title, same disabled rule; the 11 px white-on-navy one-off is gone",
-     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-sec btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>')
+     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-sec btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to ${tab === "sofar" ? "next" : "this"} week, divided over its remaining weekdays. Refused if that week is confirmed.`}>{tab === "sofar" ? "Add to next week" : "Add to this week"}</button>')   /* NARROWED 25 Nov 2026 (B1, John's yes): "Add to next week" on This week so far */
      && !_laBody.includes("text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white") && !/background: "var\(--navy\)" \}\}>spread on this week/.test(_laBody)
      && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));   // REVERSED 11 Nov 2026 (D-F4, John's yes): btn-sec btn-sm, an outline button, not on the accent
   // card 3 (finding #11 + the user's yes to finding #37)
@@ -5521,8 +5553,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && lpc.includes('{(m.flags || []).map((f, j) => <div key={j} className="lp-flag">{f}</div>)}'));
   ok("⭐ 2.1-9 (Q4): the money card reads the typed day-hire rate, names the types with no rate, else says where to type one",
      lpc.includes("saved this week, an estimate") && lpc.includes("no rate for ${money.missing.map(x => vehLabel(x))") && lpc.includes("at a day-hire rate on Config → Costing · fuel (none typed)"));
-  ok("⭐ 2.1-9 (card 3): the KPI caption gains the chained peak only when the chaining saves something",
-     code.includes("lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? ` · ${grp(Math.max(...Object.values(lorryPlan.chained.by_day)))} with each yard's lorries chained` : \"\""));
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the second line "19 if chained", only when chaining saves one
+  ok("⭐ 2.1-9 (card 3): the Lorries figure gains the chained peak only when the chaining saves something",
+     code.includes("const chainN = lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? Math.max(...Object.values(lorryPlan.chained.by_day)) : null;")
+     && code.includes("chainN != null ? `${grp(chainN)} if chained` : null") && !_laBody.includes("with each yard's lorries chained"));   // the Lorry plan's own line is C1's
   ok("⭐ 2.1-9 (Q9): the phone reads the plan once and lists the day's lorries read-only; the sheets stay a desktop download",
      code.includes("data-ph-lorry-plan={shown}") && code.includes('data-ph-lorry-list="1"') && code.includes("The driver sheets are printed from a desktop."));
   ok("⭐ 2.1-9 (card 4): Config → Costing · fuel has a Day hire row per vehicle, blank by default, under the fair-price model",

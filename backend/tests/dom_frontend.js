@@ -2198,8 +2198,9 @@ async function phoneDayFlagsDom(){
   await openSites();
   ok("⭐ PHONE DAY FLAGS (next weekday): its own gate over capacity shows on that day's card, status and details",
      card().getAttribute("data-ph-day") === next && word(A) === "Gate over" && facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q18): the flag word "Cap" is spelt out, "Route cap"
   ok("PHONE DAY FLAGS (next weekday): line B carries its route cap, and today's gate near capacity has left the card",
-     word(B) === "Cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
+     word(B) === "Route cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "Restriction");
   // NARROWED 25 Nov 2026 (task A): the sites of the three lines flagged
   ok("PHONE DAY FLAGS (next weekday): three lines flagged, counted by their sites", note().startsWith(sitesFlagged([A, B, C])), note());
@@ -2219,7 +2220,8 @@ async function phoneDayFlagsDom(){
   const deskWord = (l) => { const s = del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st`); return s ? [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim() : "(no row)"; };
   const deskMore = (l) => (del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st .rs-more`) || {}).textContent || "";
   ok("⭐ DESK GRID (unchanged): the week's row keeps every flag of the week — A's gate over capacity, B's route cap ahead of its gate near capacity (+1), C's restriction",
-     deskWord(A) === "Gate over" && deskWord(B) === "Cap" && deskMore(B) === "+1" && deskWord(C) === "Restriction",
+     // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q18): the flag word "Cap" is spelt out, "Route cap"
+     deskWord(A) === "Gate over" && deskWord(B) === "Route cap" && deskMore(B) === "+1" && deskWord(C) === "Restriction",
      `${deskWord(A)} | ${deskWord(B)} ${deskMore(B)} | ${deskWord(C)}`);
   await act(async () => { dr.unmount(); }); del.remove();
 }

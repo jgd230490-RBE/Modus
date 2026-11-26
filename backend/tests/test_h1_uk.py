@@ -1222,7 +1222,8 @@ ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning t
    # NARROWED 23 Nov 2026 (claude/working-list): 6 -> 9 — the "Working" list's running dot and progress bar, and the Light
    # look's running chip dot (fills, not text)
    # (both together, merged 24 Nov: 6 + 3 = 9)
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 9 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q9): 9 -> 10, the strip's 4 px status edge on "Delivered last week" (a fill, not text)
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 10 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
@@ -1266,7 +1267,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 23 Nov 2026 (claude/working-list): bad-text 63 -> 65, warn-text 33 -> 35 — the "Working" chip on the Light
    # look's white header bar: its word and its edge, red (Stopped) and amber (Working), on the status tints
    # (both together, merged 24 Nov: 65, measured on the merged page)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 65 and  # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+     # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1): bad-text 65 -> 66, the closures line's "the check could not be made" (was --red, 4.39:1 on some looks)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 66 and  # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
@@ -1280,7 +1282,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 37   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): 36 -> 37, the grid's "pour" in plain amber words (.pour-mark.la-pour); NARROWED 23 Nov 2026 (claude/working-list): +2, the Light look's Working chip; both together, merged 24 Nov: 34 + 2 = 36; NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): warn-text 37 -> 39, a strip figure's amber second line (.la-fig-sub.warn-line) and the diesel cell's "Index unavailable" (was text-amber-700)
+   _fe_wo.count("var(--warn-text)") == 39   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): 36 -> 37, the grid's "pour" in plain amber words (.pour-mark.la-pour); NARROWED 23 Nov 2026 (claude/working-list): +2, the Light look's Working chip; both together, merged 24 Nov: 34 + 2 = 36; NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
      # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
@@ -1503,7 +1506,8 @@ ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink 
    round(_cr("#F87171", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.27 and round(_cr("#9C9FA4", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.44
    and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
    # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
-   and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17): 9 -> 8, the Look-ahead's week switch is gone (the weeks are tabs)
+   and len(_nsInline) >= 8 and all('color: "var(--navy)"' in m for m in _nsInline)
    # NARROWED 24 Nov 2026 (own look, B1 stage 5): 8 -> 7, the Config read-only note is a margin line now (no tint)
    # NARROWED 24 Nov 2026 (own look, B1 stage 8): 7 -> 6, a chosen tab is an underline now, no tint
    and len(_nsCss) >= 6 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),

@@ -236,7 +236,7 @@ try {
   none.done();
   const all = desk(pageOf({ flags: (ls) => [flag(ls[0], "LIMIT", "Road limit"), flag(ls[2], "ROUTE_CAP", "Over the cap", WD[1]), flag(ls[5], "PARENT_CHANGED", "Month changed")] }));
   ok("STATE every site flagged: each heading carries its flag's word, the shape red or amber",
-     [...all.el.querySelectorAll("tr[data-la-site]")].map(h => norm(h.querySelector(".row-st").textContent)).join("|") === "Road limit|Cap|Month changed",
+     [...all.el.querySelectorAll("tr[data-la-site]")].map(h => norm(h.querySelector(".row-st").textContent)).join("|") === "Road limit|Route cap|Month changed",   // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q18): the flag word "Cap" is spelt out, "Route cap"
      [...all.el.querySelectorAll("tr[data-la-site]")].map(h => norm(h.querySelector(".row-st").textContent)).join("|"));
   ok("STATE every site flagged: the flags line names all three sites", norm(all.el.querySelector("[data-la-flagline]").textContent).includes("Harborough Compound")
      && norm(all.el.querySelector("[data-la-flagline]").textContent).includes("Tilton Compound") && norm(all.el.querySelector("[data-la-flagline]").textContent).includes("Tilton Viaduct site"));
