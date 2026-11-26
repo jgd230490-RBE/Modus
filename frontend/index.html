@@ -15307,9 +15307,8 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
     if(mapObj.current || !mapDiv.current || !window.mapboxgl) return;
     window.mapboxgl.accessToken = meta.mapbox_token;
     let m;
-    const ground = lookMapStyle();
     try {
-      m = new window.mapboxgl.Map({ container: mapDiv.current, style: ground,   // 10 Nov 2026 (card 14): opens on the look's basemap
+      m = new window.mapboxgl.Map({ container: mapDiv.current, style: lookMapStyle(),   // 10 Nov 2026 (card 14): opens on the look's basemap
                                     center: UK_VIEW.center, zoom: UK_VIEW.zoom, attributionControl: true });
     } catch(e) {
       // 11 Sep: the Dashboard mounts this too — a map that cannot start (no token, no
@@ -15327,7 +15326,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
       const before = under ? under.id : undefined;
       const OFF = ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4];    // each leg left of its own travel (UK)
       const round = { "line-cap": "round", "line-join": "round" };
-      const L = cmLegs(mapGroundDark(ground));
+      const L = cmLegs(cmDark);   // the same ground the key reads (both taken when the one map is made)
       m.addLayer({ id: "la-faded", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "faded"], layout: round,
                    paint: { "line-color": L.faded, "line-width": 2, "line-opacity": CM_FADED_OPACITY } }, before);
       m.addLayer({ id: "la-routes-casing", type: "line", source: "la-routes", filter: ["!=", ["get", "kind"], "faded"], layout: round,

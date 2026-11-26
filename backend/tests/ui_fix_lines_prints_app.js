@@ -46,7 +46,7 @@ ok("Q1: the Dark pair is the Routes page's own (LEG_OUT_DARK / LEG_BACK_DARK / L
    /return dark \? \{ out: LEG_OUT_DARK, back: LEG_BACK_DARK, faded: CM_FADED_DARK, edge: LEG_CASE_DARK \}/.test(html)
    && html.includes('const LEG_OUT_DARK = "#D4D6DA", LEG_BACK_DARK = "#9A9DA3", LEG_CASE = "#ffffff", LEG_CASE_DARK = "#1F2024";'));
 ok("⭐ Q1: every CommitMap line layer reads its colour from the pair for the ground its one map opens on (no green, amber or #9CA3AF left in it)",
-   cmSrc.includes("const ground = lookMapStyle();") && cmSrc.includes("style: ground,") && cmSrc.includes("const L = cmLegs(mapGroundDark(ground));")
+   cmSrc.includes("const [cmDark] = useState(() => mapGroundDark(lookMapStyle()));") && cmSrc.includes("style: lookMapStyle(),") && cmSrc.includes("const L = cmLegs(cmDark);")
    && ['"line-color": L.out', '"line-color": L.back', '"line-color": L.faded', '"line-color": L.edge'].every(w => cmSrc.includes(w))
    && !/#059669|#f59e0b|#9CA3AF/i.test(cmSrc));
 ok("Q1: the legs keep their widths and their side of the road (4 / 2.5 px, the white casing 6.5 / 5, OFF to the left)",
