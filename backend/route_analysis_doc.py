@@ -611,7 +611,10 @@ def best(rid, ctx, factors):
         out["cols"].append({"label": o["label"], "in_use": False, "chosen": bool(o.get("chosen")),
                             "traded": bool(o.get("traded")), "ruled_out": list(o.get("ruled_out") or []),
                             "counts": dict(o.get("counts") or {}), "pct": dict(o.get("pct") or {}),
-                            "head_words": dict(o.get("head_words") or {})})
+                            "head_words": dict(o.get("head_words") or {}),
+                            # 25 Nov 2026 (Q11): the rule's schedule rows (route_best.option_rows; None when ruled out),
+                            # printed as they are by the summary page's schedule
+                            "rows": [dict(x) for x in (o.get("rows") or [])] or None})
     out["busy_held"] = any((c["counts"].get("busy_min") or {}).get(h) is not None
                            for c in out["cols"] if not c["in_use"] for h in BUSY_HOURS)
     out["cycle_held"] = bool(use) and use.get("cycle_meets") is not None
