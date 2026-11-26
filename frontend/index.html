@@ -879,6 +879,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     .lp-row .lp-free{grid-column:2;text-align:left;margin-top:-2px}
     .lp-axis{grid-template-columns:140px 1fr}
     .lp-axis > span:last-child{display:none}
+    /* 26 Nov 2026 (the batch's pictures): with the third column gone the last hour, centred on the track's end, was cut to
+       "19:" at 820 px, and thirteen labels in about 574 px touch; the narrow axis labels every second hour (06:00 to 18:00) */
+    .lp-ticks span:nth-child(even){visibility:hidden}
   }
   @media (max-width:767px){.lp-axis{display:none}}
   .lp-ticks{position:relative;height:14px}

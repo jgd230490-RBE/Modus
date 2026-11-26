@@ -185,6 +185,9 @@ const cells = (el) => [...el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.
   ok("⭐ C1: a narrow panel (≤ 780 px) puts the free words under the track and the axis follows; the panel is the container",
      html.includes(".lp-panel{container:lp-panel / inline-size}") && /@container lp-panel \(max-width:780px\)\{\s*\.lp-row\{grid-template-columns:140px 1fr\}\s*\.lp-row \.lp-free\{grid-column:2;/.test(html)
      && html.includes(".lp-axis{grid-template-columns:140px 1fr}") && !/@container lp-panel[^{]*\{[^}]*(display:none)[^}]*\.lp-(blk|trip|name)/.test(html));
+  // 26 Nov 2026 (the batch's pictures, 820 px): the last hour label was cut to "19:" once the axis lost its third column
+  ok("C1: in a narrow panel the axis labels every second hour (no '19:' cut, no two labels touching)",
+     /@container lp-panel \(max-width:780px\)\{[^@]*\.lp-ticks span:nth-child\(even\)\{visibility:hidden\}/.test(html));
   ok("C1: a block too narrow for its name carries none: each name measured against its block (is-cut, hidden)",
      /\.lp-name\.is-cut\{[^}]*visibility:hidden/.test(html) && between("function LorryPlanRow(", "function LorryPlan(").includes('n.classList.add("is-cut")'));
   const colours = new Set([...m.el.querySelectorAll(".lp-blk:not(.is-break)")].map(b => b.style.background));
