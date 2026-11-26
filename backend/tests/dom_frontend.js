@@ -3103,10 +3103,14 @@ async function routesPageDom(){
        geo("loaded") >= 1 && geo("return") >= 1 && !!S.routes && (S.routes.data.features || []).some(f => f.properties.leg === "return")
        && (S.routes.data.features || []).some(f => f.properties.leg === "loaded"));
     const rl = L["route-line"], ra = L["route-arrows"];
-    ok("⭐ 2.1-7: the lines are solid, coloured by leg (out #059669, back #F59E0B), each offset LEFT of its travel; arrows ride along them",
-       !!rl && JSON.stringify(rl.paint["line-color"]) === JSON.stringify(["match", ["get", "leg"], "return", "#F59E0B", "#059669"])
+    // REVERSED 24 Nov 2026 (Routes rethink, Q3): ink out, grey back (was green #059669, amber #F59E0B)
+    ok("⭐ 2.1-7: the lines are solid, coloured by leg (out #3A3C41 ink, back #8E9197 grey), each offset LEFT of its travel; arrows ride along them",
+       !!rl && JSON.stringify(rl.paint["line-color"]) === JSON.stringify(["match", ["get", "leg"], "return", "#8E9197", "#3A3C41"])
        && !rl.paint["line-dasharray"] && JSON.stringify(rl.paint["line-offset"]).includes("-2.2") && !!ra && ra.layout["symbol-placement"] === "line");
-    ok("2.1-7: the picked route is a blue halo, never red (Q3)", !!L["sel-line"] && L["sel-line"].paint["line-color"] === "#1D4ED8");
+    // NARROWED 24 Nov 2026 (Routes rethink, Q4): the picked option a solid sign-blue line, a route picked not open a soft halo of it
+    ok("2.1-7: the picked route is a blue halo, never red (Q3); the picked option solid sign blue (24 Nov)",
+       !!L["sel-line"] && L["sel-line"].paint["line-color"] === "#0B4EA2" && L["sel-line"].paint["line-opacity"] === 1
+       && !!L["sel-halo"] && L["sel-halo"].paint["line-color"] === "#0B4EA2" && L["sel-halo"].paint["line-opacity"] === 0.3);
     const n0 = geo("loaded"), r0 = geo("return");
     await press(legBtns[1]);
     ok("2.1-7: Out draws the laden leg alone (no read of the leg back) and is pressed",

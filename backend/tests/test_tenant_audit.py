@@ -151,6 +151,10 @@ UNTENANTED = {
     # 16 Nov 2026 (claude/tools-route-check-request). The public tools' leads (a route check request, a calculator PDF's
     # email): the same kind of row as demo_requests, kept apart from any tenant; the address is only a salted hash.
     "tool_leads": "leads from the public tools for the company running the deployment, not a tenant's data",
+    # 23 Nov 2026 (claude/working-list). The "Working" list's record of the long job running (working.py). Each row
+    # carries tenant_id and every statement filters on it, but it is not PACKAGE data: a re-import replaces every
+    # TENANTED_TABLES row and is itself a job in the list, so its own row must outlive it (as the login tables).
+    "working_jobs": "the record of the long job running (the Working list): scoped by tenant_id, never shipped in or wiped by a package",
     # 14 Oct 2026 (G3). Logins and everything that hangs off them. Each carries tenant_id and every
     # statement filters on it, but none is PACKAGE data: a package import deletes and rewrites every
     # TENANTED_TABLES row, and re-importing the demo must never delete the people who sign in to it.

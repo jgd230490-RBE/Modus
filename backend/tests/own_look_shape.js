@@ -16,19 +16,24 @@ const count = (s, re) => (s.match(re) || []).length;
 ok("1 corner: the Tailwind config maps every rounded-* utility to the one 6 px corner and rounded-sm to the small 3 px",
    html.includes('borderRadius:{sm:"3px",DEFAULT:"6px",md:"6px",lg:"6px",xl:"6px","2xl":"6px"}'));
 ok("1 corner: no rounded-full is left on the page (the pills took the one corner)", !/\brounded-full\b/.test(html));
-const radii = [...new Set((css.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))].sort();
+// NARROWED 24 Nov 2026 (taking main 34e08ac in): the Working list's chip (999px) and its list (10px) are left out here
+// (the Working list, 21 Nov mockup, waiting for John); they are counted in the stage 9 ceilings instead
+const cssNoWork = css.replace(/\n  \.work-(chip|list)\{[^\n]*/g, "");
+const radii = [...new Set((cssNoWork.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))].sort();
 const allowed = ["6px", "3px", "0", "0 !important", "50%", "9px", "6px 6px 0 0", "0 0 6px 6px", "0 0 3px 3px"];
 ok("1 corner: the stylesheet's corners are 6 px, the small 3 px, none, a round dot (50 %) and the count dot's 9 px only",
    radii.every(r => allowed.includes(r)), radii);
-ok("1 corner: no 999px corner is left in the stylesheet (the count dots are 9 px on an 18 px box)", !/border-radius:999px/.test(css));
+ok("1 corner: no 999px corner is left in the stylesheet but the Working chip's (the count dots are 9 px on an 18 px box)", !/border-radius:999px/.test(cssNoWork));
 ok("1 corner: the demo bar's Guide button takes the 6 px corner (third mockup Q4), its colours unchanged",
    /\.demo-bar-guide\{[^}]*border-radius:6px;background:var\(--demo-btn-bg\);box-shadow:inset 0 0 0 1px var\(--demo-btn-ring\)/.test(css));
 ok("1 corner: the count dots stay round (.rail-dot and the phone tab's count, 9 px on 18 px)",
    /\.rail-dot\{[^}]*height:18px;[^}]*border-radius:9px;/.test(css) && /\.phone-tab \.rail-count\{[^}]*border-radius:9px;/.test(css));
 ok("1 corner: the info button stays a ring (50 %), no 999px", /\.ibtn\{[^}]*border-radius:50%;/.test(css));
 const jsxR = [...new Set((code.match(/borderRadius: \d+/g) || []))].sort();
-ok("1 corner: inline corners in the script are the small 3 px, the one 6 px or a legend dot (999 on a 10 px dot)",
-   jsxR.every(r => ["borderRadius: 3", "borderRadius: 6", "borderRadius: 999"].includes(r)), jsxR);
+// NARROWED 26 Nov 2026 (taking main 4159b66 in): the Routes map legend's swatches (PR #325, the Routes rethink) are 2 px; counted
+// here, not restyled (the own look's one corner is 6 px; the small 3 px and 2 px are swatches, not boxes)
+ok("1 corner: inline corners in the script are the small 2 / 3 px swatches, the one 6 px or a legend dot (999 on a 10 px dot)",
+   jsxR.every(r => ["borderRadius: 2", "borderRadius: 3", "borderRadius: 6", "borderRadius: 999"].includes(r)), jsxR);
 
 // ---------------------------------------------------------------- stage 2: status = a shape and a word, no tint
 ok("2 status: RowStatus draws an empty <i> (the shape, in CSS) and the word — no glyph, no RS_ICON",
@@ -39,8 +44,12 @@ ok("2 status: dot = ok, diamond = warning, square = bad, ring = none (and draft)
    && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate\(45deg\);\}/.test(css)
    && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(css)
    && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(css));
-ok("2 status: the chip has no tint, no padding, no corner; the --st-*-bg tints are gone (nothing reads them)",
-   !/\.row-st(\.rs-\w+)?\{[^}]*(background|padding|border-radius)/.test(css) && !/--st-(ok|warn|bad|none)-bg/.test(html));
+// NARROWED 24 Nov 2026 (taking main 34e08ac in): the tints are gone from the token blocks and from every status; the one
+// place left that reads them is the Working list's chip on Light (the Working list, 21 Nov mockup, waiting for John), which
+// keeps its own three beside its rules
+const _noWork = html.replace(/\n  html\[data-theme="light"\]\{--st-ok-bg:#ECFDF5;--st-warn-bg:#FFFBEB;--st-bad-bg:#FEF2F2;\}/, "").replace(/\n  html\[data-theme="light"\] \.work-chip[^\n]*/g, "");
+ok("2 status: the chip has no tint, no padding, no corner; the --st-*-bg tints are gone (only the Working chip reads them)",
+   !/\.row-st(\.rs-\w+)?\{[^}]*(background|padding|border-radius)/.test(css) && !/--st-(ok|warn|bad|none)-bg/.test(_noWork));
 ok("2 status: the second-text token for the ring and the none word, light #44464B and Dark #C9CACE",
    /--st-none:#44464B;/.test(css) && /--st-none:#C9CACE;/.test(css));
 ok("2 status: the Look-ahead flag chips (.chip-st) take the same four shapes, 10 px (warning a diamond, bad a square)",
@@ -58,8 +67,10 @@ ok("3 tags: a team, a workstream and a material are plain words in the second-te
 ok("3 tags: a tag in the warning or bad words carries the status shape (diamond / square), so it is never colour alone; 'Avoided' (a kind) does not",
    /\.tg:not\(\.tg-ns\)\[style\*="--warn-text"\]::before,\.tg:not\(\.tg-ns\)\[style\*="--bad-text"\]::before\{content:"";display:inline-block;width:9px;height:9px;/.test(css)
    && css.includes('.tg:not(.tg-ns)[style*="--warn-text"]::before{transform:rotate(45deg);}') && code.includes('className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided'));
-ok("3 tags: every former pill span carries .tg (24), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
-   count(code, /className=\{?"tg /g) === 24 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
+// NARROWED 24 Nov 2026: 24 -> 23, the Routes vehicle chips are the status chip (RowStatus), no longer a tag
+// NARROWED 26 Nov 2026 (the five amber words): 23 -> 22, the Routes "Diverted" chip is the status chip
+ok("3 tags: every former pill span carries .tg (22), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
+   count(code, /className=\{?"tg /g) === 22 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
    && /<label key=\{m\} className=\{"text-xs px-1\.5 py-0\.5 rounded border cursor-pointer/.test(code));
 ok("3 tags: the CSS pills are plain words: abnormal-load categories, the row details' chips (joined by a dot), the CLP organisation, the lorry plan's badge, the Simulation's chips, the record's end word",
    /\.al-chip\{display:inline-block;font-size:12px;font-weight:600;white-space:nowrap;margin-right:8px;\}/.test(css) && !/\.al-(so|vr1|stgo|cu|warn|bad|grey|okc)\{[^}]*background/.test(css)
@@ -120,7 +131,7 @@ ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) a
 // ---------------------------------------------------------------- stage 8: a chosen tab or day is an underline only
 ok("8 select: a chosen tab is sign blue words on a 2 px sign blue underline, no tint or outline; a chosen day the same with 3 px",
    css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}')
-   && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--line-2);box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}')
+   && css.includes('.ph-day[aria-pressed="true"]{box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}')
    && !/\.ws-tab\[aria-selected="true"\][^{]*\{[^}]*navy-soft/.test(css));
 ok("8 warning: a warning sentence carries the diamond (every amber block sentence and the road-closures line when not checked)",
    css.includes('p.text-amber-700::before,.warn-line>span:first-child::before{content:"";display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);')
@@ -129,15 +140,22 @@ ok("8 warning: a warning sentence carries the diamond (every amber block sentenc
 // 24 Nov 2026 (B1 item 9). Each figure was measured when the branch was built; a change may LOWER a ceiling (and should,
 // when it removes one), never raise it. A new screen or part follows the rule instead (the one corner, a shape and a word,
 // the ruled strip, a ruled section).
+// RAISED 24 Nov 2026 (taking main 34e08ac in), the one case a ceiling may go up, by exactly the Working list's count
+// (the Working list, 21 Nov mockup, waiting for John; its look is not restyled here): cornerSizes 9 -> 11 (.work-list 10px,
+// .work-chip 999px), css999 0 -> 1 (.work-chip), tintedStatus 0 -> 6 (its Light chip reads --st-ok-bg / -warn-bg / -bad-bg,
+// 3, and keeps those three tokens beside its rules, 3)
+// RAISED 26 Nov 2026 (taking main 4159b66 in), by exactly its count: cssBoxes 16 -> 17, the Simulation full screen's "Key"
+// list .sim-key-box (PR #324, a 1 px line and the 6 px corner over the map); counted, not restyled
+// LOWERED 26 Nov 2026: roundedLgBox 52 -> 49, the open route's Vehicles, Gates and haul roads are ruled sections
 const CEIL = {
-  cornerSizes: 9,          // distinct border-radius values in the stylesheet (6px, 3px, 50%, 0, 0 !important, 9px count dot, three half-corners)
-  css999: 0,               // border-radius:999px in the stylesheet (the count dots are 9 px on 18 px)
+  cornerSizes: 11,         // distinct border-radius values in the stylesheet (6px, 3px, 50%, 0, 0 !important, 9px count dot, three half-corners)
+  css999: 1,               // border-radius:999px in the stylesheet (the count dots are 9 px on 18 px)
   inline999: 1,            // borderRadius: 999 in the script (one 10 px legend dot)
-  tintedStatus: 0,         // --st-*-bg tints, and a .row-st rule with a fill
+  tintedStatus: 6,         // --st-*-bg tints, and a .row-st rule with a fill
   boxedFigureTiles: 0,     // a figure tile with its own box ("card px-4 py-3 min-w-0", a strip cell with a 1 px border)
   roundedXlBox: 0,         // "rounded-xl border" section boxes in the markup
-  roundedLgBox: 52,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
-  cssBoxes: 16,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
+  roundedLgBox: 49,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
+  cssBoxes: 17,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
   smallCaps: 18,  // capital labels left (the rail's groups and the demo bar, kept; menus' heads, notices' heads: listed for John)
 };
 const radiiNow = [...new Set((css.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))];
@@ -154,8 +172,8 @@ const now = {
 };
 for (const k of Object.keys(CEIL)) ok(`9 ceiling: ${k} ${now[k]} ≤ ${CEIL[k]} (may only come down)`, now[k] <= CEIL[k], { now: now[k], ceiling: CEIL[k] });
 ok("9 ceiling: the ceilings themselves are at or under the branch's measured figures (a raised ceiling fails here first)",
-   CEIL.cornerSizes <= 9 && CEIL.css999 === 0 && CEIL.inline999 <= 1 && CEIL.tintedStatus === 0 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
-   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 16 && CEIL.smallCaps <= 18);
+   CEIL.cornerSizes <= 11 && CEIL.css999 <= 1 && CEIL.inline999 <= 1 && CEIL.tintedStatus <= 6 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
+   && CEIL.roundedLgBox <= 49 && CEIL.cssBoxes <= 17 && CEIL.smallCaps <= 18);
 // 24 Nov 2026: with the carbon target flush to the column, its fold's summary (21 px) met the note's "i" at 390 px (the
 // UI audit's targets-24px): 2 px above and below make it 25 px
 ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.includes(".ct-more>summary{cursor:pointer;font-size:14px;font-weight:500;padding:2px 0;width:fit-content;}"));
@@ -164,6 +182,49 @@ ok("5 carbon target: the decisions fold's summary is at least 24 px tall", css.i
 ok("5 carbon target: the decisions fold's summary is as wide as its words", /\.ct-more>summary\{[^}]*width:fit-content/.test(css) && css.includes(".ct-more{margin-top:6px;"));
 // 24 Nov 2026: the Best option card's eyebrow in sentence case, as the third mockup draws it (".ey": 12 px, muted, no capitals)
 ok("5 best option: the card's eyebrow is not small capitals", /\n  \.bo-eye\{(?![^}]*(uppercase|letter-spacing))[^}]*\}/.test(css));
+// 24 Nov 2026, from the mother session's read of the real pictures:
+// the Dashboard strip's figures line up: the "i" stays beside its label's last word and does not make its line taller
+// (measured in Chrome at 1150, 1280 and 1366 px: every figure's top equal per row, each label 36 px; a jsdom harness
+// cannot lay out, so the measure itself is the session's Chrome probe and this pins its cause)
+ok("4 strip: a Dashboard label keeps its last word and its i together, and the i does not make the line taller",
+   // NARROWED 26 Nov 2026 (the Dashboard rethink batch): the strip's new Card ties the last word to the "i" itself (.dc-nw)
+   code.includes('<div className="dash-card-l">{head}<span className="dc-nw">{last}{info && <InfoTip')
+   && css.includes(".dash-cards .dc-nw{white-space:nowrap;}") && css.includes(".dash-card-l .ibtn{vertical-align:top;}")
+   && !code.includes("dashLabelHead(") && !code.includes("dash-card-lw"));
+ok("2 status: on the phone Look-ahead the chip stays a flex row, so its shape is drawn (the line's block-span rule made it 0 px)",
+   css.includes(".ph-line .ph-l>.row-st{display:flex;width:fit-content;}"));
+ok("8 day: the chosen day keeps the ordinary border; only the underline marks it",
+   /\.ph-day\[aria-pressed="true"\]\{(?![^}]*border-color)[^}]*box-shadow:inset 0 -3px 0 var\(--navy\)/.test(css));
+ok("2 status: the Routes vehicle chips are the one status chip, a shape and a word, the title on a wrapper",
+   code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />'));
+// 26 Nov 2026 (the mother session's list, from claude/routes-diverted-chip): the five amber words take the shape and the
+// word with no tint (#B45309 on white 5.02:1): Routes' Diverted chip, busy hours paused on Routes and on Zones, "Route
+// again: does not pass the holding area", and the Zones "no way round yet" box
+ok("2 status: the five amber words are the status shape and word, no tint left on any of them",
+   code.includes('tone={used.length ? "warn" : "bad"} />')
+   && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" />')
+   && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt} · paused`} tone="warn" />')
+   && code.includes('<RowStatus word={words} tone="warn" />')
+   && code.includes('<div className="mt-2 text-[13px] st-line st-warn" data-st-line="warn">')
+   && css.includes('.st-line.st-warn{color:var(--warn-text);}')
+   && !/rgba\(180,83,9,\.1[02]\)/.test(code));
+// measured in Chrome at 1150 and 768 px (26 Nov): every one of them inside its cell, the long "Route again" word on two lines
+ok("2 status: a long status word wraps in the route notes and the Zones busy-hours line, its shape kept",
+   css.includes("[data-route-notes] .row-st, [data-busy-in-use] .row-st{white-space:normal;}"));
+// 26 Nov 2026 (the mother session's read of the retaken Routes pictures): the open route's Vehicles, Gates and haul roads
+// are ruled sections (mockup 3 Q1, "ruled sections instead of boxes on every screen"), the haul head's capitals left for later
+ok("5 sections: the open route's Vehicles, Gates and Temporary haul roads are ruled sections, no rounded bordered box",
+   code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-vehicles={r.id}>')
+   && code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-gates-sec="1">')
+   && code.includes('<div className="ruled pt-2.5 pb-1 mb-3" data-route-haul-sec="1">')
+   && !code.includes('rounded-lg border border-slate-200 bg-white p-2.5'));
+// 26 Nov 2026 (the mother session's read of dashboard-light-390): every row of the figures strip starts on one edge, at 2, 3 and 6
+// columns (measured in Chrome at 390, 1000 and 1280 px)
+ok("4 strip: the first figure of every row takes the 2 px start, at every column count",
+   css.includes(".dash-cards .dash-card:nth-child(2n+1){padding-left:2px !important;}")
+   // NARROWED 26 Nov 2026 (the Dashboard rethink batch): the strip's columns follow its OWN width (a size container), three from 560 px, six from 1,000 px
+   && css.includes("@container (min-width:560px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));} .dash-cards .dash-card:nth-child(2n+1){padding-left:12px !important;} .dash-cards .dash-card:nth-child(3n+1){padding-left:2px !important;}}")
+   && css.includes("@container (min-width:1000px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));} .dash-cards .dash-card:nth-child(3n+1){padding-left:12px !important;} .dash-cards .dash-card:first-child{padding-left:2px !important;}"));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);

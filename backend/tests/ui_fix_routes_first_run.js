@@ -66,7 +66,8 @@ ok("⭐ 23: the Vehicles cell is a count (VehCount); each vehicle's chip moves t
    // REVERSED 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117): the chips are no
    // longer a row of the list's table. They are a box (data-route-vehicles) in the open route's own panel, before Near the route
    && !routesTable.includes("data-route-vehicles") && !routesTable.includes("<VehChips")
-   && /<div className="rounded-lg border border-slate-200 bg-white p-2\.5 mb-3" data-route-vehicles=\{r\.id\}>[\s\S]{0,200}<VehChips profiles=\{r\.profiles\} \/>/.test(html)
+   // NARROWED 26 Nov 2026 (own look B1, mockup 3 Q1): the Vehicles box is a ruled section (a 1 px ink line and its title, no box)
+   && /<div className="ruled pt-2\.5 pb-1 mb-3" data-route-vehicles=\{r\.id\}>[\s\S]{0,200}<VehChips profiles=\{r\.profiles\} \/>/.test(html)
    && html.indexOf("data-route-vehicles={r.id}") < html.indexOf("<NearDetails data={nearData} id={r.id} />"));
 if (!fnSrc("VehCount")) ok("...VehCount exists (the Vehicles cell's count)", false);
 else {

@@ -713,7 +713,8 @@ ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the
    # NARROWED 31 Oct 2026 (task 4c PR 3): 9 -> 10 — a pinned picture's "Fit to screen" (fitPic)
    # NARROWED 12 Nov 2026 (CLOCS card C-X1): 10 -> 11 — a Locations row click frames a site's layout (SiteLayoutCard)
    # NARROWED 17 Nov 2026 (route option labels, rule 1): 11 -> 12 — an open route's map is fitted to ALL its options
-   len(_fits) == 12 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 24 Nov 2026 (the Simulation's full screen): 12 -> 13 — the Simulation map keeps its area going in and out (sim_full_screen.js)
+   len(_fits) == 13 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
@@ -1220,9 +1221,12 @@ ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the marku
    # row-status icon's fill (now the --ok-btn pair on the chip's tint) left
    # NARROWED 24 Nov 2026 (own look, B1 stage 2): 8 -> 9, the ok status DOT (.row-st.rs-ok i) is filled --green (a shape)
    # NARROWED 24 Nov 2026 (own look, B1 stage 7): 9 -> 8, the Dashboard's week bar is ink (a small bar beside a status)
+   # NARROWED 23 Nov 2026 (claude/working-list): 8 -> 10 — the "Working" list's done dot and the Light look's done chip
+   # dot (fills, not text)
+   # (both together, merged 24 Nov: 8 + 2 = 10)
    # NARROWED 24 Nov 2026 (the Dashboard rethink, A1): 8 -> 9, a status figure's top edge in the strip (.dc-ok, a border)
    # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): 9 -> 10, a fine gate's dial arc is stroked --green (a shape)
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 10 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 12 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 # NARROWED 29 Oct 2026 (3b, the steel split): 8 — + the dot of Config's "Older: pick one of the three" chip (a status dot, not text)
 # NARROWED 9 Nov 2026 (UI fix phone 2): 9 — + the phone Gate arrivals list's amber bar (a fill, not text)
@@ -1233,14 +1237,20 @@ ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning t
    # border (a border, not text)
    # NARROWED 24 Nov 2026 (own look, B1 stage 7): 6 -> 5, the gates' amber peak bar is ink in every state
    # NARROWED 24 Nov 2026 (own look, B1 stage 8): 5 -> 6, the warning sentence's diamond is a --gold shape (a fill, not text)
+   # NARROWED 23 Nov 2026 (claude/working-list): 6 -> 9 — the "Working" list's running dot and progress bar, and the Light
+   # look's running chip dot (fills, not text)
+   # (both together, merged 24 Nov: 6 + 3 = 9)
+   # NARROWED 26 Nov 2026 (own look B1, the five amber words): 9 -> 10, the "no way round yet" line's diamond (.st-line, a fill)
    # NARROWED 24 Nov 2026 (the Dashboard rethink, A1): 6 -> 7, a status figure's top edge in the strip (.dc-warn, a border)
    # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): 7 stays 7 — the gates' old key swatch (.ga-key-gold) left, a near gate's dial arc is stroked --gold (a shape)
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # (26 Nov 2026, the Dashboard batch: the Working list and own look's 10 with the Dashboard's top edge = 11)
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 11 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
    and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
-   and '["rgba(3,158,134,.12)", "var(--ok-text)"]' in fe and '["rgba(191,46,85,.12)", "var(--bad-text)"]' in fe
+   # NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the one status chip (RowStatus), the pairs are gone
+   and '<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />' in fe and '["rgba(3,158,134,.12)", "var(--ok-text)"]' not in fe
    and 'style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>' in fe
    # NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the Account's "held" is the one status chip, "Delivered"
    and '{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}' in fe and ': has ? ["routed", "var(--ok-text)"] : null;' in fe
@@ -1276,7 +1286,11 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 61 and  # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): 63 -> 61, the phone gates list left (its red figure and its "n % of N"), the dial says "Over capacity" with the status square; NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+   # NARROWED 23 Nov 2026 (claude/working-list): bad-text 63 -> 65, warn-text 33 -> 35 — the "Working" chip on the Light
+   # look's white header bar: its word and its edge, red (Stopped) and amber (Working), on the status tints
+   # (both together, merged 24 Nov: 65, measured on the merged page)
+   # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the phone gates list left (its red figure and its amber one): bad-text -2, warn-text -1 on the merged page
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 61 and  # NARROWED 26 Nov 2026 (own look B1, the five amber words): 64 -> 63, Routes' "Not diverted" is RowStatus; NARROWED 24 Nov 2026 (own look, B1 item 5): 65 -> 64, the Routes vehicle chips are RowStatus (its CSS reads the colour); NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
@@ -1290,7 +1304,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 33   # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): 34 -> 33, the phone gates list's amber figure left (the dial's "Queue likely" is the status chip's); NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+   _fe_wo.count("var(--warn-text)") == 30   # NARROWED 26 Nov 2026 (own look B1, the five amber words): 35 -> 31, Diverted, busy hours paused (Routes, Zones) and "Route again" are RowStatus; the no-way-round box reads it from .st-line (net -4); NARROWED 24 Nov 2026 (own look, B1 item 5): 36 -> 35, the Routes vehicle chips are RowStatus; NARROWED 23 Nov 2026 (claude/working-list): +2, the Light look's Working chip; both together, merged 24 Nov: 34 + 2 = 36; NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
      # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
