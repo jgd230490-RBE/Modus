@@ -206,6 +206,7 @@ RESERVED = {"#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888",          # th
             "#D97706", "#F59E0B", "#C2790B",                                # amber status
             "#059669", "#3B82F6", "#2563EB", "#0F766E", "#0D9488",          # on plan, forecast / brand blue, rail, teal slot
             "#4C1D95", "#155E75", "#57534E", "#64748B", "#7C3AED",          # team bands, unassigned, violet slot
+            "#3A3C41", "#8E9197", "#A9ABB0", "#C6C8CC",                     # NARROWED 26 Nov 2026: the route network's ink and greys
             "#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95"}                     # the council plan-blue ramp
 ok("1: no kind takes a reserved colour (Volume blues, breach red, orange, amber, team / rail hexes)",
    not ({k["colour"].upper() for k in K} & RESERVED), str({k["colour"] for k in K} & RESERVED))

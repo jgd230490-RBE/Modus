@@ -565,10 +565,13 @@ ok("⭐ NO MONTH: every route with an Approved line in ANY month (R1, R2) — a 
 # NARROWED 25 Nov 2026 (the public map's route lines rethink, John's yes 24 Nov, Q12): the printed route map KEEPS its
 # green laden leg and amber empty return; the public map's legs are ink and grey since 24 Nov (its key, #3A3C41 / #8E9197),
 # and the printed maps follow in a second step, after their own mockup. Never a Volume colour on either.
-ok("⭐ ...each leg drawn: its laden leg ('Inbound Highway') green and its empty return ('Outbound Highway') amber in print, "
-   "never a Volume colour; the public map's key is ink and grey since 24 Nov (NARROWED 25 Nov 2026)",
+# REVERSED 26 Nov 2026 (the printed maps' route lines, card 3b; John, Q10: "Go with blue"): the printed legs are two band
+# blues, dark out #0051C4 and light back #72A7FF (they WERE green and amber); the public map's key stays ink and grey.
+ok("⭐ ...each leg drawn: its laden leg ('Inbound Highway') dark blue and its empty return ('Outbound Highway') light blue in "
+   "print (REVERSED 26 Nov 2026, was green and amber); the public map's key is ink and grey since 24 Nov",
    sorted((l["route_id"], l["kind"]) for l in SN["legs"]) == [("R1", "empty"), ("R1", "laden"), ("R2", "empty"), ("R2", "laden")]
-   and rme.LEG_LADEN.lower() == "#059669" and rme.LEG_EMPTY.lower() == "#f59e0b"
+   and rme.LEG_LADEN.upper() == "#0051C4" and rme.LEG_EMPTY.upper() == "#72A7FF"
+   and rme.LEG_LADEN.lower() != "#059669" and rme.LEG_EMPTY.lower() != "#f59e0b"
    and '<span class="color-dot" style="background:#3A3C41;"></span>' in read("map/index.html")
    and '<span class="color-dot" style="background:#8E9197;"></span>' in read("map/index.html"))
 ok("...no movement figures: no Volume legend, the key titled Routes, the words say no month and approved lines only",
