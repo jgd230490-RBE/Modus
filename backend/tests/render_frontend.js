@@ -442,7 +442,7 @@ if (loaded) {
         // 13 Oct 2026 (W6, narrowed): the route id is a details line under each Today row
         && todayRows.every(x => wOut.includes("<dt>Route</dt><dd>" + x.l.route_id + "</dd>")));
       ok("...this week to date and last week's account are printed with their bars",
-        wOut.includes("This week to date") && wOut.includes("Last week") && (wOut.match(/h-2 rounded-full bg-slate-100/g) || []).length === 2
+        wOut.includes("This week to date") && wOut.includes("Last week") && (wOut.match(/h-2 rounded-sm bg-slate-100/g) || []).length === 2
         && wOut.includes(`${wk.account.reported} of ${wk.account.lines} lines reported`));
       // NARROWED 8 Nov 2026 (2.1-13): the Dashboard's map is "Today on the map · the rest of this week faded", with its key row
       ok("...the map card carries the Look-ahead's CommitMap with the Dashboard's title and today's key, and no € anywhere in the Today strip",
@@ -461,7 +461,7 @@ if (loaded) {
       ok("UI FIX 6 card 5: in Rotate / One section the list is marked to fit (data-today-fit) and, until it is measured, draws every row and no count line; both bars are there (the user: keep the progress bars)",
         tvFill.includes('data-today-fit="1"') && (tvFill.match(/<tr class="rd-row /g) || []).length === todayRows.length && todayRows.length > 0
         && !tvFill.includes("today-cut") && !tvFill.includes("today-more")
-        && tvFill.includes("This week to date") && tvFill.includes("Last week") && (tvFill.match(/h-2 rounded-full bg-slate-100/g) || []).length === 2);
+        && tvFill.includes("This week to date") && tvFill.includes("Last week") && (tvFill.match(/h-2 rounded-sm bg-slate-100/g) || []).length === 2);
       // REVERSED 22 Oct 2026 (card 4, the user's yes): All sections is marked to fit now, like Rotate / One section, in its 260 px
       // box (no count line until measured); the working Dashboard is still unchanged
       ok("UI FIX 6 card 4: All sections is marked to fit in its 260 px box (no count line until it is measured); the working Dashboard carries no fit marker and no count line, in its 190 px box as before",
@@ -483,7 +483,8 @@ if (loaded) {
     // Approved-only default: the Pending IPT2 line is not in the default view
     ok("...the default view is Approved only (the Pending line is filtered out; the status select says so)",
       // 13 Oct 2026 (W3, narrowed): the scope is said once, in the kicker ("· approved"); the subtitle that repeated it is gone
-      dOut.includes(" · approved<") && !dOut.includes("approved only") && !dOut.includes(">R4<"));
+      // NARROWED 24 Nov 2026 (own look, B1 stage 6): the place line is in sentence case a part ("· Approved")
+      dOut.includes(" · Approved<") && !dOut.includes("approved only") && !dOut.includes(">R4<"));
     const rowsFix = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
       quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,
       vehicle_type: l.vehicle_type, submitted_by: "tester", reject_reason: null }));

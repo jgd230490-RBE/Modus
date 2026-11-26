@@ -1464,7 +1464,7 @@ async function rowDetailsDom(){
   const kinds0 = new Set(LA.clashes.flags.filter(f => `${f.route_id}|${f.discipline || ""}|${f.section_id || ""}|${f.month_index}` === lk0).map(f => f.code)).size;
   const st0 = r0.querySelector("td.rd-status .row-st");
   ok("⭐ ROW DETAILS · Look-ahead: a lorry over a road limit is the row's ONE status, ahead of the line's other flags, with their count (decision 1)",
-     norm(st0.textContent) === `!Road limit+${kinds0}` /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
+     norm(st0.textContent) === `Road limit+${kinds0}` /* NARROWED 24 Nov 2026 (own look, B1 stage 2): the shape has no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
   const d0 = la3.el.querySelector(`[data-rd-details="la-${lk0}"]`);
   ok("ROW DETAILS · ...and the details spell it out first, the limit sentence in full, then each other flag",
      d0.querySelector(".rd-i.rd-wide dt").textContent === "Road limit" && d0.textContent.includes(limText) && d0.querySelectorAll(".rd-i.rd-wide.rd-bad").length >= kinds0 + 1);
@@ -1603,10 +1603,10 @@ async function rowDetailsDom(){
   const limKey = `${limLine.route_id}|${limLine.discipline || ""}|${limLine.section_id || ""}`;
   const limRow = d3.el.querySelector(`tr[data-rd="dash-${limKey}"]`);
   ok("⭐ ROW DETAILS · Dashboard: a line whose lorry is over a road limit reads ROAD LIMIT in its status, the sentence in its details (decision 3)",
-     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "!Road limit" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
+     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "Road limit" /* NARROWED 24 Nov 2026 (own look): no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
      && rowText(limRow).includes(limText) && rowText(limRow).includes("Checked 13 Oct 2026"));
   const others = [...d3.el.querySelectorAll('table[data-rd-table="dashboard"] tr.rd-row')].filter(tr => tr !== limRow).map(tr => norm(tr.querySelector(".row-st").textContent));
-  ok("ROW DETAILS · ...the other lines read Clear or Not routed, nothing else", others.length > 0 && others.every(x => x === "✓Clear" || x === "!Not routed"), others.join("|"));
+  ok("ROW DETAILS · ...the other lines read Clear or Not routed, nothing else", others.length > 0 && others.every(x => x === "Clear" || x === "Not routed" /* NARROWED 24 Nov 2026 (own look): no glyph */), others.join("|"));
   d3.done();
 
   // ============================== 3. Forecasts ==============================
@@ -1643,14 +1643,14 @@ async function rowDetailsDom(){
   const stOf = (k) => norm(fT.querySelector(`tr[data-fc-line="${k}"] .row-st`).textContent);
   const rej = Object.keys(fg).find(k => k.startsWith("R3|"));
   ok("ROW DETAILS · Forecasts: a rejected line's status reads Rejected (red), its reason in full in the details",
-     stOf(rej) === "!Rejected" && rowText(fT.querySelector(`tr[data-fc-line="${rej}"]`)).includes("Wrong month: move it to November"));
+     stOf(rej) === "Rejected" /* NARROWED 24 Nov 2026 (own look): no glyph */ && rowText(fT.querySelector(`tr[data-fc-line="${rej}"]`)).includes("Wrong month: move it to November"));
   f.done();
   const f2 = mount(w.Forecasts, { meta: dMeta, who: "tester", access: plannerAcc, onEdit(){}, onChanged(){}, initialRows: rowsFix, initialCost: CLL, initialTarget: CTX });
   const fT2 = tableOf(f2.el, "forecasts");
   const limFk = [limLine.route_id, limLine.discipline || "", limLine.section_id || ""].join("|");
   const limFr = fT2.querySelector(`tr[data-fc-line="${limFk}"]`);
   ok("⭐ ROW DETAILS · Forecasts: the same line reads ROAD LIMIT before Pending or Approved, so an approver sees it first; the sentence in the details",
-     norm(limFr.querySelector(".row-st").textContent) === "!Road limit" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
+     norm(limFr.querySelector(".row-st").textContent) === "Road limit" /* NARROWED 24 Nov 2026 (own look): no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
   f2.done();
   ok("ROW DETAILS · the nothing-lost checks covered every table: Look-ahead, gates, Today, the route table and Forecasts each with ten fields or more",
      [nLa, nGa, nTd, nDash, nFc].every(n => n >= 10), [nLa, nGa, nTd, nDash, nFc].join(" / "));
@@ -1949,9 +1949,9 @@ async function abnormalDom(){
      && !p.el.querySelector(".al-holidays"), [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|"));   // NARROWED 27 Oct 2026 (the final UI pass): the holidays' words live in the Settings card now (asserted there)
   ok("⭐ AL DOM: a row a movement with the team's NAME, the class chip from the server's advice, the notify-by date and the flag with its tone, the apply-by line",
      !!rowOf(p.el, "AL001") && rowOf(p.el, "AL001").textContent.includes("Central Team") && rowOf(p.el, "AL001").querySelector(".al-chip.al-stgo").textContent === "STGO Cat 1"
-     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-flag .row-st.rs-bad").textContent === "!Notice late" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
+     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-flag .row-st.rs-bad").textContent === "Notice late" /* NARROWED 24 Nov 2026 (own look): no glyph */ /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
      && rowOf(p.el, "AL002").querySelector(".al-chip.al-so").textContent === "Special Order" && rowOf(p.el, "AL002").textContent.includes("apply by 1 Feb 2027")
-     && rowOf(p.el, "AL002").querySelector(".al-flag .row-st.rs-bad").textContent === "!SO lead time" && !/IPT[12]/.test(p.el.textContent));
+     && rowOf(p.el, "AL002").querySelector(".al-flag .row-st.rs-bad").textContent === "SO lead time" && !/IPT[12]/.test(p.el.textContent));
   ok("AL DOM: the window reads as one span (8–12 Mar 2027, day, 3 movements) and the size line as the figures typed",
      rowOf(p.el, "AL001").textContent.includes("8–12 Mar 2027") && rowOf(p.el, "AL001").textContent.includes("day · 3 movements")
      && rowOf(p.el, "AL001").textContent.includes("Low-loader · 4.6 × 3.9 × 16.5 m · 40 t · 6 axles · 9 t axle"));
@@ -3425,8 +3425,8 @@ async function todayFitDom(){
        [...tv.el.querySelectorAll("tr.rd-details")].every(d => d.hidden) && tv.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
        && w.sessionStorage.getItem("modus_rows_today") === JSON.stringify(OPEN));
     ok("UI FIX 6 card 5 (the user: keep the progress bars): the two bars and their headings are still there, above the list",
-       tv.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
-       && (tv.el.querySelector(".h-2.rounded-full.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
+       tv.el.querySelectorAll(".h-2.rounded-sm.bg-slate-100").length === 2 && norm(tv.el.textContent).includes("This week to date") && norm(tv.el.textContent).includes("Last week")
+       && (tv.el.querySelector(".h-2.rounded-sm.bg-slate-100").compareDocumentPosition(list()) & 4) === 4);
     // 2b. 22 Oct 2026 (UI fix 6, card 5, review): a scroll left over from "All sections" (40 px down) is reset before
     // measuring, so the count is the unscrolled one (without the reset the rows sit 40 px higher and four would "fit")
     { let st = 40; const lbx = list();
@@ -3464,7 +3464,7 @@ async function todayFitDom(){
       ok("UI FIX 6 card 4: in All sections every row is drawn closed (the desk opened the busiest), and both progress bars stay above the list",
          [...m.el.querySelectorAll("tr.rd-details")].every(d => d.hidden)
          && m.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
-         && m.el.querySelectorAll(".h-2.rounded-full.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
+         && m.el.querySelectorAll(".h-2.rounded-sm.bg-slate-100").length === 2 && norm(m.el.textContent).includes("This week to date"));
       m.done();
     }
     {

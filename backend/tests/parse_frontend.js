@@ -442,8 +442,9 @@ ok("peak is the busiest single month per working day",
   code.includes("Math.max(...monthlyT) / wd") && code.includes("Math.max(...monthlyQ) / wd"));
 ok("vehicle loads convert through the payload", code.includes("avgT / p, peakVeh = peakT / p"));
 ok("trips are stated to equal vehicle loads on one line", code.includes("avgTrips: avgVeh, peakTrips: peakVeh"));
-ok("the cards sit in the navy strip with tabular numerals, no new fonts",
-  code.includes('style={{ background: "var(--navy)" }}') && code.includes("tabular-nums")
+// REVERSED 24 Nov 2026 (own look, B1 stage 4): the figures sit in the ruled strip (2 px ink line), not a navy fill
+ok("the cards sit in the ruled strip with tabular numerals, no new fonts",
+  code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes('style={{ background: "var(--navy)" }}') && code.includes("tabular-nums")
   && !/fontFamily/.test(code.slice(code.indexOf("Avg vehicles / day") - 2000, code.indexOf("Avg vehicles / day") + 2000)));
 
 // ---- 4d. Tasks C + D — the Look-ahead page ------------------------------------
@@ -625,14 +626,15 @@ ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ah
   && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
-  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
+  // NARROWED 24 Nov 2026 (own look, B1 stage 8): + warn-line, the not-checked line carries the warning's diamond
+  _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700 warn-line")}>')
   && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}')
   // 24 Nov 2026 (own look, stage 3; the independent review of the second mockup): the line's link is the sign blue, never amber
   && _laBody.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
   _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
-  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}'));   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
+  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}'));   /* NARROWED 24 Nov 2026 (own look, B1 stage 8): the chosen tab is an underline only, no tint, no outline */   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
 ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
   (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
   && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2
@@ -2075,12 +2077,16 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("the rail search filters the pages in place, Enter opens the first match, Ctrl K focuses it",
     code.includes('placeholder="Find a page…"') && code.includes("g.items.filter(navMatch)") && code.includes("if(e.key === \"Enter\" && navFirst){ setPage(navFirst.id); setNavQ(\"\"); }")
     && code.includes('(e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")'));
-  ok("PageHeader takes a monospace kicker; the four rebuilt pages pass one",
-    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })") && code.includes('{kicker && <div className="kicker">{kicker}</div>}')
-    && /\.kicker\{font:600 12px ui-monospace,/.test(html)
+  // REVERSED 24 Nov 2026 (own look, B1 stage 6; John's yes to the mockups): the place line is the mark and the place in
+  // sentence case, the text face in the caption grey: no monospace, no capitals, no letter-spacing
+  ok("PageHeader takes a place line (the mark and the place in sentence case); the four rebuilt pages pass one",
+    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })")
+    && code.includes('{kicker && <div className="kicker"><img className="kicker-mark" src="/brand/mark.svg" alt="" aria-hidden="true" />{placeWords(kicker)}</div>}')
+    && /\.kicker\{display:flex;align-items:center;gap:7px;font:400 12px\/1\.4 var\(--f-text\);color:var\(--muted\);/.test(html) && !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(html)
     && ['<PageHeader title="Dashboard" kicker=', '<PageHeader title="Forecasts" kicker="Plan"', '<PageHeader title="Configuration" kicker="Data"', '<PageHeader title="Look-ahead" kicker='].every(t => code.includes(t)));
-  ok("the Dashboard's six figures sit in one strip card, and Big screen is the orange action button",
-    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled, not boxed: a 2 px ink line on top, a hairline under
+  ok("the Dashboard's six figures sit in one ruled strip, and Big screen is the orange action button",
+    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:0;border-top:2px solid var\(--ink\);border-bottom:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
   ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
     _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
     && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
@@ -2529,7 +2535,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?)\b/i.test(ctc + mxCt)
     && !/\bAI\b/.test(ctc + mxCt) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(ctc + mxCt) && !/style=\{\{ ?color/.test(ctc + mxCt));
   ok("...its colours and sizes are tokens in <style>: 14 px lines, 13 px notes, no new Tailwind colour utility to remap for the dark look",
-    /\.ct-strip\{background:var\(--surface\);border:1px solid var\(--line\);/.test(html) && /\.ct-line\{font-size:14px;[^}]*color:var\(--ink\)/.test(html)
+    // NARROWED 24 Nov 2026 (own look, B1 stage 5): the strip is a ruled section (1 px ink line), not a box
+    /\.ct-strip\{background:none;border:0;border-top:1px solid var\(--ink\);/.test(html) && /\.ct-line\{font-size:14px;[^}]*color:var\(--ink\)/.test(html)
     && /\.ct-note\{font-size:13px;[^}]*color:var\(--muted\)/.test(html)
     && !/\b(?:bg|text|border)-(?:white|black|slate|gray|red|amber|green|emerald|blue)\b/.test(ctc + mxCt) && !/\b(?:bg|text|border)-\[/.test(ctc + mxCt));
 }
@@ -3086,9 +3093,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/useUnits\("gates"\)/.test(src));
   ok("W6: the status is a word and an icon whose shape says the tone (✓ circle, ! square, ! circle, – circle), never colour alone",
      // NARROWED 9 Nov 2026 (UI critique card 11): + draft, a hollow ring with no glyph (a CLP draft; the – circle read "blocked")
-     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
-     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--chart-none\);/.test(html)
-     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}'));
+     // REVERSED 24 Nov 2026 (own look, B1 stage 2; John's yes to the second and third mockups): no glyph; the <i> IS the shape,
+     // drawn in CSS: dot = ok, diamond = warning, square = bad, ring = none; draft the ring with its word
+     src.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !src.includes("RS_ICON")
+     && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(html) && /\.row-st\.rs-warn i\{[^}]*border-radius:0;[^}]*transform:rotate\(45deg\);/.test(html)
+     && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(html)
+     && /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true"></i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
      ["lookahead", "gates", "today", "dashboard", "forecasts"].every(n => src.includes(`data-rd-table="${n}"`))
      && (src.match(/<RowDetails key=/g) || []).length === 5);
@@ -3454,9 +3466,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
      // NARROWED 23 Nov 2026 (own look, stage 2): the fallback ink is #1F2024
      && /ctx\.fillStyle = tok\("--ink", "#1F2024"\);/.test(src));
-  ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
-     /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
-     && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
+  // REVERSED 24 Nov 2026 (own look, B1 stage 2): the four shapes of the one status rule (design language §2): amber a DIAMOND
+  // (was a triangle), red a SQUARE (was a diamond), green a dot; still matched on the token the shape is painted with
+  ok("W16 (D39): an amber status is a diamond and a red one a square beside its word — every .chip-st dot, by the token it is painted with",
+     /\.chip-st i\[style\*="--gold"\]\{width:9px;height:9px;border-radius:0;margin:0 1px;transform:rotate\(45deg\);\}/.test(html)
+     && /\.chip-st i\[style\*="--red"\]\{border-radius:0;\}/.test(html) && !/clip-path:polygon\(50% 0,100% 100%,0 100%\)/.test(html)
+     && /\.chip-st i\{width:10px;height:10px;border-radius:50%;/.test(html));
   ok("W16: 🔴 no hard-coded control blue left in the app's markup — only the map's route and place colours (map data, 29 Sep) and the token blocks",
      !/rgba\(37,99,235,\.(1|08)\)", color: "var\(--navy\)"/.test(src) && !/accentColor: "#2563EB" \}\} \/>\n/.test(src.replace('toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />', ""))
      // NARROWED 16 Oct 2026 (S7): the Simulation's lorry dots read their token --sim-lorry, with #2563EB as the fallback
@@ -4067,32 +4082,38 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/\btext-slate-300\b/.test(code) && !html.includes(".text-slate-300{") && !html.includes(".text-emerald-600{")
      && (code.match(/<span className="text-slate-500">rate not set<\/span>/g) || []).length === 3);
   ok("decision 3: the Submit strip's peak values carry no colour of their own (the label says Peak)",
-     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums">{value}</div>') && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
+     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums text-[color:var(--navy-deep)]">{value}</div>') /* NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip's figure colour, no longer the fill's white */ && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
   ok("decision 2: the green status WORDS read --ok-text, never --green — In force, Delivered %, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, the simulation's checks; the red chip words read --bad-text; the stale chip --warn-text",
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
-     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#edeeef", "#44464B"]')   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
+     /* NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the one status chip (RowStatus: --ok-text / --bad-text
+        words through .row-st), no tint pairs left */
+     && code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />') && !code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') /* NARROWED 24 Nov 2026 (own look, B1 stage 3): a token, so the plain word reads in Dark too */   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
      && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
      && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
   // NARROWED 22 Oct 2026 (UI fix 6, card 3; finding #11): the one text-[9px] that was left, the Horizon's role word, is 12 px
   // too (text-xs), slate-600 on the commit week's shade — so no text-[9px] is left anywhere
+  // NARROWED 24 Nov 2026 (own look, B1 stage 1): every rounded-full chip is "rounded", the one 6 px corner (the Tailwind config maps it)
+  // NARROWED 24 Nov 2026 (own look, B1 stage 3): every chip carries the tag class .tg (a plain word, its tint and padding
+  // undone in CSS); the team, workstream and material tags are plain words in the second-text grey (.tg-plain), no colour
   ok("🔴 chips #19: the 9–10 px chips take the house 12 px (text-xs) — target / quote, stale, winter / thaw, the team and workstream pills, the Routes vehicle chips, the material categories, the gate direction (now the house navy-on-tint pair), set, gate blocked and haul — no 'text-[10px] … rounded-full' chip is left; no text-[9px] is left (22 Oct: the horizon's role word is 12 px, UI fix 6)",
-     code.includes('const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">target</span>')
-     && code.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">quote</span>')
-     && _fw.includes('<span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ color: "var(--warn-text)"')
-     && code.includes('className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route')
+     code.includes('const srcChip = (s) => s === "target" ? <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">target</span>')
+     && code.includes('<span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">quote</span>')
+     && _fw.includes('<span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)"')
+     && code.includes('className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route')
      && code.includes('<span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>')
      && code.includes('<span className="ml-1 text-xs text-amber-700" title="Spring load restrictions')
-     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"')
-     && _ipt.includes('<span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"\n    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>')
+     && _ipt.includes('<span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>') && _ipt.includes('<span className="tg tg-plain text-xs font-semibold">{teamName(k)}</span>')
+     && _ipt.includes('<span className="tg tg-plain text-xs font-semibold">{ws}</span>')
      && !/text-\[(9|10|11)px\]/.test(_ipt) && !/text-\[(9|10|11)px\]/.test(_cat)
-     && _cat.includes('<span key={c} className="text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap"')
-     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
+     && _cat.includes('<span key={c} className="tg tg-plain text-xs whitespace-nowrap">{c}</span>')
+     // NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the status chip now (a shape and a word), its title kept
+     && code.includes('<span key={k} title={tip} className="veh-st" data-veh-tone={tone}>') && !code.includes('style={{ background: bg, color: fg }}>')
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
-     && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
+     && code.includes('className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
      // RE-PINNED 29 Oct 2026 (task 3c): + the Routes row's holding-area chip, the same house chip (four)
      // RE-PINNED 5 Nov 2026 (task 0d-2): + the Routes row's "Busy hours: Alt N" chip, the same house chip (five)
@@ -4100,8 +4121,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
      // NARROWED 10 Nov 2026 (UI critique 23): the five chips moved under "From → to" (a flex row with a gap, data-route-notes), so they lose ml-1.5
      && (() => { const _rn = code.slice(code.indexOf("data-route-notes={r.id}"), code.indexOf("data-route-near-cell={r.id}"));
-        return (_rn.match(/className="text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
-     && code.includes('className={"text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
+        // NARROWED 26 Nov 2026 (own look B1): 5 -> 4, the "Diverted" chip is the one status chip (RowStatus, no tint); the
+        // holding area's "Route again" and a paused busy hours chip are too, their other states keep the house chip
+        return (_rn.match(/className="tg text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 4 && !/ml-1\.5/.test(_rn)
+          && _rn.includes('tone={used.length ? "warn" : "bad"} />') && !/rgba\(180,83,9,\.12\)/.test(_rn); })()
+     && code.includes('className={"tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
@@ -4117,15 +4141,17 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && html.includes('.sim-hold-row{flex-wrap:wrap;') && !code.includes('className="sim-lbl" data-sim-holding='));   // the CSS is in html, not in the script's code
   ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
-     && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')
-     && _fw.includes('<div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     && code.includes('<span className="tg text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>') /* NARROWED 24 Nov 2026 (own look): + the tag class */
+     // NARROWED 24 Nov 2026 (own look, B1 stage 4): the caption in sentence case (no small capitals), the words unchanged
+     && _fw.includes('<div className="text-xs text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
      && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
   ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
      !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
      && !_fw.includes("hover:bg-slate-50 disabled:opacity-40") && _fw.includes('<span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>') && _fw.includes('<span className="w-full text-xs text-slate-500">The base is locked')
-     && (code.match(/className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
+     // NARROWED 24 Nov 2026 (own look, B1 stage 4): the figure labels and group titles in sentence case (no small capitals)
+     && (code.match(/className="text-xs font-semibold text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
      && (code.match(/className="text-xs text-slate-500 fig-sub"/g) || []).length === 2 && !code.includes("text-slate-400 fig-sub")
-     && (code.match(/className="text-xs font-semibold uppercase tracking-wide(?: mb-2)? fig-group"/g) || []).length === 2 && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
+     && (code.match(/className="text-xs font-semibold(?: mb-2)? fig-group"/g) || []).length === 2 && !/uppercase tracking-wide(?: mb-2)? fig-(group|label)/.test(code) && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
      && code.includes('<div className="text-xs text-slate-500">{cw.from ? `week ') && code.includes('<div className="text-xs text-slate-500 mt-1">{bigNum(T.wkPlanT)}') && code.includes('<div className="text-xs text-slate-500 mt-1">{acct && acct.week ? `${acct.reported}')
      && !code.includes("function Kpi(") && !/\bKpi\b/.test(code));
 }
@@ -4317,12 +4343,14 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tdF.includes("const moreT = T.rows.slice(nShown).reduce((s, r) => s + (r.tonnes || 0), 0);")
      && /\n  \.today-more\{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var\(--line\);font-weight:600;color:var\(--muted\);\}\n/.test(html)
      && _tdF.indexOf("today-more") > _tdF.indexOf("</table>)}"));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 1): the bars take the small 3 px corner (rounded-sm), not rounded-full
   ok("⭐ UI FIX 6 card 5 (the user: keep the progress bars): the four figures and BOTH bars, 'This week to date' and 'Last week', are where they were and as they were",
-     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />')
+     // NARROWED 24 Nov 2026 (own look, B1 stage 7): both bars kept, now ink (a small bar beside a status), no tone
+     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} />')
      && _tdF.includes('<span className="font-semibold text-slate-700">This week to date<InfoTip id="dash.week_to_date"')
      && _tdF.includes('<span className="font-semibold text-slate-700">Last week{acct && acct.week ?')
      && (_tdF.match(/<Big value=/g) || []).length === 4 && _tdF.indexOf("This week to date") < _tdF.indexOf("today-lines")
-     && _tdF.includes('<div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
+     && _tdF.includes('<div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: "var(--ink)" }} /></div>'));
   // REVERSED 22 Oct 2026 (card 4, the user: "yes, build card 4 ... keeping the progress bars"): All sections now fits whole rows
   // like the filled layouts; the working Dashboard is still unchanged (wall false). The fill switch stays the Dashboard's.
   ok("UI FIX 6 card 4: 'All sections' fits whole rows too (tvList = wall, not fill); the working Dashboard keeps its scrolling list; the fill switch is the Dashboard's",
@@ -4345,8 +4373,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && html.includes('html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}')
      && !html.includes("(finding 7, open)"));
   ok("⭐ UI FIX 6 card 6 (the user's extra): the 'Avoided' chip is #B91C1C on its pink #FDE8EE (5.53:1, was #DC2626 at 4.13:1) — a fixed pair, not var(--bad-text) (#F87171 in the dark look would fail on the pink)",
-     code.includes('<span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>')
-     && !code.includes('color: ZONE_ROUTING }}>Avoided') && !/var\(--bad-text\)[^\n]{0,40}Avoided/.test(code));
+     // REVERSED 24 Nov 2026 (own look, B1 stage 3): no pink tint, so no fixed pair: the plain word in --bad-text, which reads on the
+     // surface in every look (light #B91C1C on white 6.47, Dark #F87171 on #1F2024 5.88); .tg-ns: no status shape, "Avoided" is a kind, not a fault
+     code.includes('<span className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided</span>') && !code.includes("#FDE8EE")
+     && !code.includes('color: ZONE_ROUTING }}>Avoided'));
 }
 
 // ---- 22 Oct 2026 (UI fix 7, claude/ui-fix-type): the 13 px floor file-wide (decision 4, finding #21) and fewer words ----
@@ -4359,8 +4389,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _css = [...html.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].filter(m => +m[1] < 12).map(m => html.slice(Math.max(0, html.lastIndexOf("\n", m.index)), m.index + 20).trim());
   const _font = [...html.matchAll(/font:\s*(?:\d{3}\s+)?(\d+(?:\.\d+)?)px/g)].filter(m => +m[1] < 12).map(m => html.slice(Math.max(0, html.lastIndexOf("\n", m.index)), m.index + 12).trim());
   const _jsx = [...src.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)\b/g)].filter(m => +m[1] < 12).map(m => src.slice(m.index, m.index + 24));
-  ok("⭐ UI FIX 7: under 12 px only the three glyphs: the status dot's mark (.row-st i), the info button's 'i' (.ibtn) and the Routes chevron (▶)",
-     _css.length === 1 && _css[0].startsWith(".row-st i{") && _font.length === 1 && _font[0].startsWith(".ibtn{")
+  // NARROWED 24 Nov 2026 (own look, B1 stage 2): the status shape carries no glyph now, so the stylesheet has no small text left
+  ok("⭐ UI FIX 7: under 12 px only the two glyphs: the info button's 'i' (.ibtn) and the Routes chevron (▶) (the status shape has no mark)",
+     _css.length === 0 && _font.length === 1 && _font[0].startsWith(".ibtn{")
      && _jsx.length === 1 && _jsx[0].startsWith("fontSize: 10 }}>▶"), JSON.stringify([_css, _font, _jsx]));
   ok("UI FIX 7: the stylesheet's small words lifted to 12 px — the Appearance menu headings, the big screen bar's labels and code tag, the rail's 'Ctrl K' (on one line) and, the user's choice (card 9), the rail's group names and count",
      html.includes(".appearance-menu h6{margin:0;font-size:12px;") && html.includes(".dash-wallbar-lbl{font-size:12px;")
@@ -4791,7 +4822,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // the link is named by its visible words: an aria-label that said something else failed axe (label-content-name-mismatch)
      && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
-     src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
+     // NARROWED 26 Nov 2026 (own look B1): the chip is the one status chip (amber Diverted, red Not diverted), the same words
+     src.includes("data-route-diverted={r.id}") && src.includes('<RowStatus word={`${used.length ? "Diverted" : "Not diverted"} ${divMonths(p.starts_on, p.ends_on)}${more > 0 ? ` +${more}` : ""}`} tone={used.length ? "warn" : "bad"} />'));
   // NARROWED 17 Nov 2026 (routes-card-room, Option B): the open route is a panel under the list, not rows of its table;
   // its Diversions are one block (routeDiversions) handed to RouteAnalysis, on the page and in full screen
   ok("0c: the opened route lists its Diversions (DivRows)", src.includes("<div data-route-diversions={id} className=\"mt-3\">")
@@ -5283,7 +5315,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("{sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan"));
   ok("BUSY HOURS: the Routes row's chip 'Busy hours: Alt N' (hover: the hours; amber while paused) from the diversions read; the Look-ahead's chip from the line context",
      code.includes("setBusyUses(dv.busy || [])") && code.includes('data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}')
-     && code.includes("Busy hours: Alt {u.alt}</span>))}") && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
+     // NARROWED 26 Nov 2026 (own look B1): paused is the one status chip (amber, a shape and the same words), in use the house chip
+     && code.includes("Busy hours: Alt {u.alt}</span>") && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" /></span>))}') && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
   ok("BUSY HOURS: the Carbon planner's 'Route choices' block reads /api/busy-hours, shows nothing with no use, sums them, and says it is already in the total (Q17)",
      code.includes("function CarbonRouteChoices(){") && code.includes("fetch(`${API}/busy-hours`)") && code.includes("if(!uses.length) return null;")
      && code.includes("All route choices") && code.includes("Planned, to the end of the approved plan. Already inside the carbon total and the target.")
