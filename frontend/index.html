@@ -1168,6 +1168,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .row-st.rs-warn{color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate(45deg);}
   .row-st.rs-bad{color:var(--bad-text);} .row-st.rs-bad i{background:var(--red);border:0;border-radius:0;}
   .row-st.rs-draft i{background:transparent;border:2px solid var(--st-none);}
+  .st-line.st-warn{color:var(--warn-text);} .st-line.st-warn>i:first-child{display:inline-block;width:9px;height:9px;margin:0 8px 1px 1px;background:var(--gold);transform:rotate(45deg);}   /* 26 Nov 2026 (B1): a status sentence, its shape first, no box */
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
      John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
      head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
@@ -16407,8 +16408,9 @@ function ZoneDiversions({ zoneId, periods, routes, prof, wayRound, canEdit, busy
         <button type="button" className="text-xs text-slate-500 hover:underline" onClick={onClose}>Hide</button>
       </div>
       {stuck.length > 0 && (
-        <div className="mt-2 text-[13px] rounded-md px-3 py-2" style={{ background: "rgba(180,83,9,.10)", color: "var(--warn-text)" }}>
-          {stuck.join(", ")}: no way round yet. Until you find one they keep their route, flagged on the Look-ahead.
+        <div className="mt-2 text-[13px] st-line st-warn" data-st-line="warn">
+          {/* 26 Nov 2026 (own look B1): a status with no tint: the shape and the words */}
+          <i aria-hidden="true"></i>{stuck.join(", ")}: no way round yet. Until you find one they keep their route, flagged on the Look-ahead.
           {canEdit && wayRound && wayRound.legs > 0 && <div className="mt-1.5">
             <button type="button" className="btn-pri btn-sm" disabled={busy} onClick={onFind}>
               {busy ? "Working…" : `Find a way round (${wayRound.here_calls} routing call${wayRound.here_calls === 1 ? "" : "s"})`}
@@ -17608,9 +17610,11 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
               return (
                 <div key={"u" + u.from} className="text-[13px] mt-2" data-busy-in-use={u.from} data-busy-status={u.status}>
                   <p className="flex flex-wrap items-center gap-2">
-                    <span className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
-                      style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
-                      Busy hours: Alt {u.alt}{u.status === "paused" ? " · paused" : ""}</span>
+                    {/* 26 Nov 2026 (own look B1): paused is a status, the one chip (a shape and a word, no tint) */}
+                    {u.status === "paused" ? <RowStatus word={`Busy hours: Alt ${u.alt} · paused`} tone="warn" />
+                    : <span className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                      style={{ background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>
+                      Busy hours: Alt {u.alt}</span>}
                     <span>{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}{since ? ` since ${since}` : ""}{u.decided_by ? `, by ${u.decided_by}` : ""}.</span>
                     {busy.can_use && u.status === "paused" && <button className="btn-sec" disabled={busyWorking} onClick={(e) => { e.stopPropagation(); busyPost({ alt: u.alt, from: u.from, to: u.to }, "It was not put back in use."); }}>Use again</button>}
                     {busy.can_use && <button className="btn-sec" disabled={busyWorking} data-busy-stop={u.from} onClick={(e) => { e.stopPropagation(); busyPost({ stop: true, from: u.from }, "It was not stopped."); }}>Stop</button>}
@@ -21234,16 +21238,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const H = ((holdSum || {}).holding_areas || []).find(x => x.id === hid) || {};
                         const words = hr.state === "calls" ? `Calls at ${H.name || "the holding area"}` : hr.state === "route_again" ? "Route again: does not pass the holding area"
                           : hr.state === "skip" ? "Does not call off" : hr.state === "exempt" ? "Straight to the gate" : "Not routed yet";
-                        return <span data-route-holding={hr.state} title={hr.state === "route_again" ? "Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)" : undefined}
+                        // 26 Nov 2026 (own look B1): the amber state is a status, the one chip (a shape and a word, no tint)
+                        if(hr.state === "route_again") return <span data-route-holding={hr.state} title="Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)"><RowStatus word={words} tone="warn" /></span>;
+                        return <span data-route-holding={hr.state}
                           className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
-                          style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
+                          style={{ background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
                       })()}
                       {(busyUses || []).filter(u => u.route_id === r.id && u.status !== "stopped").map(u => (
                         // 5 Nov 2026 (task 0d-2): "Busy hours: Alt 2", hover for the hours; amber while paused
-                        <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}${u.status === "paused" ? " · paused: the road changed" : ""}`}
+                        // 26 Nov 2026 (own look B1): paused is a status, the one chip (a shape and a word, no tint)
+                        u.status === "in_use"
+                        ? <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}`}
                           className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
-                          style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
-                          Busy hours: Alt {u.alt}</span>))}
+                          style={{ background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>
+                          Busy hours: Alt {u.alt}</span>
+                        : <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to} · paused: the road changed`}><RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" /></span>))}
                       {(() => {
                         // 8 Nov 2026 (v2.1): the return journey the route's carbon charges; muted while it is the guess
                         const typed = !!r.return_mode, mode = r.return_mode || r.return_default || "empty";
@@ -21263,11 +21272,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const p = (used[0] || bad[0]);
                         const more = (used.length ? used : bad).length - 1;
                         return (
-                          <span data-route-diverted={r.id}
-                            className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
-                            style={used.length ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }
-                                               : { background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
-                            {used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}{more > 0 ? ` +${more}` : ""}
+                          // 26 Nov 2026 (own look B1): a status, the one chip (a shape and a word, no tint)
+                          <span data-route-diverted={r.id}>
+                            <RowStatus word={`${used.length ? "Diverted" : "Not diverted"} ${divMonths(p.starts_on, p.ends_on)}${more > 0 ? ` +${more}` : ""}`} tone={used.length ? "warn" : "bad"} />
                           </span>);
                       })()}
                       {!!(r.haul_roads || []).length && (

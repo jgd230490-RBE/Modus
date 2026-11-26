@@ -4121,7 +4121,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
      // NARROWED 10 Nov 2026 (UI critique 23): the five chips moved under "From → to" (a flex row with a gap, data-route-notes), so they lose ml-1.5
      && (() => { const _rn = code.slice(code.indexOf("data-route-notes={r.id}"), code.indexOf("data-route-near-cell={r.id}"));
-        return (_rn.match(/className="tg text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
+        // NARROWED 26 Nov 2026 (own look B1): 5 -> 4, the "Diverted" chip is the one status chip (RowStatus, no tint); the
+        // holding area's "Route again" and a paused busy hours chip are too, their other states keep the house chip
+        return (_rn.match(/className="tg text-xs font-semibold px-1\.5 py-0\.5 rounded whitespace-nowrap"/g) || []).length === 4 && !/ml-1\.5/.test(_rn)
+          && _rn.includes('tone={used.length ? "warn" : "bad"} />') && !/rgba\(180,83,9,\.12\)/.test(_rn); })()
      && code.includes('className={"tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
@@ -4819,7 +4822,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // the link is named by its visible words: an aria-label that said something else failed axe (label-content-name-mismatch)
      && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
-     src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
+     // NARROWED 26 Nov 2026 (own look B1): the chip is the one status chip (amber Diverted, red Not diverted), the same words
+     src.includes("data-route-diverted={r.id}") && src.includes('<RowStatus word={`${used.length ? "Diverted" : "Not diverted"} ${divMonths(p.starts_on, p.ends_on)}${more > 0 ? ` +${more}` : ""}`} tone={used.length ? "warn" : "bad"} />'));
   // NARROWED 17 Nov 2026 (routes-card-room, Option B): the open route is a panel under the list, not rows of its table;
   // its Diversions are one block (routeDiversions) handed to RouteAnalysis, on the page and in full screen
   ok("0c: the opened route lists its Diversions (DivRows)", src.includes("<div data-route-diversions={id} className=\"mt-3\">")
@@ -5311,7 +5315,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("{sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan"));
   ok("BUSY HOURS: the Routes row's chip 'Busy hours: Alt N' (hover: the hours; amber while paused) from the diversions read; the Look-ahead's chip from the line context",
      code.includes("setBusyUses(dv.busy || [])") && code.includes('data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}')
-     && code.includes("Busy hours: Alt {u.alt}</span>))}") && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
+     // NARROWED 26 Nov 2026 (own look B1): paused is the one status chip (amber, a shape and the same words), in use the house chip
+     && code.includes("Busy hours: Alt {u.alt}</span>") && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" /></span>))}') && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
   ok("BUSY HOURS: the Carbon planner's 'Route choices' block reads /api/busy-hours, shows nothing with no use, sums them, and says it is already in the total (Q17)",
      code.includes("function CarbonRouteChoices(){") && code.includes("fetch(`${API}/busy-hours`)") && code.includes("if(!uses.length) return null;")
      && code.includes("All route choices") && code.includes("Planned, to the end of the approved plan. Already inside the carbon total and the target.")

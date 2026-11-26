@@ -68,8 +68,9 @@ ok("3 tags: a tag in the warning or bad words carries the status shape (diamond 
    /\.tg:not\(\.tg-ns\)\[style\*="--warn-text"\]::before,\.tg:not\(\.tg-ns\)\[style\*="--bad-text"\]::before\{content:"";display:inline-block;width:9px;height:9px;/.test(css)
    && css.includes('.tg:not(.tg-ns)[style*="--warn-text"]::before{transform:rotate(45deg);}') && code.includes('className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided'));
 // NARROWED 24 Nov 2026: 24 -> 23, the Routes vehicle chips are the status chip (RowStatus), no longer a tag
-ok("3 tags: every former pill span carries .tg (23), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
-   count(code, /className=\{?"tg /g) === 23 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
+// NARROWED 26 Nov 2026 (the five amber words): 23 -> 22, the Routes "Diverted" chip is the status chip
+ok("3 tags: every former pill span carries .tg (22), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
+   count(code, /className=\{?"tg /g) === 22 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
    && /<label key=\{m\} className=\{"text-xs px-1\.5 py-0\.5 rounded border cursor-pointer/.test(code));
 ok("3 tags: the CSS pills are plain words: abnormal-load categories, the row details' chips (joined by a dot), the CLP organisation, the lorry plan's badge, the Simulation's chips, the record's end word",
    /\.al-chip\{display:inline-block;font-size:12px;font-weight:600;white-space:nowrap;margin-right:8px;\}/.test(css) && !/\.al-(so|vr1|stgo|cu|warn|bad|grey|okc)\{[^}]*background/.test(css)
@@ -190,6 +191,17 @@ ok("8 day: the chosen day keeps the ordinary border; only the underline marks it
    /\.ph-day\[aria-pressed="true"\]\{(?![^}]*border-color)[^}]*box-shadow:inset 0 -3px 0 var\(--navy\)/.test(css));
 ok("2 status: the Routes vehicle chips are the one status chip, a shape and a word, the title on a wrapper",
    code.includes('const tone = both ? "ok" : p.baked ? "warn" : p.error ? "bad" : "none";') && code.includes('<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />'));
+// 26 Nov 2026 (the mother session's list, from claude/routes-diverted-chip): the five amber words take the shape and the
+// word with no tint (#B45309 on white 5.02:1): Routes' Diverted chip, busy hours paused on Routes and on Zones, "Route
+// again: does not pass the holding area", and the Zones "no way round yet" box
+ok("2 status: the five amber words are the status shape and word, no tint left on any of them",
+   code.includes('tone={used.length ? "warn" : "bad"} />')
+   && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt}`} tone="warn" />')
+   && code.includes('<RowStatus word={`Busy hours: Alt ${u.alt} · paused`} tone="warn" />')
+   && code.includes('<RowStatus word={words} tone="warn" />')
+   && code.includes('<div className="mt-2 text-[13px] st-line st-warn" data-st-line="warn">')
+   && css.includes('.st-line.st-warn{color:var(--warn-text);}')
+   && !/rgba\(180,83,9,\.1[02]\)/.test(code));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
