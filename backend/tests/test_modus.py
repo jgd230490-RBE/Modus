@@ -893,7 +893,9 @@ ok("overlay.js computes the grid scale from the data's latitude, not a constant"
 # 29 Sep 2026: the G2 ink #0F172A is RETIRED with the rebrand (ink is #1F2024 now) — it
 # joins the old list because a grep showed it gone from every shipped file.
 OLD = ("#003787", "#0A1446", "#3398DB", "#BF2E55", "#039E86", "#FFC101", "#0F172A")
-NEW = ("#1F2024", "#2563EB")
+# REVERSED 25 Nov 2026 (the public map's route lines rethink, John's yes 24 Nov; the design language bans the stock blue):
+# map/config.js's accent is the sign blue now too, so its pair is the same as the three pages'
+NEW = ("#1F2024", "#0B4EA2")
 # 24 Nov 2026 (the own look): NARROWED, not removed. On the three pages a person reads (the app, the map page, the user
 # guide) the accent is the sign blue #0B4EA2; the stock blue is on the design language's banned list for a control and
 # the guide no longer carries it at all. map/config.js still holds the 29 Sep blue for the map's own colours, so its
@@ -1075,9 +1077,11 @@ ok("document.title: the tenant's name · Wayscope, plain Wayscope for the defaul
    'document.title = (TENANT.name && TENANT.name !== "Wayscope") ? TENANT.name + " · Wayscope" : "Wayscope";' in fe_src)
 ok("the map's brand ink is #1F2024 and overlay.js reserves it (no band may reuse it)",
    'brandDark:         "#1F2024"' in read("map/config.js") and "'#1F2024'," in ov_src and "#0F172A" not in ov_src)
-ok("the map's forecast routes stay BLUE (decision 29 Sep: orange would blur with amber warnings)",
-   'brand:             "#2563EB"' in read("map/config.js") and 'forecast:          "#3B82F6"' in read("map/config.js")
-   and "#FF8C14" not in read("map/config.js"))
+# NARROWED 25 Nov 2026 (the route lines rethink): still blue, now the sign blue and the five band blues, never orange
+ok("the map's forecast routes stay BLUE (decision 29 Sep: orange would blur with amber warnings; the sign blue and the five band blues since 25 Nov)",
+   'brand:             "#0B4EA2"' in read("map/config.js") and 'forecast:          "#0B4EA2"' in read("map/config.js")
+   and "const CARBON_RAMP = ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B'];" in read("map/index.html")
+   and "#FF8C14" not in read("map/config.js") and "#2563EB" not in read("map/config.js").upper())
 _help = read("frontend/help/index.html")
 # NARROWED (29 Sep): the nav names the product as TEXT until the brand SVG is in the repo
 # (frontend/brand/logo-header-on-dark.svg — delivered separately, not yet applied); then it
