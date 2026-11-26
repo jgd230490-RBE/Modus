@@ -9047,100 +9047,6 @@ function RouteChoicesRecord({ phone }){
   );
 }
 
-// ---- 25 Nov 2026 (the Look-ahead rethink, task A; card 1, John's "Yes, as recommended" to Q1 to Q7): the week by SITE --
-// The site of every line comes from the server (backend/la_sites.py: `line.site`, `commit.sites` in the order of Data →
-// Locations, each site's totals); nothing here works a site or a total out a second way. A site's ONE status is the
-// page's own laStatus over its lines' flags (SHORTAGE never takes it) and, with no flag, the least advanced week of its
-// lines: "Confirmed" only when every line is. The flag words and their order stay LINE_FLAG_LABEL and LA_FLAG_RANK.
-const LA_WEEK_STEP = { derived: 0, edited: 1, confirmed: 2 };
-function laSiteStatus(siteLines, flagsByLine){
-  const fl = [];
-  let wk = null;
-  (siteLines || []).forEach(l => {
-    (flagsByLine[lineKeyOf(l)] || []).forEach(f => fl.push(f));
-    const w = l.week || {};
-    if(!wk || w.parent_changed || (!wk.parent_changed && (LA_WEEK_STEP[w.status] ?? -1) < (LA_WEEK_STEP[wk.status] ?? -1))) wk = w;
-  });
-  return laStatus(fl, wk || {});
-}
-// the site's carry line: "Short 305 t last week" when any of its lines is flagged short (the lines' own tonnes to carry,
-// added); the quiet grey "n t to carry" is a line's, never rolled up to the site
-function laSiteCarry(siteLines, carryBy, flagsByLine){
-  let t = 0, any = false;
-  (siteLines || []).forEach(l => {
-    if(!(flagsByLine[lineKeyOf(l)] || []).some(f => f.code === "SHORTAGE")) return;
-    const r = carryBy[laCarryKey(l)];
-    if(!r || !(+r.remaining_short > 1e-6)) return;
-    any = true; t += +(r.remaining_short_t != null ? r.remaining_short_t : r.remaining_short) || 0;
-  });
-  return any ? <span className="la-carry is-short" data-la-carry="site">Short {laQty(Math.round(t))} t last week</span> : null;
-}
-// The sites of the week as the page shows them: the server's `commit.sites` (Data → Locations order) with each site's own
-// lines, the lines INTO it first and its out lines last; an older reply with no `sites` gives one site a line. A line
-// whose two ends are no longer places sits last under "Other lines". The desk and the phone both read this one list.
-function laSiteList(commit, lines){
-  const byKey = {}; (lines || []).forEach(l => { byKey[lineKeyOf(l)] = l; });
-  const list = (commit && commit.sites) || (lines || []).map(l => ({ id: lineKeyOf(l), name: (l.context || {}).dest_name || l.route_id, type: "", lines: [lineKeyOf(l)], out_lines: 0, days: {}, week: null, out_week: null, ipt: (l.context || {}).ipt || null }));
-  const isOut = (l) => !!(l.site && l.site.dir === "out");
-  return list.map(x => {
-    const sl = (x.lines || []).map(k => byKey[k]).filter(Boolean);
-    return { ...x, name: x.name || "Other lines", sl: [...sl.filter(l => !isOut(l)), ...sl.filter(isOut)] };
-  }).filter(x => x.sl.length);
-}
-// a work section as Submit prints it: its code, and its name when it has one
-const laSecWords = (meta, id) => { if(!id) return ""; const s = ((meta && meta.work_sections) || []).find(x => x.section_id === id); return s && s.name ? `${id} · ${s.name}` : id; };
-// a site's figure in the unit the switch picks, and its out part as a second line
-const laSiteFig = (o, unit) => !o ? "—" : unit === "loads" ? grp(o.loads) : unit === "lorries" ? grp(o.lorries) : `${grp(o.t)} t`;
-const laSiteOut = (o, unit) => !o ? "" : unit === "loads" ? `${grp(o.loads)} out` : unit === "lorries" ? `${grp(o.lorries)} out` : `${grp(o.t)} t out`;
-// The flags line (in place of the rail's three sentences and its "+N more"): the rail's own count, then each kind of flag
-// as a shape and its word, most serious first, and the site(s) it is at as links (a count when a site has it more than
-// once; a dated flag says its day); last and apart, the lines short last week. `onSite(id)` opens and shows a site.
-function LaFlagLine({ rail, siteOfLine, onSite }){
-  const flags = (rail && rail.flags) || [];
-  if(!(rail && rail.count > 0)) return null;
-  const kinds = [];
-  laSorted(flags).filter(f => f.code !== "SHORTAGE").forEach(f => {
-    let k = kinds.find(x => x.code === f.code);
-    if(!k){ k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] }; kinds.push(k); }
-    if(f.day_date) k.days.add(f.day_date); else k.undated = true;
-    const s = siteOfLine(lineKeyOf(f));
-    const id = s ? (s.id || "") : null;
-    let e = k.sites.find(x => x.id === id);
-    if(!e){ e = { id, name: s ? s.name : null, n: 0 }; k.sites.push(e); }
-    e.n += 1;
-  });
-  const short = flags.filter(f => f.code === "SHORTAGE");
-  const shortKeys = Array.from(new Set(short.map(lineKeyOf)));
-  const firstShort = shortKeys.map(siteOfLine).find(Boolean);
-  return (
-    <div className="la-flagline" data-guide="lookahead-flags" data-la-flagline={rail.count}>
-      <b>{rail.count} flag{rail.count === 1 ? "" : "s"}</b>
-      {kinds.map(k => (
-        <span key={k.code} className="la-fl" data-la-flag={k.code}>
-          <RowStatus word={k.word + (!k.undated && k.days.size ? ", " + Array.from(k.days).sort().map(dayName).join(", ") : "")} tone={k.tone} />
-          {k.sites.map((e, i) => (
-            <React.Fragment key={String(e.id)}>
-              <span className={"la-fl-sep" + (i ? " la-fl-comma" : "")} aria-hidden="true">{i ? "," : "·"}</span>
-              {e.name != null
-                ? <button type="button" className="la-fl-site" onClick={() => onSite(e.id)}>{e.name}</button>
-                : <span className="la-fl-none">{e.n} line{e.n === 1 ? "" : "s"}</span>}
-              {e.name != null && e.n > 1 && <em className="la-fl-n">{e.n}</em>}
-            </React.Fragment>
-          ))}
-        </span>
-      ))}
-      {shortKeys.length > 0 && (
-        <span className="la-fl" data-la-flag="SHORTAGE">
-          <RowStatus word="Short last week" tone={laTone("SHORTAGE")} />
-          <span className="la-fl-sep" aria-hidden="true">·</span>
-          {firstShort ? <button type="button" className="la-fl-site" onClick={() => onSite(firstShort.id, shortKeys)}>{shortKeys.length} line{shortKeys.length === 1 ? "" : "s"}</button>
-                      : <span className="la-fl-none">{shortKeys.length} line{shortKeys.length === 1 ? "" : "s"}</span>}
-        </span>
-      )}
-    </div>
-  );
-}
-
 // One empty state for every page, in three kinds (10 Oct 2026, ui-review-1009 mockup 5):
 // "none" (nothing yet), "nomatch" (the filters hide everything) and "error" (a read
 // failed). Same card, same type sizes; the action names the way out.
@@ -13087,6 +12993,101 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
         </div>
       )}
       {err && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{err}</div>}
+    </div>
+  );
+}
+
+// ---- 25 Nov 2026 (the Look-ahead rethink, task A; kept here, before LookAhead and away from the Dashboard's blocks, whose
+// harnesses measure the distance between DashFirstSteps and AppliedChips; card 1, John's "Yes, as recommended" to Q1 to Q7): the week by SITE --
+// The site of every line comes from the server (backend/la_sites.py: `line.site`, `commit.sites` in the order of Data →
+// Locations, each site's totals); nothing here works a site or a total out a second way. A site's ONE status is the
+// page's own laStatus over its lines' flags (SHORTAGE never takes it) and, with no flag, the least advanced week of its
+// lines: "Confirmed" only when every line is. The flag words and their order stay LINE_FLAG_LABEL and LA_FLAG_RANK.
+const LA_WEEK_STEP = { derived: 0, edited: 1, confirmed: 2 };
+function laSiteStatus(siteLines, flagsByLine){
+  const fl = [];
+  let wk = null;
+  (siteLines || []).forEach(l => {
+    (flagsByLine[lineKeyOf(l)] || []).forEach(f => fl.push(f));
+    const w = l.week || {};
+    if(!wk || w.parent_changed || (!wk.parent_changed && (LA_WEEK_STEP[w.status] ?? -1) < (LA_WEEK_STEP[wk.status] ?? -1))) wk = w;
+  });
+  return laStatus(fl, wk || {});
+}
+// the site's carry line: "Short 305 t last week" when any of its lines is flagged short (the lines' own tonnes to carry,
+// added); the quiet grey "n t to carry" is a line's, never rolled up to the site
+function laSiteCarry(siteLines, carryBy, flagsByLine){
+  let t = 0, any = false;
+  (siteLines || []).forEach(l => {
+    if(!(flagsByLine[lineKeyOf(l)] || []).some(f => f.code === "SHORTAGE")) return;
+    const r = carryBy[laCarryKey(l)];
+    if(!r || !(+r.remaining_short > 1e-6)) return;
+    any = true; t += +(r.remaining_short_t != null ? r.remaining_short_t : r.remaining_short) || 0;
+  });
+  return any ? <span className="la-carry is-short" data-la-carry="site">Short {laQty(Math.round(t))} t last week</span> : null;
+}
+// The sites of the week as the page shows them: the server's `commit.sites` (Data → Locations order) with each site's own
+// lines, the lines INTO it first and its out lines last; an older reply with no `sites` gives one site a line. A line
+// whose two ends are no longer places sits last under "Other lines". The desk and the phone both read this one list.
+function laSiteList(commit, lines){
+  const byKey = {}; (lines || []).forEach(l => { byKey[lineKeyOf(l)] = l; });
+  const list = (commit && commit.sites) || (lines || []).map(l => ({ id: lineKeyOf(l), name: (l.context || {}).dest_name || l.route_id, type: "", lines: [lineKeyOf(l)], out_lines: 0, days: {}, week: null, out_week: null, ipt: (l.context || {}).ipt || null }));
+  const isOut = (l) => !!(l.site && l.site.dir === "out");
+  return list.map(x => {
+    const sl = (x.lines || []).map(k => byKey[k]).filter(Boolean);
+    return { ...x, name: x.name || "Other lines", sl: [...sl.filter(l => !isOut(l)), ...sl.filter(isOut)] };
+  }).filter(x => x.sl.length);
+}
+// a work section as Submit prints it: its code, and its name when it has one
+const laSecWords = (meta, id) => { if(!id) return ""; const s = ((meta && meta.work_sections) || []).find(x => x.section_id === id); return s && s.name ? `${id} · ${s.name}` : id; };
+// a site's figure in the unit the switch picks, and its out part as a second line
+const laSiteFig = (o, unit) => !o ? "—" : unit === "loads" ? grp(o.loads) : unit === "lorries" ? grp(o.lorries) : `${grp(o.t)} t`;
+const laSiteOut = (o, unit) => !o ? "" : unit === "loads" ? `${grp(o.loads)} out` : unit === "lorries" ? `${grp(o.lorries)} out` : `${grp(o.t)} t out`;
+// The flags line (in place of the rail's three sentences and its "+N more"): the rail's own count, then each kind of flag
+// as a shape and its word, most serious first, and the site(s) it is at as links (a count when a site has it more than
+// once; a dated flag says its day); last and apart, the lines short last week. `onSite(id)` opens and shows a site.
+function LaFlagLine({ rail, siteOfLine, onSite }){
+  const flags = (rail && rail.flags) || [];
+  if(!(rail && rail.count > 0)) return null;
+  const kinds = [];
+  laSorted(flags).filter(f => f.code !== "SHORTAGE").forEach(f => {
+    let k = kinds.find(x => x.code === f.code);
+    if(!k){ k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] }; kinds.push(k); }
+    if(f.day_date) k.days.add(f.day_date); else k.undated = true;
+    const s = siteOfLine(lineKeyOf(f));
+    const id = s ? (s.id || "") : null;
+    let e = k.sites.find(x => x.id === id);
+    if(!e){ e = { id, name: s ? s.name : null, n: 0 }; k.sites.push(e); }
+    e.n += 1;
+  });
+  const short = flags.filter(f => f.code === "SHORTAGE");
+  const shortKeys = Array.from(new Set(short.map(lineKeyOf)));
+  const firstShort = shortKeys.map(siteOfLine).find(Boolean);
+  return (
+    <div className="la-flagline" data-guide="lookahead-flags" data-la-flagline={rail.count}>
+      <b>{rail.count} flag{rail.count === 1 ? "" : "s"}</b>
+      {kinds.map(k => (
+        <span key={k.code} className="la-fl" data-la-flag={k.code}>
+          <RowStatus word={k.word + (!k.undated && k.days.size ? ", " + Array.from(k.days).sort().map(dayName).join(", ") : "")} tone={k.tone} />
+          {k.sites.map((e, i) => (
+            <React.Fragment key={String(e.id)}>
+              <span className={"la-fl-sep" + (i ? " la-fl-comma" : "")} aria-hidden="true">{i ? "," : "·"}</span>
+              {e.name != null
+                ? <button type="button" className="la-fl-site" onClick={() => onSite(e.id)}>{e.name}</button>
+                : <span className="la-fl-none">{e.n} line{e.n === 1 ? "" : "s"}</span>}
+              {e.name != null && e.n > 1 && <em className="la-fl-n">{e.n}</em>}
+            </React.Fragment>
+          ))}
+        </span>
+      ))}
+      {shortKeys.length > 0 && (
+        <span className="la-fl" data-la-flag="SHORTAGE">
+          <RowStatus word="Short last week" tone={laTone("SHORTAGE")} />
+          <span className="la-fl-sep" aria-hidden="true">·</span>
+          {firstShort ? <button type="button" className="la-fl-site" onClick={() => onSite(firstShort.id, shortKeys)}>{shortKeys.length} line{shortKeys.length === 1 ? "" : "s"}</button>
+                      : <span className="la-fl-none">{shortKeys.length} line{shortKeys.length === 1 ? "" : "s"}</span>}
+        </span>
+      )}
     </div>
   );
 }
