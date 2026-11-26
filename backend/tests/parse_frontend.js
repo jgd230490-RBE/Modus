@@ -3300,7 +3300,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // (or removed) must leave the list, and INFO_PINNED_MAX comes down with it; never raise either. A box not on the list fails
   // at 31 words. The guide link (a new or changed box links to its user-guide section) is not checked yet: FR7.
   const INFO_PINNED_30 = { "dash.carbon": 40, "dash.today_veh": 40, "fc.cost": 39, "dash.delivered": 38, "dash.sim": 38, "clp.holding_areas": 38,
-    "la.lorryplan": 37, "la.commit": 37, "dash.deliveries": 36, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
+    "la.lorryplan": 36, "la.commit": 37,   // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1): la.lorryplan 37 -> 36 ("load point" for "yard")
+    "dash.deliveries": 36, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
     "map.commit.today": 33, "map.commit.week": 33, "dash.stock": 33, "dash.vehicles": 32, "la.cost_quote": 32, "clp.euro_class": 31, "clp.carbon_rate": 31 };
   const INFO_PINNED_MAX = 21;
   const over30 = (dict) => Object.keys(dict).filter(k => words(dict[k].text) > 30);
@@ -3418,7 +3419,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline, and the big screen's Today list",
      // NARROWED 17 Nov 2026 (routes-card-room): two more, both the open route's panel: useBoxWide (two columns from its own
      // width) and the page kept at the panel's top while the panel's reads arrive (until the person scrolls, clicks or types)
-     (src.match(/new ResizeObserver\(/g) || []).length === 8
+     // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1): one more, a Lorry plan row measures each site's name against its
+     // block (a block too narrow for its name carries none)
+     (src.match(/new ResizeObserver\(/g) || []).length === 9
+     && (src.slice(src.indexOf("function LorryPlanRow("), src.indexOf("function LorryPlan(")).match(/new ResizeObserver\(/g) || []).length === 1
      && src.includes("const ro = new ResizeObserver(() => { if(on) go(); });")
      && (src.slice(src.indexOf("function useBoxWide("), src.indexOf("// the one status:")).match(/new ResizeObserver\(/g) || []).length === 1
      && (src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart(")).match(/new ResizeObserver\(/g) || []).length === 1 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
@@ -5527,8 +5531,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan — each lorry's day used to the full (mockup notes/drivers-day-fill-mockup-1108 v2 + addendum) ----
 {
   const lpc = code.slice(code.indexOf("function LorryPlanRow({"), code.indexOf("function GatesWeek({"));
-  ok("⭐ 2.1-9: the panel reads one GET of the Lorry plan per bucket and tick, folded by default, and hands its figures up for the KPI caption",
-     lpc.includes("fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`)") && lpc.includes("const [open, setOpen] = useState(false);")
+  // REVERSED 25 Nov 2026 (the Look-ahead rethink, C1, Q10): no fold of its own; read in both views, drawn only in "By lorry"
+  ok("⭐ 2.1-9: the panel reads one GET of the Lorry plan per bucket and tick, has NO fold of its own (drawn only in the week's By lorry view), and hands its figures up for the KPI caption",
+     lpc.includes("fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`)") && !lpc.includes("const [open, setOpen] = useState(false);")
+     && lpc.includes("if((!data && !err) || show === false) return null;") && !lpc.includes("data-lp-toggle")
      && lpc.includes("if(onData) onData(j);") && code.includes("onData={setLorryPlan} weekConfirmed={allConfirmed}"));
   ok("⭐ 2.1-9 (Q1, Q11): three views, Chained by yard the default; the weekday chips are the week's own days from the server",
      lpc.includes('const [view, setView] = useState("chained");') && lpc.includes('["booked", "chained", "compressed"].map(k =>')
@@ -5541,18 +5547,25 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      code.includes("const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;") && lpc.includes('role={can ? "group" : "img"} aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`}')
      && lpc.includes("const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);")
      && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#C6C8CC 0 4px,#E1E2E4 4px 8px);color:#34363A}"));   // NARROWED 23 Nov 2026 (own look): the neutral hatch
-  ok("⭐ 2.1-9 (Q8): the free time in the server's words at the row's end; destination colours from the chart tokens (no hard-coded control blue)",
-     lpc.includes('<div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>') && code.includes("const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`"));
+  // REVERSED 25 Nov 2026 (the Look-ahead rethink, C1, card 3): colours by site from their own list, no chart token (the chart
+  // orange went with them); ui_fix_lorry_plan_view.js checks every hue
+  ok("⭐ 2.1-9 (Q8): the free time in the server's words at the row's end; site colours from their own list --lp-s1..8 (no chart token, no hard-coded control blue)",
+     lpc.includes('<div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>') && code.includes("const lpPalette = () => LP_SITE_HEX.map((h, i) => tok(`--lp-s${i + 1}`, h)).map(lpDeep);")
+     && !code.includes("const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`"));
   ok("⭐ 2.1-9 (Q12): Apply only in the compressed view, planners / admins, never on a confirmed week or with nothing to move, and asks first; the grid re-reads after",
      lpc.includes('{view === "compressed" && canApply && <button type="button" className="btn-pri" onClick={apply} data-lp-apply="1"')
      && lpc.includes("disabled={!!busy || weekConfirmed || !mv.length}") && lpc.includes('if(!window.confirm("Move this week\'s loads between its days as the compressed view shows?')
      && lpc.includes('window.dispatchEvent(new CustomEvent("wayscope:lookahead-refresh"));') && code.includes('window.addEventListener("wayscope:lookahead-refresh", f)'));
   ok("⭐ 2.1-9 (Q5): Driver sheets (PDF) and XLSX for the day shown, not in the booked view; the moves list with its flags, folded",
-     lpc.includes("`${API}/forecast-weeks/lorry-plan/download?bucket=${bucket}&view=${view}&day=${shown}&format=${fmt}`")
-     && lpc.includes('{view !== "booked" && <span className="ml-auto flex items-center gap-2">') && lpc.includes('data-lp-moves={mv.length}')
+     // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1): the day's sheets or one load point's (yard + vehicle), from "Driver sheets ▾"
+     lpc.includes("`${API}/forecast-weeks/lorry-plan/download?bucket=${bucket}&view=${view}&day=${shown}&format=${fmt}${only}`")
+     && lpc.includes('{view !== "booked" && <span className="lp-acts">') && lpc.includes('data-lp-moves={mv.length}')
      && lpc.includes('{(m.flags || []).map((f, j) => <div key={j} className="lp-flag">{f}</div>)}'));
   ok("⭐ 2.1-9 (Q4): the money card reads the typed day-hire rate, names the types with no rate, else says where to type one",
-     lpc.includes("saved this week, an estimate") && lpc.includes("no rate for ${money.missing.map(x => vehLabel(x))") && lpc.includes("at a day-hire rate on Config → Costing · fuel (none typed)"));
+     // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1, card 3): the cell's label says "Saved this week"; no rate typed is the
+     // link "Set a day rate" (Config, Costing · fuel) for a planner or an admin, plain words for a team
+     lpc.includes("an estimate${money && money.missing") && lpc.includes("no rate for ${money.missing.map(x => vehLabel(x))") && lpc.includes('lpKpi("Saved this week"')
+     && lpc.includes('data-lp-rate="1">Set a day rate</button> : "no day rate typed"') && !lpc.includes("at a day-hire rate on Config → Costing · fuel (none typed)"));
   // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the second line "19 if chained", only when chaining saves one
   ok("⭐ 2.1-9 (card 3): the Lorries figure gains the chained peak only when the chaining saves something",
      code.includes("const chainN = lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? Math.max(...Object.values(lorryPlan.chained.by_day)) : null;")
@@ -5564,7 +5577,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes('d.day_hire = d.day_hire || {}; if(v === "" || v == null) delete d.day_hire[k];') && code.includes("Not used in the cost lines or the fair price."));
   const words = lpc + code.slice(code.indexOf('"la.lorryplan": {'), code.indexOf('"la.gates": {'));
   ok("🔴 2.1-9: the panel's words — never compliant, utilisation, fill rate or movements; no back-end words; no team id",
-     !/compliant|utilisation|fill rate|movement|endpoint|server|cache|token/i.test(words) && !/IPT[1-6]/.test(words));
+     // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1): "ResizeObserver" is the browser's name, not a word on the screen
+     !/compliant|utilisation|fill rate|movement|endpoint|server|cache|token/i.test(words.replace(/ResizeObserver/g, "")) && !/IPT[1-6]/.test(words));
   ok("2.1-9: the panel's type is 12 px or more (the 13 px floor's glyph rule keeps to the three glyphs)",
      !/\.lp-[a-z-]*\{[^}]*font-size:(9|10|11)px/.test(html));
 

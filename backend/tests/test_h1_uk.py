@@ -1268,7 +1268,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # look's white header bar: its word and its edge, red (Stopped) and amber (Working), on the status tints
    # (both together, merged 24 Nov: 65, measured on the merged page)
      # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1): bad-text 65 -> 66, the closures line's "the check could not be made" (was --red, 4.39:1 on some looks)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 66 and  # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+     # NARROWED 26 Nov 2026 (the Look-ahead rethink batch, claude/la-rethink): 66 -> 67, B1's closures line and C1's panel line together, measured on the merged page
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 67 and  # NARROWED 26 Nov 2026 (the Look-ahead rethink, C1): 65 -> 66, the driver sheet panel's failed read ("The driver sheet could not be read."); # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
@@ -1318,7 +1319,9 @@ ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-
    and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#44464B}' in fe
    and round(_cr("#64748B", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 4.47 and round(_cr("#475569", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 7.12
    and _cr(_DARK["muted"], _over("rgba(217,119,6,.06)", _eff("orange", "dark")["surface"])) >= 4.5
-   and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 1
+   # NARROWED 26 Nov 2026 (the Look-ahead rethink batch, claude/la-rethink): 7 -> 6, B1's week switch and C1's view and day
+   # chips are no longer tinted (each branch alone kept 7 or more; together, measured on the merged page)
+   and _fe_wo.count('background: "var(--navy-soft)"') >= 6 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 1
    and _fe_wo.count('background: "rgba(217,119,6,.06)"') == 1
    # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone (Orange shades' #FFF4E6 row with it)
    and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' not in fe)
@@ -1507,7 +1510,9 @@ ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink 
    and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
    # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
    # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17): 9 -> 8, the Look-ahead's week switch is gone (the weeks are tabs)
-   and len(_nsInline) >= 8 and all('color: "var(--navy)"' in m for m in _nsInline)
+   # NARROWED 26 Nov 2026 (the Look-ahead rethink, C1): 9 -> 7, the Lorry plan's view and day chips are a segment and an underline now
+   # NARROWED 26 Nov 2026 (the Look-ahead rethink batch, claude/la-rethink): both together, 6, measured on the merged page
+   and len(_nsInline) >= 6 and all('color: "var(--navy)"' in m for m in _nsInline)
    # NARROWED 24 Nov 2026 (own look, B1 stage 5): 8 -> 7, the Config read-only note is a margin line now (no tint)
    # NARROWED 24 Nov 2026 (own look, B1 stage 8): 7 -> 6, a chosen tab is an underline now, no tint
    and len(_nsCss) >= 6 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
