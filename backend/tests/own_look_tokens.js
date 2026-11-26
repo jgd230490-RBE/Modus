@@ -52,8 +52,9 @@ ok("1 type: every canvas text on a chart is IBM Plex Sans (the Routes map's sign
    canvasFaces.length >= 10 && notPlex.length === 0, notPlex.join(" | "));
 ok("1 type: Chart.js draws its own axes and keys in IBM Plex Sans (guarded: a stub Chart has no font object)",
    html.includes("if(window.Chart.defaults.font) window.Chart.defaults.font.family = \"'IBM Plex Sans', system-ui, sans-serif\";"));
-ok("1 type: a chart's downloaded picture and the record's picture name IBM Plex Sans first",
-   (html.match(/font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"/g) || []).length === 2);
+// 25 Nov 2026 (Dashboard rethink A2, gate dials): the gate dials' picture is a third, so 2 -> 3
+ok("1 type: a chart's downloaded picture, the record's picture and the gate dials' picture name IBM Plex Sans first",
+   (html.match(/font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"/g) || []).length === 3);
 
 // ---- 2 greys -------------------------------------------------------------------------------------------------------
 const twAt = html.indexOf('<script src="/vendor/tailwind-play-3.4.17.js"></script>');
@@ -87,7 +88,8 @@ ok("🔴 3 sign blue: Dark's is the light sign blue #8AB4F8 (16 % and 10 % tints
 ok("3 sign blue: the white bar's chosen segment is a sign blue tint with sign blue words (was an orange tint)",
    tokenIn(lightHdr, "hdr-on") === "rgba(11,78,162,.10)" && css.includes('html[data-theme="light"] .hdr-seg button.is-on{color:var(--navy);}'));
 ok("3 sign blue: the page's five blue utilities are the sign blue ramp, and Dark remaps them to the light sign blue (no orange)",
-   html.includes('950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}}}}};</script>')
+   // NARROWED 24 Nov 2026 (own look, B1 stage 1): the config now carries the one corner (borderRadius) after the colours
+   html.includes('950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}},borderRadius:{sm:"3px",DEFAULT:"6px",md:"6px",lg:"6px",xl:"6px","2xl":"6px"}}}};</script>')
    && css.includes('html[data-theme="dark"] .bg-blue-50{background-color:rgba(138,180,248,.12)}') && css.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}')
    && css.includes('html[data-theme="dark"] .text-blue-800{color:#A9C8FA}') && css.includes('html[data-theme="dark"] .border-blue-300{border-color:rgba(138,180,248,.45)}'));
 ok("⭐ 3 selection: the rail's chosen page, the wall bar's chosen button and the phone's chosen segment are the 10 % tint with sign blue words — none filled",
@@ -96,20 +98,21 @@ ok("⭐ 3 selection: the rail's chosen page, the wall bar's chosen button and th
    && css.includes('.ph-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);}'));
 ok("3 selection: the phone's chosen tab, its More item and its chosen day read the sign blue, not the action colour",
    css.includes(".phone-tab.is-on{color:var(--navy);") && /\.phone-tab\.is-on::before\{[^}]*background:var\(--navy\);\}/.test(css)
-   && css.includes(".phone-more-item.is-on{color:var(--navy);") && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--navy);')
+   && css.includes(".phone-more-item.is-on{color:var(--navy);") && css.includes('.ph-day[aria-pressed="true"]{box-shadow:inset 0 -3px 0 var(--navy);color:var(--navy);}') /* NARROWED 24 Nov 2026 (own look, B1 stage 8): an underline only */
    && !/\.(phone-tab\.is-on|phone-more-item\.is-on|ph-day\[aria-pressed="true"\]|ph-seg button\[aria-pressed="true"\])[^{]*\{[^}]*var\(--action\)/.test(css));
 ok("3 selection: the look list's chosen row is a light sign blue tint and tick on the dark popover (was orange)",
    // NARROWED 24 Nov 2026 (stage 5): the accent items went with the picker's accent half
    css.includes(".appearance-item.is-on{background:rgba(138,180,248,.16);}") && css.includes(".appearance-item .tick{opacity:0;color:#8AB4F8;}"));
 const placeOn = html.match(/style=\{(gatePlace|areaPlace|picking === c\.name) \? \{ background: "var\(--navy-soft\)", color: "var\(--navy\)" \} : undefined\}/g) || [];
-ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's picked tool are the tint and sign blue words; no text-white sits on a --navy or --blue fill but the Submit strip",
+// NARROWED 24 Nov 2026 (own look, B1 stage 4): the Submit strip is a ruled strip now, so no navy fill is left at all
+ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's picked tool are the tint and sign blue words; no text-white sits on a --navy or --blue fill",
    placeOn.length === 3 && html.includes('style={on ? { background: "var(--navy-soft)", color: "var(--navy)" } : undefined} />;')
    && !/background: ?"var\(--blue\)"/.test(html)
-   && (html.match(/background: ?"var\(--navy\)"/g) || []).length === 1 && html.includes('text-white kpi-num" style={{ background: "var(--navy)" }}>'));
+   && (html.match(/background: ?"var\(--navy\)"/g) || []).length === 0 && html.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">'));
 ok("3 selection: a table column (today, the commit week) is the 6 % tint: eight column washes, none on the 10 % tint",
    (html.match(/var\(--navy-soft-col\)/g) || []).length === 8 && !/\{ background: "var\(--navy-soft\)" \}/.test(html));
 ok("3 figures: the Cost groups and their planned and fair £, today's vehicles, the Submit page's loads and fair £ and the Today heading read the ink, not the sign blue",
-   (html.match(/<Group title="Cost" tone="var\(--navy-deep\)">/g) || []).length === 2 && !/tone="var\(--navy\)"/.test(html.replace('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />', ""))
+   (html.match(/<Group title="Cost" tone="var\(--navy-deep\)">/g) || []).length === 2 && !/tone="var\(--navy\)"/.test(html) /* NARROWED 24 Nov 2026 (own look, B1 stage 7): the Last week bar is ink now, no tone */
    && html.includes('fig-group" style={{ color: "var(--navy-deep)" }}>Today'));
 ok("⭐ 3 links: the road closures line's link is the sign blue even when the line is an amber warning",
    html.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));

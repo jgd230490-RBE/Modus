@@ -370,8 +370,11 @@ ok("6. the route row's chip: muted while guessed, navy once chosen", 'data-route
 ok("6. Config → Planning: Return journeys, three choices and the share, one hint line, an i box",
    'data-cfg="return-journeys"' in fe and '<InfoTip id="cfg.return" />' in fe and "May take other work charges" in fe
    and "For routes with no choice of their own (Data → Routes)." in fe)
-ok("6. the Dashboard's Transport carbon card prints loaded and empty apart on its second line",
-   "loaded ${co2T(K.totCo2L)} · empty ${co2T(K.totCo2E)}" in fe and "T.co2L += r.co2_loaded_t || 0; T.co2E += r.co2_empty_t || 0;" in fe)
+# NARROWED 24 Nov 2026 (the Dashboard rethink, A1): the Transport carbon CARD left the strip (the carbon target's answer took
+# its place, John's Q4); its figure moves to the carbon section (task B). The two legs are still summed apart for it.
+ok("6. the Dashboard still sums loaded and empty apart (the Transport carbon card's line is gone from the strip until task B)",
+   "T.co2L += r.co2_loaded_t || 0; T.co2E += r.co2_empty_t || 0;" in fe and "totCo2L: T.co2L, totCo2E: T.co2E" in fe
+   and "loaded ${co2T(K.totCo2L)} · empty ${co2T(K.totCo2E)}" not in fe)
 info = fe.split("const INFO = {")[1].split("\n};")[0]
 ok("6. the i boxes: dash.carbon says each leg and the route's choice; routes.return and cfg.return exist and point at t1-return",
    '"routes.return": {' in info and '"cfg.return": {' in info and info.count('tech: "t1-return"') == 3

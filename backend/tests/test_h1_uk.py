@@ -747,7 +747,9 @@ ok("APPEARANCE: charts rebuild on a change and read token colours — no literal
    "}, [JSON.stringify(config), theme, sized]);" in fe and "useAccent" not in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
    and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
 ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
-   ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
+   # NARROWED 24 Nov 2026 (own look, B1 stage 5): a section and the big-screen bar are ruled on the page's own surface: no fill
+   # at all, so no literal white either
+   ".card{background:none;border:0;border-top:1px solid var(--ink);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:none;" in fe
    # NARROWED 27 Oct 2026 (pilot readiness F3 b): one exemption, the two-step QR code's frame — a QR code must be dark on
    # WHITE in either look or a phone camera cannot read it
    # NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures' corner and turn handles — they sit ON THE MAP (a drawing or
@@ -1117,8 +1119,10 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
    # NARROWED 24 Nov 2026 (own look, stage 3): navy 2 -> 1 and blue 3 -> 0: the drawing palette's picked tool and the three
    # "Place on map" toggles are selections, now a --navy-soft tint with --navy words; the Submit strip stays (Group B's strip)
-   and len(_sites.get("navy", [])) == 1 and not _sites.get("blue") and len(_sites.get("slate-800", [])) == 2
-   and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): navy 1 -> 0, the Submit strip is a ruled strip with ink figures
+   and not _sites.get("navy") and not _sites.get("blue") and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 24 Nov 2026 (own look, B1 stage 3): the team pill is a plain word now, so no text-white on the team palette
+   and not _sites.get("team palette") and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
    len(_sites.get("red", [])) == 1 and ">Delete</button>" in _sites.get("red", [""])[0])
@@ -1128,7 +1132,8 @@ ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / 
    # NARROWED 10 Nov 2026 (wave 2, card 13): 14+ -> 2 navy fills (the Submit strip and the palette's picked tool); the primary
    # actions are written the same way on the accent, `background: "var(--action)"`, 23 of them
    # NARROWED 24 Nov 2026 (own look, stage 3): one navy fill (the Submit strip) and no blue fill; a selection is a tint
-   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 1 and _fe_wo.count('background: "var(--blue)"') == 0
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): no navy fill left (the Submit strip is ruled); the dark rule stays for any later one
+   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 0 and _fe_wo.count('background: "var(--blue)"') == 0
    and _fe_wo.count('background: "var(--action)"') >= 22   # NARROWED 11 Nov 2026 (CLOCS B-F6): Route all in the menu
    and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
 _bad1 = []
@@ -1142,7 +1147,10 @@ ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (
    not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
 ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values went with UI fix 4 (decision 3, 17 Oct)",
    # NARROWED 22 Oct 2026 (UI fix 7): the labels are 12 px now (text-xs)
-   '<div className="text-xs uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is no longer filled: the labels are the caption grey, in sentence
+   # case (no small capitals, design language's banned list), on the page's own surface
+   '<div className="text-xs text-slate-500">{label}</div>' in fe and "text-white/60" not in fe
+   and 'divide-x divide-slate-200 text-white kpi-num' not in fe
    and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
    and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}' in fe)   # NARROWED 10 Nov 2026 (card 13): the selected segment is the tint
 
@@ -1182,8 +1190,23 @@ ok("...the headline figures: ok-text 5.48:1 on white and 4.77:1 on the 12 % gree
 ok("...and why the words moved: the green status colour reads 3.77:1 on white and the amber 3.19:1 — under 4.5:1 for text, fine for a fill or a dot (3:1)",
    round(_cr(_ROOT["green"], "#FFFFFF"), 2) == 3.77 and round(_cr(_ROOT["gold"], "#FFFFFF"), 2) == 3.19
    and _cr(_ROOT["green"], "#FFFFFF") >= 3 and _cr(_ROOT["gold"], "#FFFFFF") >= 3)
+# 24 Nov 2026 (Dashboard rethink A2, gate dials): a gate dial's arc is the status's colour (--green / --gold / --red) over the --line-2 track, on the card and on the
+# page (the section has no box). A shape needs 3:1 on its ground (WCAG 1.4.11): measured in every look
+_arc_bad = []
+for _l in ["ink", "light", "dark"]:
+    t = _eff("orange", _l)
+    for _k in ("green", "gold", "red"):
+        for _gn, _g in (("a card", t["surface"]), ("the page", t["bg"])):
+            if _cr(t[_k], _g) < 3.0:
+                _arc_bad.append(f"{_l}: --{_k} on {_gn} {_cr(t[_k], _g):.2f}")
+ok("GATE DIALS: every dial arc colour (--green, --gold, --red) reads 3:1 or more on a card and on the page, light, ink and Dark; the CSS colours the arcs from those three tokens only",
+   not _arc_bad and ".ga-d-ok .ga-d-arc{stroke:var(--green);}" in fe and ".ga-d-warn .ga-d-arc{stroke:var(--gold);}" in fe and ".ga-d-bad .ga-d-arc{stroke:var(--red);}" in fe
+   and not _re.search(r"\.ga-d-[a-z-]+[^{]*\{[^}]*#[0-9A-Fa-f]{3,6}", fe), str(_arc_bad))
 # at source level: the green and the amber are never a TEXT colour any more — every use left is a fill, a border or a dot
-_FILLCTX = ("background", "borderColor", "fill:", "STATUS_DOT", "CARBON_TONE", "Approved:", "confirmed:", "held:", "Pending:", "edited:", "ASSUMPTION:")
+# + "inset 0 4px 0" 24 Nov 2026 (the Dashboard rethink, A1): a status figure's 4 px top EDGE in the strip (a border drawn
+#   as an inset shadow, never text)
+# NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): + "stroke:" — a gate dial's arc is a stroked line (a shape), never words
+_FILLCTX = ("background", "borderColor", "fill:", "stroke:", "STATUS_DOT", "CARBON_TONE", "Approved:", "confirmed:", "held:", "Pending:", "edited:", "ASSUMPTION:", "inset 0 4px 0 ")
 def _text_uses(tok):
     out = []
     for m in _re.finditer(_re.escape(tok), _fe_wo):
@@ -1196,9 +1219,14 @@ ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the marku
    # NARROWED 27 Oct 2026 (stockpile forecast): 12 — + the Stockpiles page's saved-message border, a border like the others
    # NARROWED 10 Nov 2026 (wave 2, card 12): 12 -> 8 — the one status chip: the old StatusWord dots (STATUS_DOT, ×3) and the
    # row-status icon's fill (now the --ok-btn pair on the chip's tint) left
+   # NARROWED 24 Nov 2026 (own look, B1 stage 2): 8 -> 9, the ok status DOT (.row-st.rs-ok i) is filled --green (a shape)
+   # NARROWED 24 Nov 2026 (own look, B1 stage 7): 9 -> 8, the Dashboard's week bar is ink (a small bar beside a status)
    # NARROWED 23 Nov 2026 (claude/working-list): 8 -> 10 — the "Working" list's done dot and the Light look's done chip
    # dot (fills, not text)
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 10 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   # (both together, merged 24 Nov: 8 + 2 = 10)
+   # NARROWED 24 Nov 2026 (the Dashboard rethink, A1): 8 -> 9, a status figure's top edge in the strip (.dc-ok, a border)
+   # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): 9 -> 10, a fine gate's dial arc is stroked --green (a shape)
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 12 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 # NARROWED 29 Oct 2026 (3b, the steel split): 8 — + the dot of Config's "Older: pick one of the three" chip (a status dot, not text)
 # NARROWED 9 Nov 2026 (UI fix phone 2): 9 — + the phone Gate arrivals list's amber bar (a fill, not text)
@@ -1207,15 +1235,22 @@ ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning t
    # dot are the one status chip now (its warning icon keeps var(--gold), a fill)
    # NARROWED 10 Nov 2026 (wave 3, finding 5): 5 -> 6 — the Account's Actual box on a line short past the share takes an amber
    # border (a border, not text)
+   # NARROWED 24 Nov 2026 (own look, B1 stage 7): 6 -> 5, the gates' amber peak bar is ink in every state
+   # NARROWED 24 Nov 2026 (own look, B1 stage 8): 5 -> 6, the warning sentence's diamond is a --gold shape (a fill, not text)
    # NARROWED 23 Nov 2026 (claude/working-list): 6 -> 9 — the "Working" list's running dot and progress bar, and the Light
    # look's running chip dot (fills, not text)
-   # NARROWED 25 Nov 2026 (claude/route-closures-line): 9 -> 10 — the Route options card's closure diamond (.bo-sh, a fill)
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 10 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # (both together, merged 24 Nov: 6 + 3 = 9)
+   # NARROWED 26 Nov 2026 (own look B1, the five amber words): 9 -> 10, the "no way round yet" line's diamond (.st-line, a fill)
+   # NARROWED 24 Nov 2026 (the Dashboard rethink, A1): 6 -> 7, a status figure's top edge in the strip (.dc-warn, a border)
+   # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): 7 stays 7 — the gates' old key swatch (.ga-key-gold) left, a near gate's dial arc is stroked --gold (a shape)
+   # (26 Nov 2026, the Dashboard batch: the Working list and own look's 10 with the Dashboard's top edge = 11)
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 11 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
    and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
-   and '["rgba(3,158,134,.12)", "var(--ok-text)"]' in fe and '["rgba(191,46,85,.12)", "var(--bad-text)"]' in fe
+   # NARROWED 24 Nov 2026 (own look, B1): the Routes vehicle chips are the one status chip (RowStatus), the pairs are gone
+   and '<RowStatus word={vehShort(k) + (p.baked && !p.return_baked ? " ↦" : "")} tone={tone} />' in fe and '["rgba(3,158,134,.12)", "var(--ok-text)"]' not in fe
    and 'style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>' in fe
    # NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the Account's "held" is the one status chip, "Delivered"
    and '{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}' in fe and ': has ? ["routed", "var(--ok-text)"] : null;' in fe
@@ -1253,7 +1288,9 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
    # NARROWED 23 Nov 2026 (claude/working-list): bad-text 63 -> 65, warn-text 33 -> 35 — the "Working" chip on the Light
    # look's white header bar: its word and its edge, red (Stopped) and amber (Working), on the status tints
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 65 and  # NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+   # (both together, merged 24 Nov: 65, measured on the merged page)
+   # NARROWED 24 Nov 2026 (Dashboard rethink A2, gate dials): the phone gates list left (its red figure and its amber one): bad-text -2, warn-text -1 on the merged page
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 61 and  # NARROWED 26 Nov 2026 (own look B1, the five amber words): 64 -> 63, Routes' "Not diverted" is RowStatus; NARROWED 24 Nov 2026 (own look, B1 item 5): 65 -> 64, the Routes vehicle chips are RowStatus (its CSS reads the colour); NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
@@ -1267,7 +1304,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 36   # NARROWED 25 Nov 2026 (claude/route-closures-line): 35 -> 36, the card's "Closure in force" head; NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+   _fe_wo.count("var(--warn-text)") == 30   # NARROWED 26 Nov 2026 (own look B1, the five amber words): 35 -> 31, Diverted, busy hours paused (Routes, Zones) and "Route again" are RowStatus; the no-way-round box reads it from .st-line (net -4); NARROWED 24 Nov 2026 (own look, B1 item 5): 36 -> 35, the Routes vehicle chips are RowStatus; NARROWED 23 Nov 2026 (claude/working-list): +2, the Light look's Working chip; both together, merged 24 Nov: 34 + 2 = 36; NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
      # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
@@ -1315,7 +1352,8 @@ ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big
    and "text-slate-300" not in _fe_wo and ".text-slate-300{" not in _dark and ".text-emerald-600{" not in _dark
    and _fe_wo.count('<span className="text-slate-500">rate not set</span>') == 3 and 'className="text-slate-500">not recorded</span>' in fe)
 ok("UI fix 4 (decision 3): the Submit strip's six values read in the strip's own text colour — the amber on the strip was 1.62:1 (1.4:1 in Dark) and the label already says Peak",
-   '<div className="text-lg font-bold tabular-nums">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled on the page's surface; the figures read --navy-deep
+   '<div className="text-lg font-bold tabular-nums text-[color:var(--navy-deep)]">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
    and '["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],' in fe
    # NARROWED 24 Nov 2026 (own look, stage 3): the 17 Oct strip was #2563EB (Dark #FF8C14), written out
    and round(_cr(_ROOT["gold"], "#2563EB"), 2) == 1.62 and round(_cr(_DARK["gold"], "#FF8C14"), 1) == 1.4)
@@ -1406,7 +1444,8 @@ ok("UI fix 6 card 6: the dark rule maps text-white on an inline var(--haul-text)
    and _fe_wo.count('background: "var(--haul-text)"') == 3 and 'style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>' in fe
    and 'const ZONE_ROUTING = "#DC2626";' in fe and round(_cr("#FFFFFF", "#DC2626"), 2) == 4.83 and "(finding 7, open)" not in fe)
 ok("UI fix 6 (the user's extra): the 'Avoided' chip is #B91C1C on its pink #FDE8EE, 5.53:1 (was #DC2626, 4.13:1), a fixed pair the same in every look — var(--bad-text) is #F87171 in the dark look and would read 2.36:1 on the pink",
-   '<span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>' in fe
+   # REVERSED 24 Nov 2026 (own look, B1 stage 3): no pink; the plain word in --bad-text, no shape (.tg-ns)
+   '<span className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided</span>' in fe and "#FDE8EE" not in fe
    and round(_cr("#B91C1C", "#FDE8EE"), 2) == 5.53 and round(_cr("#DC2626", "#FDE8EE"), 2) == 4.13
    and round(_cr(_DARK["bad-text"], "#FDE8EE"), 2) == 2.36 and "FDE8EE" not in _dark)
 # card 3 (finding #11) + the user's yes to finding #37: the Horizon's commit week, heading and role word, on its shade
@@ -1487,8 +1526,11 @@ _nsCss = re.findall(r'\n  [^\n{]*\{[^}]*background:var\(--navy-soft\);[^}]*\}', 
 ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink — status words and captions fall short on it (Dark bad-text 4.27, --muted 4.44 on the 16 % tint; light warn-text 4.27 on the 10 %), so none sits on it: every inline --navy-soft fill names --navy, every --navy-soft rule reads --navy or --ink",
    round(_cr("#F87171", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.27 and round(_cr("#9C9FA4", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.44
    and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
+   # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
    and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
-   and len(_nsCss) >= 10 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
+   # NARROWED 24 Nov 2026 (own look, B1 stage 5): 8 -> 7, the Config read-only note is a margin line now (no tint)
+   # NARROWED 24 Nov 2026 (own look, B1 stage 8): 7 -> 6, a chosen tab is an underline now, no tint
+   and len(_nsCss) >= 6 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
    str([m for m in _nsInline if 'color: "var(--navy)"' not in m][:3]) + str([r for r in _nsCss if "color:var(--navy)" not in r and "color:var(--ink)" not in r][:3]))
 # card 2 (finding #11): the Account's headings and button; card 5: the count line; card 1: the pinned short-row cell
 ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 (Ink and Light), 6.48:1 (Dark), 4.5 or better in all 12 — and the button is the accent pair (white on #C2410C 5.18:1, on #2563EB 5.17; checked in all 12 by W16 above)",

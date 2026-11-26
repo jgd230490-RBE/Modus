@@ -56,17 +56,20 @@ ok("⭐ SRC: the busy-hours and in-use limit lines are margin lines (bo-cl), no 
 {
   const one = fnSrc("BoClosure");
   ok("⭐ SRC: a closure line joins the rule's halves (name, dates, does) and adds no word of its own",
-     one.includes('[cl.name, cl.dates].filter(Boolean).join(" · ")') && one.includes("{cl.head}") && one.includes("{cl.does}")
+     one.includes('[cl.name, cl.dates].filter(Boolean).join(" · ")') && one.includes("word={cl.head}") && one.includes("{cl.does}")
      && !/>[A-Za-z][^<{]*</.test(one.replace(/aria-hidden="true"><\/i>/g, "")), one);
 }
 {
   const css = (html.match(/\.bo-cl\{[^}]*\}/) || [""])[0];
   ok("⭐ CSS: a margin line: a 2 px ink rule at the left, no box, no corner, no tint",
      css.includes("border-left:2px solid var(--ink)") && !/background|border-radius|border:1px/.test(css), css);
-  ok("⭐ CSS: a diamond (the warning colour, turned 45°) for a closure in force, a grey ring for one planned",
-     /\.bo-sh\.bo-cl-warn\{background:var\(--gold\);transform:rotate\(45deg\) scale\(\.82\);\}/.test(html)
-     && /\.bo-sh\.bo-cl-none\{border-radius:50%;border:2px solid #8E9197;\}/.test(html)
-     && /\.bo-cl-st\.bo-cl-warn\{color:var\(--warn-text\);\}/.test(html));
+  // NARROWED 26 Nov 2026 (main's own look B1 taken in): the diamond and the ring are the ONE status form, RowStatus
+  // (.row-st rs-warn: the gold diamond turned 45°, the word in --warn-text; rs-none: the ring), not shapes of the card's own
+  ok("⭐ CSS: a diamond (the warning colour, turned 45°) for a closure in force, a ring for one planned: RowStatus's, no shape of the card's own",
+     /\.row-st\.rs-warn i\{background:var\(--gold\);[^}]*transform:rotate\(45deg\);\}/.test(html)
+     && /\.row-st i\{[^}]*border-radius:50%;[^}]*border:2px solid var\(--st-none\);\}/.test(html)
+     && fnSrc("BoClosure").includes('<RowStatus word={cl.head} tone={cl.state === "in_force" ? "warn" : "none"} />')
+     && !/\.bo-sh|\.bo-cl-st/.test(html));
 }
 
 // =========================== source checks: the map ===========================
@@ -204,7 +207,7 @@ if (hasCard) {
     const first = m.host.querySelector(".bo-card").children[1];
     ok("⭐ R027: ONE closure line, in force, at the top above the answer: the diamond, 'Closure in force', then the rule's line",
        lines.length === 1 && lines[0].getAttribute("data-bo-closure") === "in_force" && first === lines[0]
-       && lines[0].querySelector(".bo-sh.bo-cl-warn[aria-hidden='true']") && lines[0].querySelector(".bo-cl-st").textContent === "Closure in force"
+       && lines[0].querySelector(".row-st.rs-warn > i[aria-hidden='true']") && lines[0].querySelector(".row-st").textContent === "Closure in force"
        && lines[0].children[1].textContent === "A47 at the new Tilton junction · until 17 Dec 2027 · the diversion is in use"
        && lines[0].querySelector(".bo-g").textContent === "the diversion is in use"
        && lines[0].compareDocumentPosition(m.host.querySelector(".bo-ans")) === w.Node.DOCUMENT_POSITION_FOLLOWING, m.host.innerHTML.slice(0, 600));
@@ -215,8 +218,8 @@ if (hasCard) {
   {
     const m = mount(B(route({ route: "R012", closures: [CL_R012] })));
     const l = m.host.querySelector("[data-bo-closure]");
-    ok("⭐ R012: 'Closure planned' with the ring and the Diversions table's figures, muted",
-       l && l.getAttribute("data-bo-closure") === "planned" && l.querySelector(".bo-sh.bo-cl-none") && l.querySelector(".bo-cl-st.bo-cl-none")
+    ok("⭐ R012: 'Closure planned' with the ring (RowStatus none) and the Diversions table's figures, muted",
+       l && l.getAttribute("data-bo-closure") === "planned" && l.querySelector(".row-st.rs-none > i[aria-hidden='true']") && l.querySelector(".row-st").textContent === "Closure planned"
        && l.textContent === "Closure plannedMarket Harborough town centre · 1–31 Dec 2027 · diverts, +2.7 mi · −3 min"
        && l.querySelector(".bo-g").textContent === "diverts, +2.7 mi · −3 min", l && l.textContent);
     m.done();
