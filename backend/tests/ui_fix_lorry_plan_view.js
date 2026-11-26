@@ -208,6 +208,14 @@ const cells = (el) => [...el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.
        hexes.map(h => `${h} ${h && hue(h) != null ? hue(h).toFixed(0) : "-"}° ${h ? contrast(F.lpDeep(h)).toFixed(2) : ""}`).join(", "));
   }
   ok("C1: the light tokens are the list the page falls back to", looks.light.join() === looks.list.join());
+  // 26 Nov 2026 (the mother session: violet and purple read alike): the list spaced out by CIEDE2000 in normal sight and under protan
+  // and deutan simulation (the figures are in the session note); one list in both looks; the first five are a hue family each
+  const SPACED = ["#0B6F68", "#747915", "#7B1FAD", "#194D1F", "#AD1F58", "#79156A", "#257D93", "#456218"];
+  const hGap = (a, b) => { const d = Math.abs(hue(a) - hue(b)); return Math.min(d, 360 - d); };
+  const five = SPACED.slice(0, 5), gaps5 = five.flatMap((a, i) => five.slice(i + 1).map(b => hGap(a, b)));
+  ok("⭐ C1: the site colours are the spaced list, the same in Dark, and the first five sit 40° or more apart in hue; the old violet and purple are gone",
+     looks.list.join() === SPACED.join() && looks.dark.join() === SPACED.join() && Math.min(...gaps5) >= 40
+     && !html.includes("#5B34B8") && !html.includes("#86198F"), `min hue gap of the first five ${Math.min(...gaps5).toFixed(0)}°`);
 
   // ---------------------------------------------------------------- 5. the words: load point, never yard
   const shown = norm(sec().textContent);

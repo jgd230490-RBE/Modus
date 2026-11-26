@@ -82,7 +82,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
        categories, in fixed order, never cycled; --chart-none is "not yet". Validated for
        colour-blind separation and 3:1 contrast on white and on the dark surface. Status
        (--green/--gold/--red) is a separate, reserved scale and never a series colour. */
-    --lp-s1:#0B6F68; --lp-s2:#5B34B8; --lp-s3:#4D6B1F; --lp-s4:#9D174D; --lp-s5:#44464B; --lp-s6:#86198F; --lp-s7:#1F5F3F; --lp-s8:#155E75;
+    --lp-s1:#0B6F68; --lp-s2:#747915; --lp-s3:#7B1FAD; --lp-s4:#194D1F; --lp-s5:#AD1F58; --lp-s6:#79156A; --lp-s7:#257D93; --lp-s8:#456218;
     --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#0B4EA2; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
@@ -111,7 +111,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     --haul-text:#F0A838; --haul-soft:#3A2E1C;
     --line-2:#4B4D52;
     --st-none:#C9CACE;
-    --lp-s1:#0F766E; --lp-s2:#6D28D9; --lp-s3:#4D7C0F; --lp-s4:#BE185D; --lp-s5:#5F6268; --lp-s6:#A21CAF; --lp-s7:#15803D; --lp-s8:#0E7490;
+    --lp-s1:#0B6F68; --lp-s2:#747915; --lp-s3:#7B1FAD; --lp-s4:#194D1F; --lp-s5:#AD1F58; --lp-s6:#79156A; --lp-s7:#257D93; --lp-s8:#456218;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
     color-scheme:dark;
@@ -12474,8 +12474,11 @@ const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;    // the track: 06:00 to 19:00
 const lpMin = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
 const lpShort = (n) => String(n || "").replace(" (fictional)", "").replace("Rail Freight Terminal", "RFT");
 // 25 Nov 2026 (the Look-ahead rethink, card 3): a colour a SITE, from its own list (--lp-s1 to --lp-s8, one set a look):
-// never the sign blue, the chart orange or any hue between 15 and 45 degrees; darkened by lpDeep until white words pass 4.5 : 1
-const LP_SITE_HEX = ["#0B6F68", "#5B34B8", "#4D6B1F", "#9D174D", "#44464B", "#86198F", "#1F5F3F", "#155E75"];
+// never the sign blue, the chart orange or any hue between 15 and 45 degrees; darkened by lpDeep until white words pass 4.5 : 1.
+// 26 Nov 2026: spaced out (the mother session, after violet and purple read alike): in the order given, any two of the first five
+// differ by CIEDE2000 13 or more, all eight by 9.6 or more, in normal sight and under protan and deutan simulation; the same list in
+// both looks (each stays 14 or more from Dark's track)
+const LP_SITE_HEX = ["#0B6F68", "#747915", "#7B1FAD", "#194D1F", "#AD1F58", "#79156A", "#257D93", "#456218"];
 const lpPalette = () => LP_SITE_HEX.map((h, i) => tok(`--lp-s${i + 1}`, h)).map(lpDeep);
 // 11 Nov 2026 (CLOCS card C-F4): a fill darkened, hue kept, until white text on it passes 4.5 : 1 (WCAG AA); the chart
 // tokens #E8590C and #0D9488 gave 3.4 and 3.7. Anything but #rrggbb is left as it is.
