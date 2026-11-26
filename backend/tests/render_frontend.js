@@ -1321,7 +1321,8 @@ if (loaded) {
         fNone.includes("No diesel price yet") && fNone.includes("No diesel price to work it from") && !/undefined|NaN/.test(fNone));
       const fStale = render("the widget renders a stale index", h(FuelWidget, { who: "t", access: planner, mode: "compact",
         initial: { ...fuelFix.costing, index_eur_per_l: null } }));
-      ok("...a compact card with no index says so instead of a price", fStale.includes("Index unavailable"));
+      // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q2): the compact card says "No price"
+      ok("...a compact card with no index says so instead of a price", fStale.includes("No price") && !fStale.includes("Index unavailable"));
     }
 
     // the empty page: no lines, no account, no horizon — every view has an EmptyState

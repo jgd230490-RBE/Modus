@@ -626,7 +626,8 @@ ok("7: the panel sits under Gates this week; the KPI caption gains the chained f
    # NARROWED 25 Nov 2026 (C1): drawn only in the week's By lorry view, the view switch handed in
    "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} show={laBy === \"lorry\"} viewSwitch={<LaViewSwitch value={laBy} onChange={setLaBy} />} />" in APP
    # NARROWED 26 Nov 2026 (the Look-ahead rethink, B1, card 2): the figure "Lorries, busiest day" carries "19 if chained"
-   and "chainN != null ? `${grp(chainN)} if chained` : null" in APP and 'data-ph-lorry-plan={shown}' in APP and 'data-ph-lorry-list="1"' in APP)
+   # REVERSED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q3): the phone's chained-lorries line is gone (the desk's Lorry plan carries it)
+   and "chainN != null ? `${grp(chainN)} if chained` : null" in APP and 'data-ph-lorry-plan={shown}' not in APP and 'data-ph-lorry-list="1"' in APP)
 ok("7: the Config rows: a day-hire rate per lorry type, optional, never seeded", 'function DayHireSection({ doc, upd })' in APP
    and 'data-day-hire-section="1"' in APP and "Blank = the saving in lorry-days only" in APP and "<DayHireSection doc={doc} upd={upd} />" in APP)
 ok("7: the info box", '"la.lorryplan": {' in APP and 'guide: "ug-lorry-plan", tech: "t1-lorry-plan"' in APP)

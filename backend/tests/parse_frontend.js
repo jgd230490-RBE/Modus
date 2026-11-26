@@ -3952,7 +3952,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
        // NARROWED 25 Nov 2026 (task A): "N lines flagged" became "N sites flagged · N lines short last week", from the same day's flags
        && _pl.includes("laFlagGroups(r.lf).map(g =>") && !_pl.includes("const flagged = rows.filter(r => r.lf.length).length;")
        && _pl.includes('const siteFlagged = daySites.filter(x => x.rows.some(r => r.lf.some(f => f.code !== "SHORTAGE"))).length;')
-       && _pl.includes('const shortLines = rows.filter(r => r.lf.some(f => f.code === "SHORTAGE")).length;'));
+       // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q3): ONE note line as card c1 drew it, the week's state then the sites flagged; no short-lines count
+       && !_pl.includes("const shortLines") && _pl.includes("weekWords,\n    siteFlagged ? `${siteFlagged} site"));
     ok("DESK GRID (17 Oct, unchanged): the desk Look-ahead's row is the whole week, so it keeps joining by line alone, every flag of the week",
        _la.length > 3000 && _la.includes("(rail.flags || []).forEach(f => { const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f); });")
        && !_la.includes("phFlagsByLine") && !/day_date !== day/.test(_la));
@@ -5641,7 +5642,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      code.includes("const chainN = lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? Math.max(...Object.values(lorryPlan.chained.by_day)) : null;")
      && code.includes("chainN != null ? `${grp(chainN)} if chained` : null") && !_laBody.includes("with each yard's lorries chained"));   // the Lorry plan's own line is C1's
   ok("⭐ 2.1-9 (Q9): the phone reads the plan once and lists the day's lorries read-only; the sheets stay a desktop download",
-     code.includes("data-ph-lorry-plan={shown}") && code.includes('data-ph-lorry-list="1"') && code.includes("The driver sheets are printed from a desktop."));
+     // REVERSED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q3): the chained-lorries line leaves the phone (the desk's Lorry plan carries it)
+     !code.includes("data-ph-lorry-plan={shown}") && code.includes('data-ph-lorry-list="1"') && code.includes("The driver sheets are printed from a desktop."));
   ok("⭐ 2.1-9 (card 4): Config → Costing · fuel has a Day hire row per vehicle, blank by default, under the fair-price model",
      code.includes("function DayHireSection({ doc, upd })") && code.includes("<DayHireSection doc={doc} upd={upd} />")
      && code.includes('d.day_hire = d.day_hire || {}; if(v === "" || v == null) delete d.day_hire[k];') && code.includes("Not used in the cost lines or the fair price."));

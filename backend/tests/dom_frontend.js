@@ -2204,6 +2204,7 @@ async function phoneDayFlagsDom(){
   const openSites = async () => { for (const b of [...el.querySelectorAll(".ph-site-b")].filter(x => x.getAttribute("aria-expanded") === "false"))
     await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
   const siteOfL = (l) => { const s = (LA.commit.sites || []).find(x => x.lines.includes(lk(l))); return s ? String(s.id || "") : lk(l); };
+  // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q3): the note now starts with the week's state, so the sites-flagged bit is one of its parts
   const sitesFlagged = (ls) => { const n = new Set(ls.map(siteOfL)).size; return `${n} site${n === 1 ? "" : "s"} flagged`; };
   const pick = async (iso) => { await act(async () => { [...el.querySelectorAll(".ph-days > button")].find(b => b.textContent === w.__F.dayName(iso) + " " + w.__F.dayNum(iso)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
 
@@ -2215,7 +2216,7 @@ async function phoneDayFlagsDom(){
      word(B) === "Gate near" && more(B) === "" && facts(B).includes(`Gate B on ${today}`) && !/\bCap\b/.test(facts(B)), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (today): a flag with no date (a road restriction) is on the card", word(C) === "Restriction" && facts(C).includes("Road closed all week"), word(C));
   // NARROWED 25 Nov 2026 (task A): the count is the sites flagged that day (B's and C's), not A's
-  ok("PHONE DAY FLAGS (today): the count names the sites of the two lines flagged today, not three", note().startsWith(sitesFlagged([B, C])), note());
+  ok("PHONE DAY FLAGS (today): the count names the sites of the two lines flagged today, not three", note().split(" · ").includes(sitesFlagged([B, C])), note());
 
   await pick(next);
   await openSites();
@@ -2226,14 +2227,14 @@ async function phoneDayFlagsDom(){
      word(B) === "Route cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "Restriction");
   // NARROWED 25 Nov 2026 (task A): the sites of the three lines flagged
-  ok("PHONE DAY FLAGS (next weekday): three lines flagged, counted by their sites", note().startsWith(sitesFlagged([A, B, C])), note());
+  ok("PHONE DAY FLAGS (next weekday): three lines flagged, counted by their sites", note().split(" · ").includes(sitesFlagged([A, B, C])), note());
 
   await pick(third);
   await openSites();
   ok("⭐ PHONE DAY FLAGS (a day no dated flag names): only the undated restriction — one line flagged, A and B in the week's own state",
      card().getAttribute("data-ph-day") === third && word(C) === "Restriction" && !/Gate|Cap/.test(word(A) + word(B))
      // NARROWED 25 Nov 2026 (task A): one SITE flagged (C's)
-     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && note().startsWith(sitesFlagged([C])), `${word(A)} | ${word(B)} | ${note()}`);
+     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && note().split(" · ").includes(sitesFlagged([C])), `${word(A)} | ${word(B)} | ${note()}`);
   await act(async () => { r.unmount(); }); el.remove();
 
   // the desk grid: its row is the whole week, so every flag of the week stays on it (unchanged by the phone's rule)

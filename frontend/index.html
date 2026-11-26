@@ -13718,7 +13718,9 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
         {/* 26 Nov 2026: "Index unavailable" WRAPS in a narrow cell (seven across with the rail folded, 152 px: it was cut to
             "Index unavail…"); a price stays one line */}
         <div className={"kpi-num la-fig-num font-semibold tabular-nums text-2xl " + (hasIndex ? "leading-8 truncate" : "la-fig-wrap")} style={{ color: "var(--navy-deep)" }}>
-          {hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)}` : <span className="text-base" style={{ color: "var(--warn-text)" }}>Index unavailable</span>}
+          {/* 26 Nov 2026 (John, "As recommended" to the batch page's Q2): no price is a missing setting, not a status: "No price"
+              in the figure's own ink, the second line says where to type one; no amber (a status is a shape and a word) */}
+          {hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)}` : <span data-la-fig-none="1">No price</span>}
         </div>
         {hasIndex && idx.stale ? <div className="la-fig-sub warn-line" data-la-fig-sub="warn"><span>stale · {typed ? "typed " : ""}{laDay(idx.bulletin_date)}</span></div>
           : <div className="la-fig-sub" data-la-fig-sub="plain"><span>{hasIndex ? `${typed ? "typed " : ""}${laDay(idx.bulletin_date)}` : (canType ? "type a price on Config" : "not set")}{rf.running ? " · updating…" : ""}</span></div>}
@@ -15052,9 +15054,11 @@ function PhoneLookAhead({ meta, initialPage }){
   const byLk = {}; rows.forEach(r => { byLk[r.lk] = r; });
   const daySites = laSiteList(page && page.commit, lines).map(x => ({ ...x, rows: x.sl.map(l => byLk[lineKeyOf(l)]).filter(Boolean) })).filter(x => x.rows.length);
   const siteFlagged = daySites.filter(x => x.rows.some(r => r.lf.some(f => f.code !== "SHORTAGE"))).length;
-  const shortLines = rows.filter(r => r.lf.some(f => f.code === "SHORTAGE")).length;
-  const noteBits = [page && page.commit && page.commit.team_only ? `${page.commit.team_only}'s lines only` : "", siteFlagged ? `${siteFlagged} site${siteFlagged === 1 ? "" : "s"} flagged` : "",
-    shortLines ? `${shortLines} line${shortLines === 1 ? "" : "s"} short last week` : "",
+  // 26 Nov 2026 (John, "As recommended" to the batch page's Q3): ONE note line as card c1 drew it, "18 of 22 lines confirmed ·
+  // 4 sites flagged": the week's state first, then the sites flagged; the lines short last week and the chained lorries leave
+  // the phone (the desk's flags line and Lorry plan carry them)
+  const noteBits = [page && page.commit && page.commit.team_only ? `${page.commit.team_only}'s lines only` : "", weekWords,
+    siteFlagged ? `${siteFlagged} site${siteFlagged === 1 ? "" : "s"} flagged` : "",
     rows.length > routed.length ? `${rows.length - routed.length} not routed yet` : ""].filter(Boolean);
 
   const daySheet = async () => {
@@ -15109,9 +15113,6 @@ function PhoneLookAhead({ meta, initialPage }){
               </div>
               {rows.length > 0 && <div className="ph-note" data-ph-note="1">{noteBits.length ? noteBits.join(" · ") : weekWords}</div>}
               {!rows.length && <div className="ph-note">Nothing planned on this day.</div>}
-              {lp && lp.chained && lp.chained.by_day && lp.chained.by_day[shown] != null && lp.chained.saved_week > 0 && (
-                <div className="ph-note" data-ph-lorry-plan={shown}>{grp(lp.chained.by_day[shown])} lorries with each load point's trips chained · {grp((lp.booked.by_day[shown] || 0) - lp.chained.by_day[shown])} lorry-day{(lp.booked.by_day[shown] || 0) - lp.chained.by_day[shown] === 1 ? "" : "s"} saved</div>
-              )}
               {daySites.map(x => {
                 const sid = x.id || "";
                 const skey = "s:" + sid;

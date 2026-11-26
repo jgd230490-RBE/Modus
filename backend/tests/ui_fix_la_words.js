@@ -149,7 +149,10 @@ try {
   f = await state({ costing: { index_source: "manual" } }, "Diesel, per litre");
   ok("STATE: a typed price: \"typed 23 Nov\"", f.sub === "typed 23 Nov" && !f.warn, f.sub);
   f = await state({ costing: { index_eur_per_l: null, index_bulletin_date: null } }, "Diesel, per litre");
-  ok("STATE: no price: \"Index unavailable\", and \"not set\" for a reader", f.num === "Index unavailable" && f.sub === "not set", f.num + "|" + f.sub);
+  // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q2): no price is a missing setting, not a status: "No price" in ink, no amber
+  ok("STATE: no price: \"No price\", and \"not set\" for a reader, no amber", f.num === "No price" && f.sub === "not set" && !f.warn, f.num + "|" + f.sub);
+  ok("🔴 SOURCE: the strip's diesel cell has no amber 'Index unavailable' (Q2, 26 Nov)",
+     !FW.includes('style={{ color: "var(--warn-text)" }}>Index unavailable</span>') && FW.includes('<span data-la-fig-none="1">No price</span>'));
   f = await state({ costing: { index_eur_per_l: null, index_bulletin_date: null }, access: { can_approve: true, role: "admin" } }, "Diesel, per litre");
   ok("STATE: no price, an admin: \"type a price on Config\"", f.sub === "type a price on Config", f.sub);
   ROUTES = { "/fuel-index": { index: { eur_per_l: 1.901, bulletin_date: "2026-11-10", source: "desnz", stale: true, refresh: null }, fuel: {}, summary: {} } };

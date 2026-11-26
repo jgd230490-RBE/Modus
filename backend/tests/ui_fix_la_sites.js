@@ -285,8 +285,12 @@ try {
      norm(pss[2].querySelector(".ph-sn").textContent) === "Tilton Viaduct site" && norm(pss[2].querySelector(".ph-sf").textContent) === "170 t"
      && norm(pss[2].querySelector(".ph-sm").textContent) === "9 loads · 3 lines · 80 t out", norm(pss[2].querySelector(".ph-sm").textContent));
   ok("PHONE: \"1 load\", never \"1 loads\"", !/\b1 loads\b/.test(pel.textContent));
-  ok("⭐ PHONE: the note counts the SITES flagged that day and the lines short last week apart",
-     norm(pel.querySelector("[data-ph-note]").textContent) === "2 sites flagged · 1 line short last week · 1 not routed yet", norm(pel.querySelector("[data-ph-note]").textContent));
+  // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q3): ONE line as card c1 drew it: the week's state, then the SITES flagged; no short-lines count
+  ok("⭐ PHONE: the note is the week's state, then the SITES flagged that day (no lines-short count)",
+     /^(\d+ of \d+ lines confirmed|Derived from the month · not confirmed yet|The week is confirmed) · 2 sites flagged · 1 not routed yet$/.test(norm(pel.querySelector("[data-ph-note]").textContent)),
+     norm(pel.querySelector("[data-ph-note]").textContent));
+  ok("🔴 PHONE: one note line only: no chained-lorries line, nothing 'short last week' (Q3, 26 Nov)",
+     pel.querySelectorAll(".ph-card > .ph-note").length === 1 && !pel.querySelector("[data-ph-lorry-plan]") && !/short last week/.test(pel.textContent));
   click(pss[0].querySelector(".ph-site-b"));
   ok("PHONE: a tapped site shows its lines (\"From …\", material · section), each opening its details",
      pel.querySelectorAll(".ph-line").length === 2 && norm(pel.querySelector(".ph-line .ph-l > span").textContent) === "From Kilby Ridge Quarry"
