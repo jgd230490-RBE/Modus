@@ -160,7 +160,10 @@ for (const [label, s] of PLAIN) ok(`4 places: ${label}`, html.includes(s));
 ok("🔴 4 places: no plate on the map page", !fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").includes("rd-plate"));
 const plateAt = [...html.matchAll(/rd-plate/g)].map(m => m.index);
 ok("4 places: the class is written only in the plate's CSS and in the helper (no map popup's HTML string carries a plate)",
-   plateAt.length === 8 && plateAt.every(i => i < css.length || (i > a && i < b)), String(plateAt.length));
+   // NARROWED 27 Nov 2026 (main e42e33e taken in): 8 -> 9, the Look-ahead rethink's CSS comment over its own .lp-plate names
+   // this class ("the look of ... .rd-plate"); it is inside the CSS, so the rule below still holds. One plate class for
+   // both (the Lorry plan's block using roadPlates) is a follow-up once this branch is on main.
+   plateAt.length === 9 && plateAt.every(i => i < css.length || (i > a && i < b)), String(plateAt.length));
 
 console.log(`own_look_plates.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }
