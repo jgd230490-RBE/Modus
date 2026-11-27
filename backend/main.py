@@ -2284,9 +2284,12 @@ def forecast_week_lorry_plan(bucket: str = "commit"):
 
 
 @app.get("/api/forecast-weeks/lorry-plan/download")
-def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit"):
+def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit",
+                                  yard: str = None, vehicle: str = None, lorry: int = None):
     """The day's driver sheets (one A4 page a lorry, PDF) or the day's trips (XLSX), for the chained or compressed view.
-    Made fresh on each download; the sheet carries who made it and when. Nothing is sent."""
+    Made fresh on each download; the sheet carries who made it and when. Nothing is sent. 25 Nov 2026 (the Look-ahead
+    rethink, card 4): optional `yard` (a load point's id), `vehicle` (its lorry type) and `lorry` (n) narrow it to one
+    load point's lorries or one lorry's page."""
     from fastapi.responses import Response       # not in the test stub; imported here
     import lorry_plan
     if format not in ("pdf", "xlsx"):
@@ -2294,15 +2297,15 @@ def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "ch
     data = _lorry_plan_data(bucket)
     try:
         if format == "pdf":
-            body, mime = lorry_plan.build_pdf(data, view, day), "application/pdf"
+            body, mime = lorry_plan.build_pdf(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry), "application/pdf"
         else:
-            body, mime = (lorry_plan.build_xlsx(data, view, day),
+            body, mime = (lorry_plan.build_xlsx(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry),
                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except lorry_plan.PlanError as e:
         raise HTTPException(400, str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
-    name = f"{lorry_plan.file_stem(data, view, day)}.{format}"
+    name = f"{lorry_plan.file_stem(data, view, day, yard=yard, lorry=lorry)}.{format}"
     return Response(content=body, media_type=mime,
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
@@ -5775,6 +5778,23 @@ def _gate_arrivals_build(month, acc):
     out["busiest_loads"] = b.get("loads")
     out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
+
+
+@app.get("/api/forecast-weeks/lorry-plan/sheet")
+def forecast_week_lorry_plan_sheet(day: str, view: str = "chained", bucket: str = "commit", yard: str = None,
+                                   vehicle: str = None, lorry: int = None):
+    """
+    25 Nov 2026 (the Look-ahead rethink, card 4): the Driver sheet as data, the same pages, words and "Take care on this
+    route" blocks the PDF prints (lorry_plan.driver_pages, which build_pdf draws), so the screen can show a lorry's sheet
+    under its row. Scoped like the Lorry plan (any staff code or login; a team sees its own lines). Stored data only:
+    nothing is fetched or written. `yard`, `vehicle` and `lorry` narrow it as the download does.
+    """
+    import lorry_plan
+    data = _lorry_plan_data(bucket)
+    try:
+        return lorry_plan.driver_pages(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry)
+    except lorry_plan.PlanError as e:
+        raise HTTPException(400, str(e))
 
 
 #: 27 Nov 2026 (claude/route-pieces; the route lines plan's Q6, Q8, Q12 and Q16, John's "Yes, all as recommended" of

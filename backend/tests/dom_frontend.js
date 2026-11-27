@@ -1368,9 +1368,13 @@ async function rowDetailsDom(){
     });
     return out;
   };
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A; card 1, John's "Yes, as recommended"): a Look-ahead site's line
+  // under its name ("Compound · 2 lines · North Team") and a line's ("Ready-mixed concrete · WS4 · Tilton viaduct") are
+  // drawn with several " · " on card 1; those two lines (.la-sm, .la-lm) are read apart, the rest of a cell still holds one
+  const cellText = (c) => { const k = c.cloneNode(true); k.querySelectorAll(".la-sm, .la-lm").forEach(x => x.remove()); return norm(k.textContent); };
   const dotCheck = (label, table) => {
     const cells = table ? cellsOf(table) : [];
-    const bad = cells.filter(c => dots(norm(c.textContent)) > 1).map(c => norm(c.textContent).slice(0, 90));
+    const bad = cells.filter(c => dots(cellText(c)) > 1).map(c => norm(c.textContent).slice(0, 90));
     ok(`ROW DETAILS · ≤ one ' · ' per rendered cell: ${label} (${cells.length} cells)`, !!table && cells.length > 0 && bad.length === 0, bad.slice(0, 3).join(" | "));
   };
   const pressUnit = (el, which) => {
@@ -1800,14 +1804,29 @@ async function phoneShellDom(){
   const figs = () => [...ph().querySelectorAll(".ph-figs > span")].map(s => s.textContent.replace(/\s+/g, " ").trim());
   const sumOf = (rows, k) => rows.reduce((a, x) => a + ((x.d.derived || {})[k] || 0), 0);
   const rT = dayRows(LA.today);
-  ok("⭐ PHONE: the day card's figures are the server's for that day: tonnes, loads, lorries (routed lines), lines",
+  // 25 Nov 2026 (the Look-ahead rethink, task A): the day is its SITES (the server's commit.sites, in its order; an older
+  // page with none gives one site a line, in the lines' order), every site listed and folded to start
+  const lkOf = (l) => `${l.route_id}|${l.discipline || ""}|${l.section_id || ""}|${l.month_index}`;
+  const siteIds = (rows) => { const keys = new Set(rows.map(x => lkOf(x.l)));
+    return LA.commit.sites ? LA.commit.sites.filter(s => s.lines.some(k => keys.has(k))).map(s => String(s.id || ""))
+                           : LA.commit.lines.filter(l => keys.has(lkOf(l))).map(lkOf); };
+  const openSites = (el) => [...el.querySelectorAll(".ph-site-b")].filter(b => b.getAttribute("aria-expanded") === "false").forEach(b => click(b));
+  // NARROWED 25 Nov 2026 (task A; card 1): the fourth figure is the day's sites, not its lines
+  ok("⭐ PHONE: the day card's figures are the server's for that day: tonnes, loads, lorries (routed lines), sites",
      figs().join("|") === [`${w.__F.grp(sumOf(rT, "tonnes"))}t`, `${w.__F.grp(sumOf(rT, "trips"))}loads`,
                            `${rT.some(x => x.l.context.baked) ? w.__F.grp(rT.filter(x => x.l.context.baked).reduce((a, x) => a + (x.d.derived.vehicles || 0), 0)) : "—"}${rT.some(x => !x.l.context.baked) && rT.some(x => x.l.context.baked) ? "lorries, routed lines" : "lorries"}`,
-                           `${rT.length}line${rT.length === 1 ? "" : "s"}`].join("|"), figs().join("|"));
+                           `${siteIds(rT).length}site${siteIds(rT).length === 1 ? "" : "s"}`].join("|"), figs().join("|"));
   const lineEls = () => [...ph().querySelectorAll(".ph-line")];
   const tonnesOf = (el) => { const k = el.getAttribute("data-ph-line"); const x = rT.find(y => `${y.l.route_id}|${y.l.discipline || ""}|${y.l.section_id || ""}|${y.l.month_index}` === k); return x ? (x.d.derived.tonnes || 0) : -1; };
-  ok("PHONE: one row per line planned that day, heaviest first",
-     lineEls().length === Math.min(rT.length, 6) && lineEls().every((e, i, a) => i === 0 || tonnesOf(a[i - 1]) >= tonnesOf(e)));
+  // REVERSED 25 Nov 2026 (task A; card 1): no longer the six heaviest lines and "Show N more": one row a SITE in the server's
+  // order, folded to start (no line drawn); opened, every line planned that day is there once
+  ok("PHONE: one row a site with something planned that day, in the server's order, folded to start",
+     [...ph().querySelectorAll("[data-ph-site]")].map(e => e.getAttribute("data-ph-site")).join("|") === siteIds(rT).join("|")
+     && lineEls().length === 0 && [...ph().querySelectorAll(".ph-site-b")].every(b => b.getAttribute("aria-expanded") === "false")
+     && !/Show \d+ more line|Show fewer lines/.test(ph().textContent));
+  openSites(ph());
+  ok("PHONE: ...opened, every line planned that day is listed once (no 'Show N more')",
+     lineEls().length === rT.length && new Set(lineEls().map(e => e.getAttribute("data-ph-line"))).size === rT.length && tonnesOf(lineEls()[0]) >= 0);
   ok("🔴 PHONE: team NAMES on the phone Look-ahead, never an id", !/\bIPT ?\d\b/i.test(ph().textContent) && /Team \d|North Team|No team/i.test(ph().textContent));
   const first = lineEls()[0], fb = first.querySelector("button"), fdl = first.querySelector("dl");
   ok("PHONE: a line's facts are shut until it is tapped (a native button, aria-expanded / aria-controls)",
@@ -2179,29 +2198,43 @@ async function phoneDayFlagsDom(){
   const word = (l) => { const s = line(l).querySelector(".row-st"); return [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim(); };
   const more = (l) => (line(l).querySelector(".row-st .rs-more") || {}).textContent || "";
   const facts = (l) => line(l).querySelector("dl").textContent;
-  const note = () => card().querySelector(".ph-note").textContent;
+  const note = () => card().querySelector("[data-ph-note]").textContent;
+  // 25 Nov 2026 (task A): the day is its sites, folded to start: open every site before reading a line; the note counts
+  // the SITES flagged that day (a line's site from the server's commit.sites, else the line itself)
+  const openSites = async () => { for (const b of [...el.querySelectorAll(".ph-site-b")].filter(x => x.getAttribute("aria-expanded") === "false"))
+    await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
+  const siteOfL = (l) => { const s = (LA.commit.sites || []).find(x => x.lines.includes(lk(l))); return s ? String(s.id || "") : lk(l); };
+  // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q3): the note now starts with the week's state, so the sites-flagged bit is one of its parts
+  const sitesFlagged = (ls) => { const n = new Set(ls.map(siteOfL)).size; return `${n} site${n === 1 ? "" : "s"} flagged`; };
   const pick = async (iso) => { await act(async () => { [...el.querySelectorAll(".ph-days > button")].find(b => b.textContent === w.__F.dayName(iso) + " " + w.__F.dayNum(iso)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
 
+  await openSites();
   ok("PHONE DAY FLAGS: the card opens on today with all three lines", card().getAttribute("data-ph-day") === today && !!line(A) && !!line(B) && !!line(C));
   ok("⭐ PHONE DAY FLAGS (today): a gate over capacity dated another day is NOT on the card — not in the line's status, not in its details",
      word(A) !== "Gate over" && !/Gate over/.test(facts(A)) /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && !facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (today): a flag dated today IS on the card; the same line's route cap dated another day is not",
      word(B) === "Gate near" && more(B) === "" && facts(B).includes(`Gate B on ${today}`) && !/\bCap\b/.test(facts(B)), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (today): a flag with no date (a road restriction) is on the card", word(C) === "Restriction" && facts(C).includes("Road closed all week"), word(C));
-  ok("PHONE DAY FLAGS (today): the count names the two lines flagged today, not three", /· 2 lines flagged/.test(note()), note());
+  // NARROWED 25 Nov 2026 (task A): the count is the sites flagged that day (B's and C's), not A's
+  ok("PHONE DAY FLAGS (today): the count names the sites of the two lines flagged today, not three", note().split(" · ").includes(sitesFlagged([B, C])), note());
 
   await pick(next);
+  await openSites();
   ok("⭐ PHONE DAY FLAGS (next weekday): its own gate over capacity shows on that day's card, status and details",
      card().getAttribute("data-ph-day") === next && word(A) === "Gate over" && facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q18): the flag word "Cap" is spelt out, "Route cap"
   ok("PHONE DAY FLAGS (next weekday): line B carries its route cap, and today's gate near capacity has left the card",
-     word(B) === "Cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
+     word(B) === "Route cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "Restriction");
-  ok("PHONE DAY FLAGS (next weekday): three lines flagged", /· 3 lines flagged/.test(note()), note());
+  // NARROWED 25 Nov 2026 (task A): the sites of the three lines flagged
+  ok("PHONE DAY FLAGS (next weekday): three lines flagged, counted by their sites", note().split(" · ").includes(sitesFlagged([A, B, C])), note());
 
   await pick(third);
+  await openSites();
   ok("⭐ PHONE DAY FLAGS (a day no dated flag names): only the undated restriction — one line flagged, A and B in the week's own state",
      card().getAttribute("data-ph-day") === third && word(C) === "Restriction" && !/Gate|Cap/.test(word(A) + word(B))
-     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && /· 1 line flagged/.test(note()), `${word(A)} | ${word(B)} | ${note()}`);
+     // NARROWED 25 Nov 2026 (task A): one SITE flagged (C's)
+     && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && note().split(" · ").includes(sitesFlagged([C])), `${word(A)} | ${word(B)} | ${note()}`);
   await act(async () => { r.unmount(); }); el.remove();
 
   // the desk grid: its row is the whole week, so every flag of the week stays on it (unchanged by the phone's rule)
@@ -2211,7 +2244,8 @@ async function phoneDayFlagsDom(){
   const deskWord = (l) => { const s = del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st`); return s ? [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim() : "(no row)"; };
   const deskMore = (l) => (del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st .rs-more`) || {}).textContent || "";
   ok("⭐ DESK GRID (unchanged): the week's row keeps every flag of the week — A's gate over capacity, B's route cap ahead of its gate near capacity (+1), C's restriction",
-     deskWord(A) === "Gate over" && deskWord(B) === "Cap" && deskMore(B) === "+1" && deskWord(C) === "Restriction",
+     // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q18): the flag word "Cap" is spelt out, "Route cap"
+     deskWord(A) === "Gate over" && deskWord(B) === "Route cap" && deskMore(B) === "+1" && deskWord(C) === "Restriction",
      `${deskWord(A)} | ${deskWord(B)} ${deskMore(B)} | ${deskWord(C)}`);
   await act(async () => { dr.unmount(); }); del.remove();
 }
@@ -3254,17 +3288,22 @@ async function lorryPlanDom(){
   const m = mount({});
   await settle();
   const sec = () => m.el.querySelector("[data-lorry-plan]");
-  ok("⭐ 2.1-9 DOM: the panel mounts folded with its head line: the week's lorry-days chained vs booked; one GET",
-     !!sec() && norm(m.el.querySelector("[data-lp-head]") && m.el.querySelector("[data-lp-head]").textContent) === "80 lorry-days this week with each yard's lorries chained, 135 as booked"
-     && gets === 1 && !m.el.querySelector(".lp-row"));
-  act(() => { m.el.querySelector("[data-lp-toggle]").click(); });
+  // REVERSED 25 Nov 2026 (the Look-ahead rethink, C1, Q10): the panel is the week's "By lorry" view: OPEN, no fold, no head
+  // line (its figures are in the three cells); one GET
+  ok("⭐ 2.1-9 DOM: the panel mounts OPEN with no fold and no head line; one GET",
+     !!sec() && !m.el.querySelector("[data-lp-head]") && !m.el.querySelector("[data-lp-toggle]")
+     && gets === 1 && m.el.querySelectorAll(".lp-row").length === 2);
   ok("⭐ 2.1-9 DOM: opened: Chained by yard, today's chip (Wed 4) pressed, the day's yard block with two lorry rows, no Apply in this view",
      // NARROWED 11 Nov 2026 (CLOCS card C-F7): today's chip says so ("Wed 4, today")
      sec().getAttribute("data-lp-view") === "chained" && [...m.el.querySelectorAll('[aria-label="Day"] button')].find(b => b.getAttribute("aria-pressed") === "true").textContent === "Wed 4, today"
      && m.el.querySelectorAll(".lp-row").length === 2 && !m.el.querySelector("[data-lp-apply]"));
   const kp = [...m.el.querySelectorAll(".lp-kpi")].map(e => norm(e.textContent));
-  ok("⭐ 2.1-9 DOM: the four figures: 16 lorries chained on Wed 4, 27 booked, 11 lorry-days saved this day · 55 this week, £ — with where to type a rate",
-     kp[0].startsWith("16 lorries") && kp[1].startsWith("27") && kp[2].startsWith("11 lorry-days saved") && kp[2].includes("55 this week") && kp[3].startsWith("£ —") && kp[3].includes("Config → Costing · fuel"), kp.join(" | "));
+  // NARROWED 25 Nov 2026 (the Look-ahead rethink, C1, card 3): THREE cells, a label over each figure
+  const kc = [...m.el.querySelectorAll(".lp-kpi")].map(e => ({ l: norm(e.querySelector(".lp-kl").firstChild.textContent), v: norm(e.querySelector("b").textContent), s: norm((e.querySelector(":scope > span") || {}).textContent) }));
+  ok("⭐ 2.1-9 DOM: the three figures: Lorries, Wed 4 16 (27 as booked · 80 against 135 this week); Lorry-days saved 11 (55 this week); Saved this week £ — and the link to type a rate",
+     kc.length === 3 && kc[0].l === "Lorries, Wed 4" && kc[0].v === "16" && kc[0].s === "27 as booked · 80 against 135 this week"
+     && kc[1].l === "Lorry-days saved" && kc[1].v === "11" && kc[1].s === "55 this week"
+     && kc[2].l === "Saved this week" && kc[2].v === "£ —" && kc[2].s === "Set a day rate" && !!m.el.querySelector('[data-lp-rate="1"]'), JSON.stringify(kc));
   const r1 = m.el.querySelector('[data-lp-lorry="1"]'), r2 = m.el.querySelector('[data-lp-lorry="2"]');
   ok("⭐ 2.1-9 DOM: lorry 1: six trip blocks and a hatched break, its free words 'Full day'; lorry 2: one trip, '8 h 29 free · room for 5 more trips'",
      r1.querySelectorAll(".lp-blk").length === 7 && r1.querySelectorAll(".lp-blk.is-break").length === 1 && norm(r1.querySelector(".lp-free").textContent) === "Full day"
@@ -3274,28 +3313,29 @@ async function lorryPlanDom(){
   ok("⭐ 2.1-9 DOM: a trip block sits at its start time across a 06:00–19:00 track (07:00 = 7.7 %, 91 min = 11.7 % wide) and the track carries the words for a screen reader",
      Math.abs(parseFloat(blk.style.left) - 7.69) < 0.1 && Math.abs(parseFloat(blk.style.width) - 11.67) < 0.1 && /Lorry 1: 07:00 R011 → Melton Compound, 29 t/.test(r1.querySelector(".lp-track").getAttribute("aria-label")));
   ok("2.1-9 DOM: the yard's line: loads, places, booked vs chained, saved; the key names the place, the break and free",
-     norm(m.el.querySelector(".lp-sub").textContent) === "7 loads to 1 place · the lines book 2 lorries · 2 chained" && norm(m.el.querySelector("[data-lp-key]").textContent).includes("required break"));
-  act(() => { [...m.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+     // NARROWED 25 Nov 2026 (C1, card 3): "sites", "n lorries as booked"
+     norm(m.el.querySelector(".lp-sub").textContent) === "7 loads to 1 site · 2 lorries as booked · 2 chained" && norm(m.el.querySelector("[data-lp-key]").textContent).includes("required break"));
+  act(() => { [...m.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "Week compressed").click(); });
   ok("⭐ 2.1-9 DOM (Q12): Week compressed: Apply drawn for a planner on an unconfirmed week with moves, the moves fold says 1 move · 1 would raise a flag",
      sec().getAttribute("data-lp-view") === "compressed" && !!m.el.querySelector("[data-lp-apply]") && !m.el.querySelector("[data-lp-apply]").disabled
      && norm(m.el.querySelector("[data-lp-moves] button").textContent).includes("1 move this week · 1 would raise a flag"));
   act(() => { m.el.querySelector("[data-lp-moves] button").click(); });
   ok("2.1-9 DOM: the move row: the day, the line, loads and quantity from → to, the CAP flag in amber words",
      /Mon 2 ?R018 Northfield Quarry → Stockpile North ?7 → 9 loads · 200(\.0)? → 257\.1 t ?CAP: 9 loads/.test(norm(m.el.querySelector("[data-lp-move]").textContent)), norm(m.el.querySelector("[data-lp-move]").textContent));
-  act(() => { [...m.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "As booked").click(); });
+  act(() => { [...m.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "As booked").click(); });
   ok("2.1-9 DOM: As booked: no rows, no sheets, the note that it is the grid's own figure",
      !m.el.querySelector(".lp-row") && !m.el.querySelector("[data-lp-sheets]") && norm(sec().textContent).includes("Each line's own whole lorries"));
   m.done();
   const t = mount({ access: { role: "team", ipt: "IPT1" }, weekConfirmed: true });
   await settle();
-  act(() => { t.el.querySelector("[data-lp-toggle]").click(); });
-  act(() => { [...t.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
+  act(() => { [...t.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "Week compressed").click(); });
   ok("⭐ 2.1-9 DOM (Q10, Q12): a team login never sees Apply", !t.el.querySelector("[data-lp-apply]"));
   t.done();
   const c = mount({ weekConfirmed: true });
   await settle();
-  act(() => { c.el.querySelector("[data-lp-toggle]").click(); });
-  act(() => { [...c.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
+  act(() => { [...c.el.querySelectorAll('[aria-label="Lorry plan view"] button')].find(b => b.textContent === "Week compressed").click(); });
   ok("⭐ 2.1-9 DOM (Q12): on a confirmed week a planner's Apply is drawn but disabled, saying to re-open the week",
      c.el.querySelector("[data-lp-apply]") && c.el.querySelector("[data-lp-apply]").disabled && /re-open/.test(c.el.querySelector("[data-lp-apply]").title));
   c.done();
@@ -3312,7 +3352,7 @@ async function lorryPlanDom(){
   };
   const d = mount({});
   await settle();
-  act(() => { d.el.querySelector("[data-lp-toggle]").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
   // 11 Nov 2026 (CLOCS card C-F6): until "Move trips" no trip can be dragged (each keeps its menu) and the drag hint is hidden
   const trips0 = [...d.el.querySelectorAll(".lp-trip")];
   ok("⭐ C-F6 DOM: before 'Move trips' no trip is draggable, each keeps its menu; the toggle reads 'Move trips', not pressed; no drag hint",
@@ -3360,7 +3400,7 @@ async function lorryPlanDom(){
   let asked = 0; const realConfirm = w.confirm; w.confirm = () => { asked++; return true; };
   const a = mount({});
   await settle();
-  act(() => { a.el.querySelector("[data-lp-toggle]").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
   ok("⭐ 2.1-9b DOM (card 9): an arranged yard carries the badge 'your arrangement' and the panel's note says it is kept until the loads change; Reset is drawn",
      !!a.el.querySelector('[data-lp-arranged="1"] .lp-badge') && norm(a.el.querySelector('[data-lp-arranged="1"] .lp-badge').textContent) === "your arrangement"
      && norm(a.el.querySelector(".ct-note").textContent).includes("kept for this week until its loads change") && !!a.el.querySelector("[data-lp-reset]"));
@@ -3373,7 +3413,7 @@ async function lorryPlanDom(){
   // a team: the plain picture, nothing to drag, no menu, no Reset
   const tm = mount({ access: { role: "team", ipt: "IPT1" } });
   await settle();
-  act(() => { tm.el.querySelector("[data-lp-toggle]").click(); });
+  // NARROWED 25 Nov 2026 (C1): no fold to open
   ok("⭐ 2.1-9b DOM (Q10): a team sees the plan as a picture — no draggable trip, no menu, no Reset, the track role=img",
      !tm.el.querySelector(".lp-trip") && !tm.el.querySelector("[data-lp-reset]") && tm.el.querySelector(".lp-track").getAttribute("role") === "img" && tm.el.querySelectorAll('[data-lp-lorry="1"] .lp-blk').length === 7);
   tm.done();

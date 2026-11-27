@@ -67,7 +67,10 @@ ok("...StatusWord (Forecasts' and Users' status, Config's changed / unsaved) dra
 ok("...an abnormal load's flags, the Abnormal loads summary and the Look-ahead's flag strip use the chip too",
    code.includes('<span className="al-flag" title={f.text}><RowStatus word={AL_FLAG_WORD[f.code] || f.code} tone={AL_FLAG_TONE[f.code] || "warn"} /></span>')
    && code.includes('<RowStatus word="Notice late" tone="bad" />') && code.includes('<RowStatus word="AIL road limit" tone="bad" />')
-   && code.includes('<span key={i} className="la-flag-line"><RowStatus word={flagWord(f)} tone={laTone(f.code)} />')
+   // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): the rail's strip became the flags line, one chip a kind of flag
+   && code.includes("k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] };")
+   && code.includes('<RowStatus word={k.word + (!k.undated && k.days.size ? ", " + Array.from(k.days).sort().map(dayName).join(", ") : "")} tone={k.tone} />')
+   && !code.includes('className="la-flag-line"')
    && !code.includes("NOTICE LATE</AlChip>"));
 const caps = [];
 for (const name of ["RAIL_LABEL", "LINE_FLAG_LABEL", "POUR_WORD", "AL_FLAG_WORD"]) {
@@ -99,7 +102,8 @@ ok("⭐ 13: ONE tab — .ws-tab, the selected one a --navy-soft tint with --navy
    css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--surface);color:var(--navy);border-color:var(--line-2);box-shadow:inset 0 -2px 0 var(--navy);}'));   /* NARROWED 24 Nov 2026 (own look, B1 stage 8): the chosen tab is an underline only, no tint, no outline */
 ok("...Users' tabs, the Look-ahead's Account / Commit / Horizon, Stockpiles' piles and years and the CLP notes' tabs all use it",
    code.includes('className="ws-tab" aria-current={tab === k ? "page" : undefined}>{l}</button>)}')
-   && code.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>')
+   // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17): the Look-ahead's tabs are Last week · This week · Next week · Weeks ahead
+   && code.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" data-la-tab-id={id} aria-current={tab === id || (id === "account" && tab === "sofar") ? "page" : undefined}>{label}</button>')
    && code.includes('<div className="ws-tabs mb-3" role="tablist" aria-label="Stockpile">') && code.includes('className="ws-tab">{y}</button>)}')
    && code.includes('<div className="ws-tabs mt-2 mb-1" role="tablist" aria-label="Whose notes and tasks" data-clp-tabs="1">')
    && !code.includes('className={tab === k ? "btn-pri" : "btn-sec"}'));
@@ -201,10 +205,13 @@ ok("...the bulletin's and the PDF maps' scale bars are in the organisation's uni
 
 // 10 Nov 2026 (the UI audit after the comma change): "£57,833" lost its space to wrap at and ran 6 px past the Look-ahead tile
 {
-  const m = code.match(/\(len > 12 \? "text-sm" : len > 9 \? "text-base" : len > (\d+) \? "text-lg" : "text-2xl"\)/);
+  // REVERSED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the noun left the figure for a label over it and the cell is wider
+  // (seven across, not eight; about 150 px at John's window): "£60,764" and "315,905" (7 characters) keep the largest size, and
+  // the figure steps down from 8 ("1,234,567", "£123,456"), as the card says ("steps down a size from 8 characters")
+  const m = code.match(/\(len > 12 \? "text-base" : len > 9 \? "text-lg" : len > (\d+) \? "text-xl" : "text-2xl"\)/);
   const step = m ? +m[1] : null;
-  ok("⭐ 20: a Look-ahead figure of 7 characters (\"£57,833\", \"162,438\") steps down from the largest size; 6 (\"12,345\") keeps it",
-     step === 6 && "£57,833".length > step && "162,438".length > step && !("12,345".length > step), String(step));
+  ok("⭐ 20: a Look-ahead figure of 8 characters (\"£123,456\", \"1,234,567\") steps down from the largest size; 7 (\"£60,764\") keeps it",
+     step === 7 && "£123,456".length > step && "1,234,567".length > step && !("£60,764".length > step), String(step));
 }
 console.log(`ui_fix_consistency.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  ✗ " + f)); process.exit(1); }

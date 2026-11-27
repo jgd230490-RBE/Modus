@@ -855,7 +855,12 @@ ok("⭐ W17 PDF: the flags list names GATE OVER CAPACITY and the gate, and print
 # printed on Monday's sheet too. A flag that carries day_date belongs on that day's sheet only.
 import copy as _cp  # noqa: E402
 _fe = open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read()
-_lfl = dict(re.findall(r'(\w+): "([^"]*)"', re.search(r"const LINE_FLAG_LABEL = \{([^}]*)\}", _fe).group(1)))
+# NARROWED 26 Nov 2026 (the Look-ahead rethink, B1, card 2): the team's share is a getter ("<team word> share", TEAM()),
+# so the object is read up to its own closing "};" and the getter counts as the word "… share"
+_lfl_src = re.search(r"const LINE_FLAG_LABEL = \{(.*?)\};", _fe, re.S).group(1)
+_lfl = dict(re.findall(r'(\w+): "([^"]*)"', _lfl_src))
+if re.search(r'get IPT_SHARE\(\)\{ return TEAM\(\) \+ " share"; \}', _lfl_src):
+    _lfl["IPT_SHARE"] = "… share"
 _lfr = [c for c, v in sorted(re.findall(r"(\w+): ([\d.]+)", re.search(r"const LA_FLAG_RANK = \{([^}]*)\}", _fe).group(1)),
                              key=lambda cv: float(cv[1]))]
 ok("⭐ DAY SHEET: the gate flags read GATE OVER / GATE NEAR, the grid's and the phone day card's words (LINE_FLAG_LABEL); "
@@ -867,7 +872,12 @@ ok("⭐ DAY SHEET: the gate flags read GATE OVER / GATE NEAR, the grid's and the
    and _export.DAY_FLAG_WORD.get("GATE_NEAR") == "GATE NEAR" == _lfl.get("GATE_NEAR").upper()
    and set(_export.DAY_FLAG_WORD) == set(_lfl) == set(_clashes.CODES)
    # the one word that differs: Helvetica on the PDF has no ≠
-   and all(_export.DAY_FLAG_WORD[c] == _lfl[c].upper() for c in _lfl if c != "DAYS_NE_WEEK" and not c.startswith("POUR_"))
+   # NARROWED 26 Nov 2026 (B1, card 2): the screens say "Route cap" and "<team word> share"; the printed sheet keeps its
+   # short CAP and SHARE (15 characters, the PDFs are not this task's)
+   and all(_export.DAY_FLAG_WORD[c] == _lfl[c].upper() for c in _lfl
+           if c not in ("DAYS_NE_WEEK", "ROUTE_CAP", "IPT_SHARE") and not c.startswith("POUR_"))
+   and _lfl["ROUTE_CAP"] == "Route cap" and _export.DAY_FLAG_WORD["ROUTE_CAP"] == "CAP"
+   and _lfl["IPT_SHARE"] == "… share" and _export.DAY_FLAG_WORD["IPT_SHARE"] == "SHARE"
    and all(len(_export.DAY_FLAG_WORD[c]) <= 15 for c in _lfl)
    and _export.DAY_FLAG_WORD["DAYS_NE_WEEK"] == "DAYS NOT = WEEK" and _lfl["DAYS_NE_WEEK"] == "Days ≠ week",
    str((_export.DAY_FLAG_WORD, _lfl)))
