@@ -1576,7 +1576,7 @@ ok("ROUTES PAGE: 9.2's map item names no back end (no API, endpoint, geometry, s
    bool(_m25) and not re.search(r"\b(API|endpoint|geometry|server|token|HERE|/api/)\b", _m25))
 ok("ROUTES PAGE: technical T1 has the reads, the layer names and the full-screen columns",
    all(w in _tg25 for w in ('id="t1-routes-page"', "<code>GET /api/routes/geojson?profile=&amp;leg=&amp;alt_index=</code>", "<code>rlEnsure()</code>",
-                            "<code>/api/community</code>", "<code>/api/collisions</code>", "<code>300px | map | 380px</code>", "<code>routesPageDom</code>")))
+                            "<code>/api/community</code>", "<code>/api/collisions</code>", "<code>325px | map | 405px</code>", "<code>routesPageDom</code>")))   # NARROWED 26 Nov 2026 (own look B1 after): 300 | map | 380 became 325 | map | 405
 # 9 Nov 2026 (v2.1 2.1-11b): the movement count, in both guides; "two-way" retired from the user guide
 _tg_cnt = open(TECH, encoding="utf-8").read()
 ok("COUNT (2.1-11b): the user guide names the Config switch and what it changes, and the Dashboard card",

@@ -2456,8 +2456,12 @@
     // every addLayer of the page goes through here (8d): the slot and the emissive strength, and a `before` that names a layer
     // the style does not list (a classic style's label layer, on Standard) is dropped rather than refused
     const _addLayerRaw = map.addLayer.bind(map);
+    // 26 Nov 2026: and every layer of the page is stamped as ours (OWN_LAYER_MARK in its metadata, which Mapbox keeps and
+    // getStyle() lists), so labelAnchor() can tell the basemap's names from a text layer of ours by the stamp, never by its id
+    const OWN_LAYER_MARK = 'wayscope:own';
     map.addLayer = function (layer, before) {
         if (layer && typeof layer === 'object') {
+            layer.metadata = Object.assign({}, layer.metadata || {}, { [OWN_LAYER_MARK]: true });
             if (styleHasSlots() && !layer.slot && SLOT_TYPES.has(layer.type)) layer.slot = 'middle';
             const em = EMISSIVE[layer.type];
             if (em) { layer.paint = Object.assign({}, layer.paint || {}); if (!(em in layer.paint)) layer.paint[em] = 1; }
@@ -2480,6 +2484,29 @@
     const _setStyleRaw = map.setStyle.bind(map);
     map.setStyle = function (...a) { STYLE_READY.now = false; return _setStyleRaw(...a); };
     function styleReady() { return STYLE_READY.now; }
+    // 26 Nov 2026 (claude/map-switch-leftovers): ONE handler a layer, an event and a piece of code. About twenty places
+    // register a click / mouseenter / mouseleave on a layer from code that runs again at every style.load (a basemap
+    // switch): setupHoverEvents(), the abnormal loads, the traffic limits and others. Each switch added the same handlers
+    // again (24 / 23 / 23 at load, 79 / 93 / 93 after five switches), so one click on an abnormal load opened its popup six
+    // times. A second registration of the SAME code on the same layer and event now replaces the first (the newest is
+    // kept: it holds the state of the last style.load). A handler with other code, on another layer or for the whole map
+    // (no layer) is never touched, nor a bound or native function (no code to compare). A new place that
+    // registers on a layer needs nothing extra.
+    const _onRaw = map.on.bind(map), _offRaw = map.off.bind(map);
+    const LAYER_HANDLERS = new Map();
+    map.on = function (type, layers, fn) {
+        if (typeof fn === 'function' && (typeof layers === 'string' || Array.isArray(layers))) {
+            const code = Function.prototype.toString.call(fn);
+            if (!/\[native code\]/.test(code)) {
+                const key = type + '|' + [].concat(layers).join('+') + '|' + code;
+                const old = LAYER_HANDLERS.get(key);
+                if (old) { try { _offRaw(type, layers, old); } catch (e) {} }
+                LAYER_HANDLERS.set(key, fn);
+            }
+        }
+        return _onRaw.apply(null, arguments);
+    };
+    // (end of the layer-handler rule)
     // Standard's light preset (day / dawn / dusk / night): set on every style load while a Standard style shows; the row of
     // buttons under the Basemap list shows only then; the share link carries &light= (day, the default, writes nothing)
     function applyLightPreset() {
@@ -2935,12 +2962,18 @@
     // basemap's first text layer; the page's own symbols (route labels, badges, the marks) are added without a before and
     // stay on top as before. Each basemap names that layer differently (road-label-simple on Light and Dark, road-label on
     // Streets), so it is found, never named. With no text layer (a bare style) the line simply goes on top, as it used to.
+    // 26 Nov 2026: a text layer of OURS is never the anchor, whatever its id: every layer the page adds carries the stamp
+    // 'wayscope:own' (map.addLayer above). The id list below found only the names it listed: the usual road's crosses
+    // (div-usual-x, PR #330), traffic-limit-badge, holding-chevrons and busy-hours-at were text layers of ours under the
+    // month's lines, so the shared sections, a pick, the busy road and the abnormal loads went in UNDER the forecast lines.
+    // The stamp is read by its literal name here, so the harnesses can run this function on its own.
     function labelAnchor(){
         try {
             // 28 Oct 2026: while a council view is on, the town names sit UNDER the council fill (placeTownNames); the
             // anchor is the first basemap name ABOVE the fill, so a layer added then still goes over the colours
             const layers = map.getStyle().layers, fill = layers.findIndex(x => x.id === 'area-fill');
             const l = layers.find((x, i) => i > fill && x.type === 'symbol' && x.layout && x.layout['text-field']
+                && !(x.metadata && x.metadata['wayscope:own'])
                 && !/^(forecast|road-load|temp-haul|site|restriction|limit|area|community|abnormal|collision|evr)/.test(x.id));
             return l ? l.id : undefined;
         } catch (e) { return undefined; }
@@ -3087,6 +3120,11 @@
             try { map.setPaintProperty(l, 'line-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1); } catch (e) {} });
         if (map.getLayer('holding-chevrons')) { try { map.setPaintProperty('holding-chevrons', 'text-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1); } catch (e) {} }
     }
+    // 26 Nov 2026 (claude/map-switch-leftovers): the dim on the other routes while one is picked, put back after a basemap
+    // switch makes the legs again (they come back at full strength, and applySolidColors() sets them to 1 again 500 ms later)
+    function reapplyRouteDim() {
+        try { if (selectedRouteId) setRouteDim(selectedRouteId); } catch (e) {}
+    }
     function raiseMarks() {
         if (!map || !map.getStyle) return;
         if (typeof applyLabels === 'function') applyLabels();     // 28 Oct 2026 (task 0a): a label layer just (re)made
@@ -3096,6 +3134,7 @@
         if (typeof placeDiversionEdge === 'function') placeDiversionEdge();
         if (typeof restyleUsualRoad === 'function') restyleUsualRoad();
         if (typeof placeBusyRoads === 'function') { placeBusyRoads(); restyleBusyRoads(); }
+        restackOverLines();                                               // 26 Nov 2026: the layers over the lines, in one order
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
         // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
@@ -3106,6 +3145,42 @@
         const tail = ids.slice(ids.length - present.length);
         if (tail.join('|') === present.join('|')) return;
         present.forEach(id => { try { map.moveLayer(id); } catch (e) {} });
+    }
+    // 26 Nov 2026 (claude/map-label-anchor; notes\route-lines-plan-1126): THE ONE ORDER over the month's lines. Each of these
+    // layers was put "before labelAnchor()" by its own adder at its own moment, so the stack was whatever order they came
+    // in: after a basemap switch the pick, the abnormal loads and the traffic limits were made BEFORE the forecast lines were
+    // made again, and ended UNDER them. Read bottom to top: the shared road sections, the amber rails, the abnormal loads,
+    // a traffic limit's fill, band and edge, the busy-hours road, the pick, the limit's badge, the pick's hours, then the
+    // basemap's names. The pick sits where a pick has always drawn (the old selectRoute() put it just under the anchor,
+    // which was the limit's badge): over an abnormal load and a limit's band, under the limit's badge; a month change no
+    // longer flips it (applyAbnormalPublicMonth and applyTrafficMonth call this after their own move). raiseMarks() (on
+    // every forecast re-add) and selectRoute() call it too; it moves nothing while the order already holds. A NEW layer
+    // that must draw over the month's lines joins OVER_LINES here, never a moveLayer of its own.
+    const OVER_LINES = ['road-load-casing', 'road-load-line', 'diversion-edge', 'abnormal-public-casing', 'abnormal-public-lines',
+        'traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'busy-casing', 'busy-core',
+        'sel-glow', 'sel-casing', 'sel-core', 'traffic-limit-badge'];
+    function restackOverLines() {
+        if (!map || !map.getStyle) return;
+        let layers; try { layers = map.getStyle().layers || []; } catch (e) { return; }
+        const ids = layers.map(l => l.id);
+        const anchor = labelAnchor();
+        const top = anchor ? ids.indexOf(anchor) : -1;
+        const list = OVER_LINES.filter(id => ids.indexOf(id) >= 0);
+        // the busy-hours pill goes with them only where something has already put it under the names (a pick)
+        if (ids.indexOf('busy-hours-at') >= 0 && top >= 0 && ids.indexOf('busy-hours-at') < top) list.push('busy-hours-at');
+        if (!list.length) return;
+        const at = list.map(id => ids.indexOf(id));
+        const floor = ids.indexOf('forecast-layer');
+        const holds = at[0] > floor && at.every((v, i) => i === 0 || v > at[i - 1]) && (top < 0 || at[at.length - 1] < top);
+        if (holds) return;
+        // a style with no basemap name layer (Standard lists only ours): just under the first text or mark of ours above them
+        let before = anchor;
+        if (!before) {
+            const l = layers.find((x, i) => i > Math.max(floor, at[0]) && list.indexOf(x.id) < 0 && x.type === 'symbol'
+                && x.metadata && x.metadata['wayscope:own']);
+            before = l ? l.id : undefined;
+        }
+        list.forEach(id => { try { if (before) map.moveLayer(id, before); else map.moveLayer(id); } catch (e) {} });
     }
 
 
@@ -4622,6 +4697,7 @@
         });
 
         applyFilters();
+        reapplyRouteDim();      // 26 Nov 2026: a picked route keeps the others dimmed across a basemap switch
         setupHoverEvents();
         renderIptLegend();
         applyIptFilter();
@@ -6804,6 +6880,7 @@
                     if (typeof applyLegLook === 'function') applyLegLook();
                     if (map.getLayer('inbound-lines')) map.setPaintProperty('inbound-lines', 'line-opacity', 1.0);
                     if (map.getLayer('outbound-lines')) map.setPaintProperty('outbound-lines', 'line-opacity', 1.0);
+                    reapplyRouteDim();      // 26 Nov 2026: and a picked route keeps the others dimmed (the reset was the last write)
 
                     // Setup Universal Hover Glow Layer (Sits behind the routes)
                     if (!map.getLayer('global-route-hover')) {
@@ -7084,7 +7161,10 @@
         ensureSelectionLayers();
         const src=map.getSource('selected-route'); if(src) src.setData({type:'FeatureCollection',features:feats});
         showBusyRoad(rl);
-        ['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach(l => { if(map.getLayer(l)) { try { map.moveLayer(l, labelAnchor()); } catch(e){} } });
+        // NARROWED 26 Nov 2026 (claude/map-label-anchor): the pick takes its place in the one order over the lines
+        // (restackOverLines: over the abnormal loads, a limit's band and the busy-hours road, under the limit's badge), the pill last
+        if(map.getLayer('busy-hours-at')) { try { map.moveLayer('busy-hours-at', labelAnchor()); } catch(e){} }
+        restackOverLines();
         setRouteDim(routeId);
         // 12 Nov 2026 (option A): the Forecast detail tab is on screen while a route is picked: its table follows the pick
         try { const dr = document.getElementById('route-drawer'); if (drawerTab === 'detail' && dr && dr.classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail(); } catch (e) {}
@@ -11549,6 +11629,7 @@
             // above the month's blue routes (added after these layers when the timeline opens) and still under the names: the
             // load's line is the thing to see in its month; the ring and the dot on top of everything
             try { ['abnormal-public-casing', 'abnormal-public-lines'].forEach(l => map.moveLayer(l, labelAnchor())); ['abnormal-public-ends', 'abnormal-public-dot'].forEach(l => map.moveLayer(l)); } catch (e) {}
+            if (typeof restackOverLines === 'function') restackOverLines();   // 26 Nov 2026: back under a picked route (the one order over the lines)
             const lineFilter = ids ? ['all', ['==', ['geometry-type'], 'LineString'], ['in', ['get', 'id'], ['literal', ids]]] : ['==', ['geometry-type'], 'LineString'];
             try { ['abnormal-public-casing', 'abnormal-public-lines'].forEach(l => map.setFilter(l, lineFilter)); } catch (e) {}
             const ends = m ? ABP.active.map(f => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: f.geometry.coordinates[f.geometry.coordinates.length - 1] } })) : [];
@@ -11707,6 +11788,7 @@
             try { map.getSource('traffic-limit-source').setData(fc.shapes); map.getSource('traffic-limit-badges').setData(fc.badges); } catch (e) {}
             // above the month's blue routes (added later when the timeline opens), still under the road names
             try { ['traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'].forEach(l => map.moveLayer(l, labelAnchor())); } catch (e) {}
+            if (typeof restackOverLines === 'function') restackOverLines();   // 26 Nov 2026: the band back under a picked route, the badge over it (the one order)
         }
         renderTrafficPanel();
     }

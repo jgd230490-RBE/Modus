@@ -3004,8 +3004,9 @@ async function fullScreenDom(){
        !!g && under.hasAttribute("inert") && upChain.every(n => !n.hasAttribute("inert")) && !g.querySelector("[inert]"));
     ok("⭐ FULL SCREEN: ⤢ lays the Locations grid over the window (sl-full) and asks Chrome for its own full screen once (Q1)",
        !!g && / sl-full$/.test(g.className) && FS.req === 1 && fsEl === de);
-    ok("FULL SCREEN: before Draw the map takes the window less a 380 px column for the site's panel (Q4); the SAME map div fills its card",
-       !!g && g.style.gridTemplateColumns === "minmax(0, 1fr) 380px" && card.style.gridColumn === "1" && panel.style.gridColumn === "2"
+    // NARROWED 26 Nov 2026 (own look B1 after): the full screen is on the page white with hairlines between its columns, so each open column is 25 px wider (12 + 12 padding and the hairline) and what is inside keeps its width
+    ok("FULL SCREEN: before Draw the map takes the window less a 380 px column for the site's panel (Q4); the SAME map div fills its card  [NARROWED: 405 px]",
+       !!g && g.style.gridTemplateColumns === "minmax(0, 1fr) 405px" && card.style.gridColumn === "1" && panel.style.gridColumn === "2"
        && panel.style.overflowY === "auto" && mapDiv.style.height === "100%");
     ok("FULL SCREEN: the button turns into 'Leave full screen' (pressed; CSS draws ⤡)",
        btn().textContent === "" && btn().getAttribute("aria-label") === "Leave full screen" && btn().getAttribute("aria-pressed") === "true");
@@ -3196,8 +3197,8 @@ async function routesPageDom(){
     ok("⭐ 2.1-8: the ⤢ control shows on the Routes page at a desk (Q1)", !!box() && box().style.display === "");
     await press(btn());
     const g = el.querySelector("[data-full]");
-    ok("⭐ 2.1-8: ⤢ lays the page over the window: the route list | the map | the chosen route (300 px | map | 380 px), the panel hidden",
-       !!g && / sl-full$/.test(g.className) && g.style.gridTemplateColumns === "300px minmax(0, 1fr) 380px"
+    ok("⭐ 2.1-8: ⤢ lays the page over the window: the route list | the map | the chosen route (300 px | map | 380 px), the panel hidden  [NARROWED 26 Nov: 325 | map | 405, the same insides on white]",
+       !!g && / sl-full$/.test(g.className) && g.style.gridTemplateColumns === "325px minmax(0, 1fr) 405px"
        && !!el.querySelector("[data-route-full-list]") && !!el.querySelector("[data-route-full-details]") && fsEl === de);
     ok("2.1-8: the list holds every route with its two legs", el.querySelectorAll("[data-route-full-pick]").length === 2
        && /Out .*Back /.test(el.querySelector('[data-route-full-pick="R001"]').textContent));
@@ -3210,7 +3211,7 @@ async function routesPageDom(){
        && el.querySelector('[data-route-full-pick="R001"]').getAttribute("aria-current") === "true");
     const folds = [...g.querySelectorAll("button.sl-fold")];
     await press(folds[0]);
-    ok("2.1-8: « folds the list to a strip", g.style.gridTemplateColumns === "44px minmax(0, 1fr) 380px" && !el.querySelector("[data-route-full-pick]"));
+    ok("2.1-8: « folds the list to a strip  [NARROWED 26 Nov: the other column 405]", g.style.gridTemplateColumns === "44px minmax(0, 1fr) 405px" && !el.querySelector("[data-route-full-pick]"));
     await press([...g.querySelectorAll("button.sl-fold")][1]);
     ok("2.1-8: » folds the chosen route to a strip", g.style.gridTemplateColumns === "44px minmax(0, 1fr) 44px");
     await act(async () => { wide = false; mqOn.forEach(f => f()); }); await settle();
