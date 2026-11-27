@@ -2284,9 +2284,12 @@ def forecast_week_lorry_plan(bucket: str = "commit"):
 
 
 @app.get("/api/forecast-weeks/lorry-plan/download")
-def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit"):
+def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit",
+                                  yard: str = None, vehicle: str = None, lorry: int = None):
     """The day's driver sheets (one A4 page a lorry, PDF) or the day's trips (XLSX), for the chained or compressed view.
-    Made fresh on each download; the sheet carries who made it and when. Nothing is sent."""
+    Made fresh on each download; the sheet carries who made it and when. Nothing is sent. 25 Nov 2026 (the Look-ahead
+    rethink, card 4): optional `yard` (a load point's id), `vehicle` (its lorry type) and `lorry` (n) narrow it to one
+    load point's lorries or one lorry's page."""
     from fastapi.responses import Response       # not in the test stub; imported here
     import lorry_plan
     if format not in ("pdf", "xlsx"):
@@ -2294,15 +2297,15 @@ def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "ch
     data = _lorry_plan_data(bucket)
     try:
         if format == "pdf":
-            body, mime = lorry_plan.build_pdf(data, view, day), "application/pdf"
+            body, mime = lorry_plan.build_pdf(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry), "application/pdf"
         else:
-            body, mime = (lorry_plan.build_xlsx(data, view, day),
+            body, mime = (lorry_plan.build_xlsx(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry),
                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except lorry_plan.PlanError as e:
         raise HTTPException(400, str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
-    name = f"{lorry_plan.file_stem(data, view, day)}.{format}"
+    name = f"{lorry_plan.file_stem(data, view, day, yard=yard, lorry=lorry)}.{format}"
     return Response(content=body, media_type=mime,
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
@@ -5775,6 +5778,94 @@ def _gate_arrivals_build(month, acc):
     out["busiest_loads"] = b.get("loads")
     out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
+
+
+@app.get("/api/forecast-weeks/lorry-plan/sheet")
+def forecast_week_lorry_plan_sheet(day: str, view: str = "chained", bucket: str = "commit", yard: str = None,
+                                   vehicle: str = None, lorry: int = None):
+    """
+    25 Nov 2026 (the Look-ahead rethink, card 4): the Driver sheet as data, the same pages, words and "Take care on this
+    route" blocks the PDF prints (lorry_plan.driver_pages, which build_pdf draws), so the screen can show a lorry's sheet
+    under its row. Scoped like the Lorry plan (any staff code or login; a team sees its own lines). Stored data only:
+    nothing is fetched or written. `yard`, `vehicle` and `lorry` narrow it as the download does.
+    """
+    import lorry_plan
+    data = _lorry_plan_data(bucket)
+    try:
+        return lorry_plan.driver_pages(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry)
+    except lorry_plan.PlanError as e:
+        raise HTTPException(400, str(e))
+
+
+#: 27 Nov 2026 (claude/route-pieces; the route lines plan's Q6, Q8, Q12 and Q16, John's "Yes, all as recommended" of
+#: 26 Nov): where each stored option of a leg differs from the line in use, by ONE rule on the server (route_pieces.py),
+#: and what lies along the line in use as one list in metres from A. Nothing reads them yet: the pages keep their own
+#: rules until a visible task, with its own mockup, moves them on. The public read carries only what the public map is
+#: already sent (route_pieces.PUBLIC_WHATS); one kept copy a route and leg, until the next write.
+ROUTE_PIECES_PUBLIC = "public/route-pieces"
+ROUTE_LEGS = ("loaded", "return")
+
+
+def _pieces_day(day):
+    import datetime as _dt
+    if not day:
+        return _dt.date.today()
+    try:
+        return _dt.date.fromisoformat(str(day)[:10])
+    except ValueError:
+        raise HTTPException(400, "day must be YYYY-MM-DD")
+
+
+@app.get("/api/routes/{route_id}/along")
+def route_along(route_id: str, leg: str = "loaded", profile: Optional[str] = None, day: Optional[str] = None):
+    """
+    27 Nov 2026 (claude/route-pieces). One route, one leg (`loaded` | `return`), one lorry type (`profile`; default the
+    public map's own choice): the line in use on `day` (YYYY-MM-DD, default today) and, as ONE list in metres from A,
+    the limits the lorry is at or over, the schools, hospitals and health centres beside it, the cycle-route crossings,
+    the collision evidence's numbered stretches, the haul-road stretches, and where each dated diversion and busy-hours
+    road leaves and rejoins it; with every stored option's pieces against it (route_pieces.along). Any staff login or
+    code; a team sees its own team's routes only (another's is a 404). Stored data only, kept until the next write.
+    """
+    import collisions
+    import route_pieces
+    acc = _require_access()
+    if leg not in ROUTE_LEGS:
+        raise HTTPException(400, "leg must be loaded or return")
+    d = _pieces_day(day)
+    try:
+        collisions._route_row(route_id, acc)
+    except collisions.EvidenceError:
+        raise HTTPException(404, "no such route")
+    prof = route_pieces.lorry_for(route_id, profile)
+    if not prof:
+        raise HTTPException(404, "no line of this route for that lorry type")
+    return _staff_json("routes/along", {"route": route_id, "leg": leg, "profile": prof, "day": d.isoformat()},
+                       lambda: route_pieces.along(route_id, prof, leg, d), acc)
+
+
+@app.get("/api/public/route-pieces")
+def public_route_pieces(route: str, leg: str = "loaded", profile: Optional[str] = None):
+    """
+    27 Nov 2026 (claude/route-pieces). The public map's share of one leg (route_pieces.public): every stored option
+    against option 0 with where it leaves and rejoins and the stretches that differ in metres along both lines (a
+    diversion with its dates, a busy-hours road with its hours), the haul-road stretches, and the limits the public
+    map's own collection already lists for this route. Behind the map gate like the rest of /api/public/; one kept copy
+    a route, leg and lorry type until the next write.
+    """
+    import route_pieces
+    if leg not in ROUTE_LEGS:
+        raise HTTPException(400, "leg must be loaded or return")
+    if not db.query("SELECT id FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route)):
+        raise HTTPException(404, "no such route")
+    prof = route_pieces.lorry_for(route, profile)
+    if not prof:
+        raise HTTPException(404, "no line of this route for that lorry type")
+
+    def build():
+        with _heavy("route-pieces"):
+            return _json_body(route_pieces.public(route, leg, prof))
+    body = read_cache.cached(f"{ROUTE_PIECES_PUBLIC}|{route}|{leg}|{prof}", (MONTH_COUNT,), build)
+    return Response(content=body, media_type="application/json")
 
 
 #: 17 Nov 2026 (John: "Yes, add it"): the rule's table reads nothing of the caller (route_best.table takes a day only), so

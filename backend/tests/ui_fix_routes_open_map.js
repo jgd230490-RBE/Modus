@@ -69,8 +69,10 @@ ok("⭐ SRC Q2: the 30 % fade only while a route is picked and NOT open (applyEm
 ok("⭐ SRC Q2: an open route's two ends come from its own row (status), the drawn lines only as a fallback",
    html.includes("const st = (status || []).find(r => r.id === olRoute) || {};")
    && html.includes("const ends = [st.origin_id || p0.origin_id, st.dest_id || p0.dest_id].filter(Boolean);"));
-ok("⭐ SRC: none of this reaches the Simulation map or a printed map (their own green and amber stay with the public map's session)",
-   html.includes('const CM_OUT = "#059669", CM_BACK = "#f59e0b"'));
+// NARROWED 26 Nov 2026 (lines-prints Q1): the week maps took the same pair in their own branch (CM_OUT / CM_BACK = LEG_OUT /
+// LEG_BACK's values); this branch's own constants are still the only ones on the Routes map
+ok("⭐ SRC: the Routes map's pair is its own (LEG_OUT / LEG_BACK); the week maps keep their own constants, now the same ink and grey (lines-prints Q1)",
+   html.includes('const CM_OUT = "#3A3C41", CM_BACK = "#8E9197"') && html.includes('const LEG_OUT = "#3A3C41", LEG_BACK = "#8E9197"'));
 
 // ---------------- the app in a DOM, over a stand-in map ----------------
 const dom = new JSDOM(`<!doctype html><html><head></head><body><div id="root"></div></body></html>`,

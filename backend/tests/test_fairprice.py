@@ -452,7 +452,10 @@ ok("the page: FairPriceSection defined once and mounted in the Costing tab; the 
    len(re.findall(r"function FairPriceSection\(", _fe)) == 1 and _fe.count("<FairPriceSection") == 1
    # NARROWED (G2): the currency symbol is the tenant's — {CUR()} where it said €
    and "Fair {CUR()} <span" in _fe and "Fair € <span" not in _fe
-   and "(model, ${totals.fair_lines} of ${totals.lines})" in _fe)
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the strip's second line "fair price £…"; "model" moved into
+   # the Planned cost figure's "i" ("what the cost model says it should cost, never a quote")
+   and "`fair price ${CUR()}${grp(totals.fair_eur)}`" in _fe and "what the cost model says it should cost, never a quote" in _fe
+   and "(model, ${totals.fair_lines} of ${totals.lines})" not in _fe)
 ok("...the copy calls it a floor for negotiation, never a quote", "a floor for negotiation, never a quote" in _fe)
 ok("🔴 no fair price on the public map", "fair price" not in open(os.path.join(ROOT, "map", "index.html"), encoding="utf-8").read().lower())
 ok("no route type field was invented: no 'route_type' / 'road_surface' NAME in the backend (docstrings may say the word)",

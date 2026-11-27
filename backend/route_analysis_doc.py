@@ -29,6 +29,7 @@ import datetime
 import json
 import math
 
+import chainage
 import db
 
 MAX_ROUTES = 12
@@ -169,7 +170,7 @@ def _limits(rid, used, loaded, ret, index):
         a = g.get("anchor")
         g["along_m"], g["off_m"] = None, None
         if a and len(loaded) >= 2 and a[0] is not None:
-            off, along = collisions._project(index, loaded, (a[0], a[1]))
+            off, along = chainage.project(index, loaded, (a[0], a[1]))
             g["along_m"], g["off_m"] = along, off
         g["legs"] = sorted(g["legs"], key=lambda x: 0 if x == "loaded" else 1)
         g["legs_words"] = ("out and back" if len(g["legs"]) == 2 else ("out" if g["legs"][0] == "loaded" else "back"))
@@ -304,7 +305,7 @@ def _community(rid, loaded, index, feats):
             continue
         counts[kind] += 1
         props = f.get("properties") or {}
-        along = collisions._chainage(index, loaded, at) if len(loaded) >= 2 else None
+        along = chainage.chainage(index, loaded, at) if len(loaded) >= 2 else None
         row = {"kind": kind, "kind_label": community.KIND_BY_KEY[kind]["label"],
                "name": props.get("name") or None, "m": int(round(best)), "at": [at[0], at[1]],
                "along_m": along, "from_a": (f"{_miles(along):.1f}" if along is not None else None)}
@@ -326,12 +327,12 @@ def _cycle(ev, index):
     head = ev.get("headline") or []
     turns = []
     for i, t in enumerate(ev.get("turns") or [], 1):
-        at = collisions.point_at(index, ev["loaded"], t["m"]) if len(ev.get("loaded") or []) >= 2 else None
+        at = chainage.point_at(index, ev["loaded"], t["m"]) if len(ev.get("loaded") or []) >= 2 else None
         turns.append({"no": i, "words": t.get("words"), "m": t["m"], "at": at, "cycle": t.get("cycle"),
                       "cycle_m": t.get("cycle_m"), "angle": t.get("deg") or t.get("angle")})
     meets = []
     for x in (ev.get("cycle") or {}).get("meets") or []:
-        at = collisions.point_at(index, ev["loaded"], x["m"]) if len(ev.get("loaded") or []) >= 2 else None
+        at = chainage.point_at(index, ev["loaded"], x["m"]) if len(ev.get("loaded") or []) >= 2 else None
         meets.append({"m": x["m"], "words": x["words"], "name": x.get("name"), "at": at})
     return {"shown": bool(ev.get("cycle_shown")), "columns": head, "turns": turns, "meets": meets,
             "lines": ev.get("cycle_lines") or [], "beside_m": collisions.CYCLE_BESIDE_M,
@@ -386,14 +387,14 @@ def _diversions(rid, base, index):
     import collisions
     zs = {z["id"]: z for z in zones.list_zones()}
     out = []
-    main_out = collisions.line_length_m(index, base["loaded"]) if len(base["loaded"]) >= 2 else None
-    main_back = collisions.line_length_m(index, base["return"]) if len(base["return"]) >= 2 else None
+    main_out = chainage.line_length_m(index, base["loaded"]) if len(base["loaded"]) >= 2 else None
+    main_back = chainage.line_length_m(index, base["return"]) if len(base["return"]) >= 2 else None
     for d in base.get("diversions") or []:
         if d.get("kind") == "busy":
             continue                                           # Q12: the busy-hours road is section E
         zids = [z for z in zs if (zs[z].get("name") or z) in (d.get("because") or [])]
-        lo = collisions.line_length_m(index, d["loaded"]) if len(d.get("loaded") or []) >= 2 else None
-        bk = collisions.line_length_m(index, d["return"]) if len(d.get("return") or []) >= 2 else None
+        lo = chainage.line_length_m(index, d["loaded"]) if len(d.get("loaded") or []) >= 2 else None
+        bk = chainage.line_length_m(index, d["return"]) if len(d.get("return") or []) >= 2 else None
         out.append({"when": d.get("when"), "from": d.get("from"), "to": d.get("to"), "back_on": d.get("back_on"),
                     "because": d.get("because") or [], "notes": [zs[z].get("note") for z in zids if zs[z].get("note")],
                     "zones": [{"id": z, "name": zs[z].get("name") or z, "geometry": zs[z].get("geometry")} for z in zids],
@@ -462,9 +463,9 @@ def gather(route_ids, lorry=None, sections=None, acc=None, now=None):
         # the Route sheet do (R001: 19.1 mi, where the drawn line measured 18.9); the drawn line's own length only where
         # no distance is stored. The line's length still places things along it (a limit "5.2 mi from A").
         R["out_m"] = (base["loaded_km"] * 1000.0 if base.get("loaded_km") is not None
-                      else (collisions.line_length_m(index, base["loaded"]) if len(base["loaded"]) >= 2 else None))
+                      else (chainage.line_length_m(index, base["loaded"]) if len(base["loaded"]) >= 2 else None))
         R["back_m"] = (base["return_km"] * 1000.0 if base.get("return_km") is not None
-                       else (collisions.line_length_m(index, base["return"]) if len(base["return"]) >= 2 else None))
+                       else (chainage.line_length_m(index, base["return"]) if len(base["return"]) >= 2 else None))
         if "limits" in sections:
             R["limits"] = _limits(rid, base["vehicle"], base["loaded"], base["return"], index)
             R["closures"] = _held_closures(rid, base["vehicle"]) if base["drawn"] else {"held": False, "hits": [],
@@ -611,7 +612,10 @@ def best(rid, ctx, factors):
         out["cols"].append({"label": o["label"], "in_use": False, "chosen": bool(o.get("chosen")),
                             "traded": bool(o.get("traded")), "ruled_out": list(o.get("ruled_out") or []),
                             "counts": dict(o.get("counts") or {}), "pct": dict(o.get("pct") or {}),
-                            "head_words": dict(o.get("head_words") or {})})
+                            "head_words": dict(o.get("head_words") or {}),
+                            # 25 Nov 2026 (Q11): the rule's schedule rows (route_best.option_rows; None when ruled out),
+                            # printed as they are by the summary page's schedule
+                            "rows": [dict(x) for x in (o.get("rows") or [])] or None})
     out["busy_held"] = any((c["counts"].get("busy_min") or {}).get(h) is not None
                            for c in out["cols"] if not c["in_use"] for h in BUSY_HOURS)
     out["cycle_held"] = bool(use) and use.get("cycle_meets") is not None

@@ -699,7 +699,9 @@ ok("export: the Clashes sheet and the PDF name the codes and the teams",
    and export._flag_label({"code": "IPT_SHARE"}) == "SHARE" and "TARK_TEE" not in export.FLAG_LABEL)
 # NARROWED 14 Oct 2026 (D9): + the Day sheet's rows (export.day_sheet_rows builds its namer once, before its loop)
 ok("export: the team namer is built once per sheet, not per row",
-   read("backend/export.py").count("= _team_namer()") == 5   # day rows, Clashes sheet, PDF rows, PDF flags, Day sheet rows
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task C2): 5 -> 7, the "By site" sheet's headings and the Day sheet's
+   # site headings (each once, before its loop)
+   read("backend/export.py").count("= _team_namer()") == 7   # day rows, Clashes sheet, PDF rows, PDF flags, Day sheet rows, By site, Day sheet sites
    and "    name = _team_namer()\n    by_line = {}" in read("backend/export.py"))
 _page = {"commit": {"lines": [{"route_id": "R9", "context": {"ipt": "IPT3", "origin_name": "A", "dest_name": "B"},
                                "days": [{"day_date": "2026-09-14", "derived": {}}]}]}}
@@ -732,14 +734,20 @@ ok("frontend: signed-in role text shows the team's name",
 ok("frontend: the clash rail shows the code's name (the provider's for a restriction) and the teams' names",
    # NARROWED 10 Nov 2026 (wave 2, card 12): the word is the one status chip (RowStatus), in sentence case; a provider's own
    # word in capitals ("ROADWORKS") reads in sentence case through capsWord
-   "<RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}" in fe_src and 'IPT_SHARE: "Share"' in fe_src
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): the rail became the flags line, a kind of flag with its site(s);
+   # a flag's own sentence, with the teams' names (teamText), is in the line's details (laFlagGroups)
+   "k = { code: f.code, word: flagWord(f), tone: laTone(f.code), days: new Set(), undated: false, sites: [] };" in fe_src
+   and "<RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}" not in fe_src
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1): "<team word> share", through TEAM()
+   and 'const t = teamText(f.text || "")' in fe_src and 'get IPT_SHARE(){ return TEAM() + " share"; }' in fe_src and 'IPT_SHARE: "Share"' not in fe_src
    and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? capsWord(f.label) : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
    and "{f.code}</span> {f.text}" not in fe_src and 'TARK_TEE: "TARK TEE"' not in fe_src)
 ok("frontend: the map entry is not called public — the map is behind the gate",
    '{ id: "map", label: "Route map"' in fe_src and "Back to public map" not in fe_src and 'label: "Public route map"' not in fe_src)
 ok("frontend: a long KPI value steps its size down rather than being cut off, and says itself on hover",
-   '(len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")' in fe_src   # NARROWED 10 Nov 2026 (wave 2, finding 20): steps down from 7 characters ("£57,833")
-   and 'data-fuel-widget="compact" title={hasIndex ? String(price) : ""}' in fe_src)
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): steps down from 8 characters, the label over the figure
+   '(len > 12 ? "text-base" : len > 9 ? "text-lg" : len > 7 ? "text-xl" : "text-2xl")' in fe_src
+   and 'data-fuel-widget="compact" data-la-fig="Diesel, per litre" title={hasIndex ? String(price) : ""}' in fe_src)
 # NARROWED (H1): "published" rather than "bulletin" — the GB series is not a bulletin
 ok("frontend: a typed diesel price is dated as typed, a fetched one as published",
    '${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}' in fe_src)
