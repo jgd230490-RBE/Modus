@@ -3130,7 +3130,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !src.includes("RS_ICON")
      && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(html) && /\.row-st\.rs-warn i\{[^}]*border-radius:0;[^}]*transform:rotate\(45deg\);/.test(html)
      && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(html)
-     && /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
+     // NARROWED 26 Nov 2026 (own look B1 after): the shape drops to the first line's middle (margin-top in em)
+     && /\.row-st i\{[^}]*width:10px;height:10px;margin-top:calc\(\.675em - 5px\);border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
      && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(html)
      && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true"></i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
@@ -5444,8 +5445,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      dmc.includes('const fullOk = isWide && ((subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id))) || (subTab === "routes" && !drawing));')
      && dmc.includes("useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);") && dmc.includes('c.box.style.display = fullOk ? "" : "none";'));
   ok("FULL SCREEN: before Draw, the map | a 380 px column for the site's panel; while drawing, the Drawing bar across, then palette | map | settings filling the height",
-     dm.includes('{ gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" }')
-     && dm.includes('gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)"')
+     // NARROWED 26 Nov 2026 (own look B1 after): the full screen is on the page white with hairlines between its columns, so each open column is 25 px wider (12 + 12 padding and the hairline) and what is inside keeps its width (380 to 405, 232 to 257, 300 to 325)
+     dm.includes('{ gridTemplateColumns: "minmax(0, 1fr) 405px", gridTemplateRows: "minmax(0, 1fr)" }')
+     && dm.includes('gridTemplateColumns: `${fold.l ? 44 : 257}px minmax(0, 1fr) ${fold.r ? 44 : 325}px`, gridTemplateRows: "auto minmax(0, 1fr)"')
      && ed.includes('const colH = full ? { height: "100%", minHeight: 0 } : { maxHeight: wide ? SL_DRAW_H : undefined };')
      && (ed.match(/\.\.\.colH/g) || []).length === 2 && !/maxHeight: wide \? SL_DRAW_H/.test(ed.replace("{ maxHeight: wide ? SL_DRAW_H : undefined }", "")));
   ok("⭐ FULL SCREEN: « / » fold either side column to a 44 px strip (Q5), named buttons that say what they show, opening unfolded each time",
@@ -5667,7 +5669,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && dmr.includes('const o = legFig(pinfo, "loaded", showAlt), b = legFig(pinfo, "return", showAlt);')
      && code.includes("{r.loaded_hr != null ? Math.round(r.loaded_hr * 60) : \"—\"}") && code.includes("{r.return_hr != null ? Math.round(r.return_hr * 60) : \"—\"}"));
   ok("⭐ ROUTES PAGE (2.1-8, Q1): full screen only on ⤢, the route list | the map | the chosen route, each side folding",
-     dmr.includes('onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 300}px minmax(0, 1fr) ${fold.r ? 44 : 380}px`, gridTemplateRows: "minmax(0, 1fr)" }')
+     // NARROWED 26 Nov 2026 (own look B1 after): the full screen is on the page white with hairlines between its columns, so each open column is 25 px wider (12 + 12 padding and the hairline) and what is inside keeps its width
+     dmr.includes('onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 325}px minmax(0, 1fr) ${fold.r ? 44 : 405}px`, gridTemplateRows: "minmax(0, 1fr)" }')
      && dmr.includes("{full && onRoutes && !drawing && <>") && lst.includes("gridColumn: 1") && det.includes("gridColumn: 3")
      && det.includes("<RouteSheetButton routeId={r.id} /><RouteAnalysisMenu routes={routes} picked={r.id} vehicles={vehicles} />"));   // NARROWED 9 Nov 2026 (2.1-6): the route analysis replaces the collision evidence buttons
   // the Chrome check (8 Nov): in full screen the DEMO pill sat over Out · Back · Both, and the detail table pushed the column sideways
