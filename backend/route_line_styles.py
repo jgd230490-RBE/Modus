@@ -15,11 +15,15 @@ WHO READS IT
   * Python, by import: `route_map_export`, `export` (the route map export, the Route sheet, the collision evidence,
     the bulletin's printed map, the Look-ahead week sheet), `route_analysis_render`, `bulletin_doc` (the bulletin's
     web map), `clp_doc_pictures` (the CLP regional plan).
-  * The two pages, through a GENERATED copy written into each page between the markers
-    `<!-- route-line-styles:begin -->` and `<!-- route-line-styles:end -->` by `backend/tools/route_line_styles_build.py`:
-    a plain script that sets `window.ROUTE_LINE_STYLES` (the page's surfaces only) and a style block of custom
-    properties `--rl-…` for the HTML key samples. Inline, so a page loads nothing new and cannot lose its lines to a
-    request that fails; `test_route_line_styles.py` fails when a page's copy is stale.
+  * The two pages, through a GENERATED copy in two regions of each page, written by
+    `backend/tools/route_line_styles_build.py` (run it after any change here; `--check` says whether a page is stale):
+      - `// route-line-styles:begin` … `// route-line-styles:end`, the FIRST statement of the page's main script:
+        `var ROUTE_LINE_STYLES = {…};` (the page's surfaces only). The map page reads `RLSP` (public_map), the app
+        `RLS_R` (routes_map), `RLS_C` (commit_map), `RLS_S` (simulation_map).
+      - `<!-- route-line-styles:css:begin -->` … `:css:end -->`, just before `</head>`: a style block of custom
+        properties `--rl-<surface>-<role>-<field>` for every colour, read by the HTML key samples.
+    Inline, so a page loads nothing new and cannot lose its lines to a request that fails; `test_route_line_styles.py`
+    fails when a page's copy is stale.
 
 THE SHAPE
 ---------
@@ -71,13 +75,14 @@ ROLES = {
                                     "routes": {"width": 3, "opacity": 1.00, "casing_opacity": 0.85},
                                     "zones": {"width": 2, "opacity": 0.55, "casing_opacity": 0.35}},
                        "dim_factor": 0.3, "key": "Out"},
-        "commit_map": {"color": "#3A3C41", "color_dark": "#D4D6DA", "width": 4, "offset": ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4],
-                       "casing": "#ffffff", "casing_dark": "#1F2024", "casing_width": 6.5, "casing_opacity": 0.9,
+        # on a dark ground the week map takes the Routes map's own Dark pair and casing (routes_map color_dark / casing_dark)
+        "commit_map": {"color": "#3A3C41", "width": 4, "offset": ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4],
+                       "casing": "#ffffff", "casing_width": 6.5, "casing_opacity": 0.9,
                        "key": "Out (loaded)", "key_today": "Today, out (loaded)"},
         "plan": {"color": "#0051C4", "width": 2.2, "casing": "#ffffff", "casing_extra": 1.4, "offset": 1.5,
                  "keyline": "#1F2024", "keyline_extra": 0.4, "key": "Laden (out)"},
         "route_sheet": {"color": "#0051C4", "width": 2.8, "casing": "#ffffff", "casing_extra": 1.6, "offset": 1.8,
-                        "key": "Out, loaded"},
+                        "key": "Loaded, A to B"},
         "route_analysis": {"color": "#0051C4", "width": 2.4, "width_section_f": 2.4, "key": "Out, loaded, A to B"},
     },
     "empty_leg": {
@@ -88,13 +93,14 @@ ROLES = {
         "routes_map": {"color": "#8E9197", "color_dark": "#9A9DA3", "width": 3, "offset": ["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5],
                        "casing": "#ffffff", "casing_dark": "#1F2024", "casing_width": 5, "casing_opacity": 0.85,
                        "key": "Back"},
-        "commit_map": {"color": "#8E9197", "color_dark": "#9A9DA3", "width": 2.5, "offset": ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4],
-                       "casing": "#ffffff", "casing_dark": "#1F2024", "casing_width": 5, "casing_opacity": 0.9,
-                       "key_height": 3, "key": "Back (empty)", "key_today": "Today, back (empty)"},
+        "commit_map": {"color": "#8E9197", "width": 2.5, "offset": ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4],
+                       "casing": "#ffffff", "casing_width": 5, "casing_opacity": 0.9,
+                       # the key shows the back leg only on the map of today (no "Back" row on the week's map)
+                       "key_height": 3, "key_today": "Today, back (empty)"},
         "plan": {"color": "#72A7FF", "width": 2.2, "casing": "#ffffff", "casing_extra": 1.4, "offset": 1.5,
                  "key": "Empty (return)"},
         "route_sheet": {"color": "#72A7FF", "width": 2.8, "casing": "#ffffff", "casing_extra": 1.6, "offset": 1.8,
-                        "key": "Back, empty"},
+                        "key": "Empty, back to A"},
         # the Route analysis draws the return 0.3 pt thinner than the loaded leg and 3 pt to its side
         "route_analysis": {"color": "#72A7FF", "thinner": 0.3, "offset": 3.0, "width_section_f": 2.1, "key": "Back, empty, B to A"},
     },
@@ -120,7 +126,7 @@ ROLES = {
         "public_map": {"width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 12, 2.4, 16, 3.8], "dash": [0, 2.2],
                        "eraser": "#ffffff", "eraser_dark": "#1F2024"},
         "route_sheet": {"width": 1.7, "gap": 4.4},
-        "simulation_map": {"color": "#7C3AED", "token": "--chart-4", "width": 4, "dash": [1.5, 1], "key_width": 3,
+        "simulation_map": {"color": "#7C3AED", "app_var": "--chart-4", "width": 4, "dash": [1.5, 1], "key_width": 3,
                            "key": "Haul road (assigned speed)"},
     },
     "temporary_haul": {
@@ -191,7 +197,7 @@ ROLES = {
                        "label": "#1F2024", "label_dark": "#F4F4F5", "label_halo": "#ffffff", "label_halo_dark": "#1F2024"},
         # drawn unseen (opacity 0); in its hours the frame shows it at on_opacity with its glow, and the main road's stretch
         # it replaces fades to main_faded_opacity (else the route's own 0.75)
-        "simulation_map": {"color": "#1D4ED8", "token": "--navy", "width": 2.6, "glow_width": 12, "glow_blur": 6, "glow_opacity": 0,
+        "simulation_map": {"color": "#1D4ED8", "app_var": "--navy", "width": 2.6, "glow_width": 12, "glow_blur": 6, "glow_opacity": 0,
                            "on_opacity": 0.95, "glow_on_opacity": 0.16, "main_faded_opacity": 0.25,
                            "main_width": 1.6, "key_width": 3, "key_shadow": "rgba(29,78,216,.25)"},
         "plan": {"color": "#3A3C41", "width": 1.2, "casing": "#ffffff", "casing_extra": 1.4, "key": "Busy-hours road"},
@@ -216,7 +222,7 @@ ROLES = {
     "holding_chevrons": {
         "what": "The run from a holding area to the gate (called forward): chevrons",
         "public_map": {"glyph": "›", "size": 18, "spacing": 34, "color": "#1F2024", "halo": "#FFFFFF", "halo_width": 1.2},
-        "simulation_map": {"glyph": "›", "size": 18, "spacing": 34, "color": "#1F2024", "token": "--ink", "halo": "#FFFFFF", "halo_width": 1.2},
+        "simulation_map": {"glyph": "›", "size": 18, "spacing": 34, "color": "#1F2024", "app_var": "--ink", "halo": "#FFFFFF", "halo_width": 1.2},
         "route_sheet": {"color": "#1F2024", "width": 1.1, "casing": "#ffffff", "casing_width": 2.6, "every": 11.0},
     },
     "abnormal_load": {
@@ -250,6 +256,8 @@ KNOWN_ODDITIES = [
     "the bulletin's casing is ink (#1F2024) where the public map's is white",
     "the Simulation's busy-hours road and haul read app tokens (--navy, --chart-4) with fallbacks",
     "the Routes map's picked line is sign blue, the public map's picked line ink",
+    "on Data → Routes the line in use is made 3.2 px wide, then set to the tab's leg width (3 on Routes) once drawn",
+    "the Simulation's busy-hours road falls back to #1D4ED8 where --navy is missing; --navy is the sign blue today",
 ]
 
 
@@ -296,7 +304,7 @@ def page_css(page):
                 if isinstance(v, str) and (v.startswith("#") or v.startswith("rgba(")):
                     props.append(f"{_css_name(s, r, f)}:{v};")
     return (f"<!-- route-line-styles:css:begin ({_GEN}) -->\n"
-            "<style id=\"route-line-styles\">html{" + "".join(props) + "}</style>\n"
+            "<style id=\"route-line-styles\">html:root{" + "".join(props) + "}</style>\n"
             "<!-- route-line-styles:css:end -->")
 
 
