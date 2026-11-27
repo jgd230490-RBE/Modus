@@ -116,7 +116,7 @@ ok("⭐ 3: Abnormal loads are cards: the load and its size lead, the status top 
 ok("...team and route on the foot line beside the next-step button and ⋯; the gates and the apply-by date are left to Details",
    alRow.includes('<td className="tc-foot">{m.team_name || "—"}</td>') && alRow.includes('<td className="tc-foot tc-span2" data-al-route-cell=')
    && alRow.includes('data-al-actions={m.id}>') && alRow.includes('className="text-right whitespace-nowrap rd-actions"')
-   && /text-\[13px\] text-slate-500 tc-hide">\{\[m\.origin_gate_name/.test(alRow) && alRow.includes('text-[13px] text-slate-500 tc-hide">apply by'));
+   && /text-\[13px\] text-slate-500 tc-hide">\{roadPlates\(\[m\.origin_gate_name/.test(alRow)   /* 24 Nov 2026: road plates (own_look_plates.js) */ && alRow.includes('text-[13px] text-slate-500 tc-hide">apply by'));
 ok("⭐ 3: a card opens its details with a worded \"Details\" (tc-only: a tablet only); the chevron cell is left out there",
    alRow.includes('<button type="button" className="tc-only al-det-btn" aria-expanded={isOpen} data-al-det-btn={m.id} onClick={() => setOpen(isOpen ? null : m.id)}>{isOpen ? "Hide details" : "Details"}</button>')
    && alRow.includes('<td className="tc-hide"><button type="button" className={"al-tri"'));

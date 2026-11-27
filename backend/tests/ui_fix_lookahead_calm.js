@@ -242,7 +242,7 @@ ok("⭐ 33: every gate is one row of one list (no six-chart grid, no \"N more ga
    && gw.includes('<thead><tr><th scope="col">Gate</th><th scope="col">Busiest day</th><th scope="col">Of what it can check in</th><th scope="col">Status</th></tr></thead>')
    && gw.includes("{gs.map(g => {") && !code.includes("GW_SHOW") && !gw.includes("data-gw-rest") && !gw.includes("more gate"));
 ok("...a row: the gate's two names, its busiest day with its lorries, a thin bar against what it can check in, one status chip",
-   gw.includes('<span className="gw-name">{g.location_name}<small>{g.gate_name}</small></span>')
+   gw.includes('<span className="gw-name">{g.location_name}<small>{roadPlates(g.gate_name)}</small></span>')   /* 24 Nov 2026: road plates (own_look_plates.js) */
    && gw.includes("<b>{grp(b.arrivals)}</b> lorr{+b.arrivals === 1 ? \"y\" : \"ies\"}<small>{b.day}</small>")
    && gw.includes('<div className="ga-pbar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, g.peak_pct)) + "%" }}></i></div>')
    && gw.includes("<span>{g.peak_pct} % of {grp(g.capacity_per_day)}</span>") && gw.includes("<td><RowStatus word={st.word} tone={st.tone} /></td>"));

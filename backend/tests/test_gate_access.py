@@ -460,7 +460,7 @@ ok("⭐ the gate form: 'Access road from the public road', a choice of the drawn
    and "(haulRoadList || []).map(z => <option key={z.id} value={z.id}>{z.name}</option>)" in _fe
    and "access_zone_id: gateForm.access_zone_id || null," in _fe and 'access_zone_id: g.access_zone_id || "", shut_windows:' in _fe)
 ok("⭐ the gate list says each gate's access road, or 'no access road drawn' in amber",
-   "access road: {((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name || g.access_zone_id}" in _fe
+   "access road: {roadPlates(((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name) || g.access_zone_id}" in _fe   # 24 Nov 2026: road plates (own_look_plates.js)
    # NARROWED 22 Oct 2026 (UI fix 7): the gate row's words take the row's 12 px (no 10 px class)
    and '<span className="text-amber-700" data-gate-access-missing={g.id}' in _fe and "no access road drawn" in _fe)
 ok("🔴 the word rule on the new text: no bake / geometry / server / endpoint / token",
