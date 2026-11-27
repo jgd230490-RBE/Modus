@@ -52,6 +52,7 @@ import tempfile
 import threading
 from datetime import datetime, date, timedelta, timezone
 
+import chainage
 import db
 
 ON_ROUTE_M = 25
@@ -981,30 +982,11 @@ def gate_span(route_row, factors=None):
     return min(a for a, _ in spans), max(b for _, b in spans)
 
 
-def _chainage(index, line, p):
-    """Metres along `line` (from its first vertex) to the point on it nearest `p`."""
-    return _project(index, line, p)[1]
-
-
-def _project(index, line, p):
-    """(metres from `line`, metres along it from its first vertex) for the point on `line` nearest `p`."""
-    best, at, run = None, 0.0, 0.0
-    P = index._xy(p)
-    for a, b in zip(line, line[1:]):
-        A, B = index._xy(a), index._xy(b)
-        dx, dy = B[0] - A[0], B[1] - A[1]
-        L2 = dx * dx + dy * dy
-        t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((P[0] - A[0]) * dx + (P[1] - A[1]) * dy) / L2))
-        d = math.hypot(P[0] - (A[0] + t * dx), P[1] - (A[1] + t * dy))
-        if best is None or d < best:
-            best, at = d, run + t * math.sqrt(L2)
-        run += math.sqrt(L2)
-    return (best if best is not None else float("inf")), at
-
-
-def line_length_m(index, line):
-    """The length of `line` in metres on the index's projection (the one _project measures along)."""
-    return sum(math.hypot(*(B - A for A, B in zip(index._xy(a), index._xy(b)))) for a, b in zip(line, line[1:]))
+# 27 Nov 2026 (claude/route-pieces): distance along a line lives in chainage.py, ONE set of functions for the server;
+# the old private names stay as aliases so every caller here, in route_analysis_doc and in traffic is unchanged
+_chainage = chainage.chainage
+_project = chainage.project
+line_length_m = chainage.line_length_m
 
 
 def locations(recs, index, line):
@@ -1317,29 +1299,8 @@ def stretch_summary(parts, locs, plan, features, index, line, du_words):
     return out
 
 
-def point_at(index, line, metres):
-    """The (lon, lat) `metres` along `line` from its first vertex (on the index's projection)."""
-    run = 0.0
-    for a, b in zip(line, line[1:]):
-        A, B = index._xy(a), index._xy(b)
-        L = math.hypot(B[0] - A[0], B[1] - A[1])
-        if run + L >= metres and L > 0:
-            t = (metres - run) / L
-            return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]
-        run += L
-    return list(line[-1]) if line else None
-
-
-def line_between(index, line, a_m, b_m):
-    """The vertices of `line` between a_m and b_m metres from its start, with the two end points."""
-    out, run = [point_at(index, line, a_m)], 0.0
-    for a, b in zip(line, line[1:]):
-        A, B = index._xy(a), index._xy(b)
-        run += math.hypot(B[0] - A[0], B[1] - A[1])
-        if a_m < run < b_m:
-            out.append(list(b))
-    out.append(point_at(index, line, b_m))
-    return [p for p in out if p]
+point_at = chainage.point_at
+line_between = chainage.line_between
 
 
 # --------------------------------------------------------------------------- #

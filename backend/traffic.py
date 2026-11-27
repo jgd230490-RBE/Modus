@@ -35,6 +35,7 @@ import csv
 import math
 import os
 
+import chainage
 import db
 
 LA_LIST_URL = "https://storage.googleapis.com/dft-statistics/road-traffic/downloads/data-gov-uk/local_authority_traffic.csv"
@@ -207,7 +208,6 @@ def expected_for(index, line, a_m, b_m, road, urban, years, rows):
     'class_words', 'aadf' (lowest, highest of the latest year), 'counted' (years with a count, not an estimate),
     'points'} — or {'why': words} when it cannot be worked out.
     """
-    import collisions as cl
     if not road or (not road.startswith(("A", "B", "M")) and not road.endswith("(M)")):
         return {"why": "no numbered road"}
     cls = road_class(road, urban)
@@ -217,7 +217,7 @@ def expected_for(index, line, a_m, b_m, road, urban, years, rows):
     for r in rows:
         if (r.get("road_name") or "") != road:
             continue
-        d, m = cl._project(index, line, (r["lon"], r["lat"]))
+        d, m = chainage.project(index, line, (r["lon"], r["lat"]))
         if d <= MATCH_M and a_m - REACH_M <= m <= b_m + REACH_M:
             mine.append(r)
     if not mine:
