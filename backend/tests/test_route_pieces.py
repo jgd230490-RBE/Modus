@@ -275,6 +275,15 @@ ok("2. every threshold is named once in the top block, with the public map's hau
    all(f"\n{n} = " in _top for n in ("NEAR_M", "STEP_M", "MIN_RUN_M", "CLEAR_M", "JOIN_M", "HAUL_NEAR_M"))
    and (RP.NEAR_M, RP.MIN_RUN_M, RP.CLEAR_M, RP.JOIN_M, RP.HAUL_NEAR_M) == (25.0, 100.0, 60.0, 50.0, 9.0)
    and "const HAUL_NEAR_M = 9;" in read("map/index.html"))
+_hold = chainage.Grid.__init__
+_reach = []
+chainage.Grid.__init__ = lambda self, index, line, reach: (_reach.append(reach), _hold(self, index, line, reach))[1]
+try:
+    _never = RP.pieces(PJ, DET, BASE, clear=1e9)
+finally:
+    chainage.Grid.__init__ = _hold
+ok("2. a CLEAR of 'never' (10^9 m) builds no grid past APART_CAP_M (it ran out of memory) and the detour still counts "
+   "by its length", max(_reach) == RP.APART_CAP_M + 1 and len(_never) == 1 and _never[0]["counts"] is True, str(_reach))
 ok("2. no router call and no outside fetch in the module",
    not any(w in _src for w in ("here_routing.route", "requests.", "urllib", "httpx", "fetch_guard", "basemap.fetch")))
 

@@ -53,6 +53,7 @@ STEP_M = 10.0          # the walk's spacing between a line's own vertices
 MIN_RUN_M = 100.0      # a piece at least this long on one of the two lines counts...
 CLEAR_M = 60.0         # ...and so does a shorter one that gets more than this far from the other line
 JOIN_M = 50.0          # two pieces closer than this on BOTH lines are one
+APART_CAP_M = 1000.0   # how far "apart" is ever measured (the grid's reach); a CLEAR beyond it never counts by distance
 HAUL_NEAR_M = 9.0      # = the public map's HAUL_NEAR_M (withHaulPieces): a leg point this close to a haul road is on it
 
 #: the limit verdicts the along list carries ("every limit the lorry is at or over"); "within" and "unknown" are counted
@@ -141,7 +142,9 @@ def pieces(proj, opt, base, near=NEAR_M, step=STEP_M, min_run=MIN_RUN_M, clear=C
     cut). The line's start and end are gaps too when either line has more before its first or after its last match."""
     if len(opt) < 2 or len(base) < 2:
         return []
-    reach = max(near, clear + 1.0)
+    # how far "apart" is measured: just past CLEAR, never past APART_CAP_M (a grid's cells grow with its reach; a CLEAR
+    # of a kilometre or more is "never by distance", and a piece that far out counts by MIN_RUN anyway)
+    reach = max(near, min(clear, APART_CAP_M) + 1.0)
     g_base, g_opt = chainage.Grid(proj, base, reach), chainage.Grid(proj, opt, reach)
     lo_len, lb_len = g_opt.length, g_base.length
     jump = 2 * step + near                      # the base running on this much more than the option is a gap
@@ -180,7 +183,7 @@ def pieces(proj, opt, base, near=NEAR_M, step=STEP_M, min_run=MIN_RUN_M, clear=C
             continue
         merged.append(list(it))
     out = []
-    cap = clear + 1.0
+    cap = reach
     for o0, o1, b0, b1 in merged:
         o_off, o_apart = _off(o_s, o0, o1, g_base, near, cap, join)
         b_off, b_apart = _off(b_s, b0, b1, g_opt, near, cap, join)
