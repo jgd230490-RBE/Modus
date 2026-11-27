@@ -158,19 +158,30 @@ ok("⭐ 5: the map keeps the full width at 768–1024: map | panel side by side 
 // ---------------------------------------------------------------- card 6: the Look-ahead
 // NARROWED 12 Nov 2026 (batch 5): batch 3 (C-I2) added a prop after initialView, so the slice starts at the name
 const la = between(code, "function LookAhead({ meta, who, access, initialPage, initialView", "\nfunction CommitMap(");
-ok("⭐ 6: at 768–1024 the Status column goes and its chip (and last week's carry line) sits under the route's name",
-   la.includes("const laTab = useMQ(TABLET_MQ);") && la.includes("{!laTab && <th>Status</th>}")
-   && la.includes('{laTab && <span className="la-st-under" data-la-st-under="1"><RowStatus word={st.word} tone={st.tone} more={st.more} />')
-   && la.includes('{!laTab && <td className="rd-status" data-label="Status">') && la.includes("{!laTab && <td></td>}")
-   && la.includes("colSpan={(laTab ? 2 : 3) + dates.length}"));
-ok("...the day columns narrow (Mon–Fri and Week fit at 768 with the rail folded); more days scroll, the route column held at 200 px",
-   la.includes("style={{ minWidth: laTab ? `${200 + (dates.length + 1) * 70}px` : `${440 + dates.length * 96}px` }}")
-   && la.includes('<div className="overflow-auto rd-scroll" data-la-tab={laTab ? "1" : undefined}>')
-   && css.includes('[data-la-tab="1"] .tbl .la-stick{min-width:200px !important;}') && css.includes(".la-st-under{display:block;margin-top:4px;font-weight:400;}"));
-ok("🔴 6: the desk's grid is as it was (the Route column 280 px, one Status column, 96 px a day)",
-   la.includes('<th className="la-stick" style={{ minWidth: 280 }}>Route</th>') && la.includes('firstStyle={{ minWidth: 280 }}'));
+// REVERSED 25 Nov 2026 (the Look-ahead rethink, task A; John, 25 Nov 09:22 UTC: "Cards as drawn", against the
+// recommendation): at 768–1024 the Look-ahead is CARDS under ruled site headings (.tab-cards, card 1), no longer a table
+// with the status under the route's name. The status is its own cell everywhere (a card places it top right); the old
+// tablet table's rules are gone. ui_fix_la_sites.js reads the cards themselves.
+ok("⭐ 6: at 768–1024 the Look-ahead is cards (REVERSED 25 Nov: was the Status column gone and its chip under the route's name)",
+   la.includes("const laTab = useMQ(TABLET_MQ);") && la.includes("<th>Status</th>") && !la.includes("{!laTab && <th>Status</th>}")
+   && !la.includes("la-st-under") && !la.includes("data-la-st-under")
+   && la.includes('<td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />')
+   && !la.includes("{!laTab && <td></td>}") && la.includes("colSpan={3 + dates.length}") && !la.includes("colSpan={(laTab ? 2 : 3) + dates.length}")
+   && la.includes('(laTab ? " tab-cards la-cards" : "")'));
+ok("...the cards: no narrowed day columns or 200 px route column any more (REVERSED 25 Nov), a day a column of the card",
+   !la.includes("${200 + (dates.length + 1) * 70}px") && la.includes('style={laTab ? { "--tc-n": dates.length + 1 } : { minWidth: `${440 + dates.length * 96}px` }}')
+   && la.includes('<div className={laTab ? "rd-scroll" : "overflow-auto rd-scroll"} data-la-cards={laTab ? "1" : undefined}>')
+   && !css.includes('[data-la-tab="1"]') && !css.includes(".la-st-under{") && !la.includes("data-la-tab="));
+// NARROWED 25 Nov 2026 (task A): the first column is the Site
+ok("🔴 6: the desk's grid is as it was (the Site column 280 px, one Status column, 96 px a day)",
+   la.includes('<th className="la-stick" style={{ minWidth: 280 }}>Site</th>') && la.includes('firstStyle={{ minWidth: 280 }}')
+   && la.includes("`${440 + dates.length * 96}px`"));
 // NARROWED 24 Nov 2026 (own look, B1 stage 4): the same grid, now one ruled strip (.fig-strip)
-ok("...the eight cards stay two rows of four from 768 (md:grid-cols-4), as approved on 9 Nov", la.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">'));
+// NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): SEVEN figures; the columns follow the strip's own width (a size
+// container): four (then three) a row from 560 px of the strip, seven from 1,000 px, so a tablet still reads two rows
+ok("...the seven figures stay two rows on a tablet (four, then three), as approved on 9 Nov for the eight",
+   la.includes('<div className="la-figs-box mb-3">\n          <div className="fig-strip la-figs" data-fig-strip="lookahead">')
+   && code.length > 0 && /@container \(min-width:560px\)\{\.fig-strip\.la-figs\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);\}\}/.test(html));
 
 // ---------------------------------------------------------------- card 7: Configuration → Vehicles
 const cfg = between(code, "function ConfigPage(", "\nfunction ");

@@ -82,8 +82,10 @@ ok("4 figures: .fig-strip is the one ruled strip (2 px ink on top, a hairline un
    css.includes(".fig-strip{display:grid;gap:0 !important;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);overflow:hidden;background:none;}")
    && css.includes(".fig-strip>*{border:0 !important;border-radius:0 !important;background:none !important;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line) !important;margin:-1px 0 0 -1px;min-width:0;}"));
 ok("4 figures: the Look-ahead's tiles and the Submit page's six figures are .fig-strip rows; the tiles carry no .card, the Submit strip no fill",
-   code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">')
-   && code.includes('<div className="px-4 py-3 min-w-0" data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
+   // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): seven figures, still one .fig-strip row (.la-figs: each cell its own top edge)
+   code.includes('<div className="fig-strip la-figs" data-fig-strip="lookahead">')
+   // NARROWED 25 Nov 2026 (B1): the cell's class adds its status edge (la-fig-warn) when it has one; still no .card
+   && code.includes('<div className={"px-4 py-3 min-w-0" + (edge ? " la-fig-" + edge : "")} data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
    && code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes("divide-x divide-slate-200 text-white kpi-num"));
 // NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the Dashboard's ink line is each cell's top edge (2 px,
 // or 4 px in a status's colour), not the strip's border
@@ -236,8 +238,11 @@ ok("2 status: the shape is an inline block of its own; a tablet card cell keeps 
 // (the Account view's four figures had no rule at all)
 ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account view's too",
    (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
-     return opens.length >= 11 && opens.every(t => /className="fig-strip /.test(t)); })()
-   && code.includes('<div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">'));
+     // NARROWED 26 Nov 2026 (the Look-ahead rethink batch): 11 -> 10 rows of figures, B1 turned the eight tiles into one seven-figure strip
+     return opens.length >= 10 && opens.every(t => /className="fig-strip /.test(t)); })()
+   // NARROWED 26 Nov 2026 (the Look-ahead rethink batch, claude/la-rethink): B1 (card 2's second table) made the Last week
+   // figures its own labelled strip, so the Account row is that strip, not the shape branch's "account" wrapper
+   && code.includes('<div className="fig-strip la-figs la-figs-4" data-fig-strip="lookahead-last">'));
 // 26 Nov 2026 (own look B1, after): a status word that wraps kept its shape on the middle of the WHOLE block (17.5 px under
 // the first line in a cell, 52.6 px in a tablet card); the row is now top-aligned and the shape drops half a line less half itself
 ok("4 status: the row is top-aligned and each shape sits on the first line's middle (.675em = half of the 1.35 line, less half the shape)",

@@ -388,6 +388,8 @@ def _diversions(route_id, used, legs, leg_words, vehicle_text):
         alts = sorted({0} | {int(r["alt_index"]) for r in by_leg.values()})
         lim_status, lim_lines = _limits_words(route_id, used, vehicle_text, alts=alts)
         out.append({
+            # 25 Nov 2026 (card 4): the option each leg takes on this page, for its "Take care on this route" block
+            "alts": {leg: (int(by_leg[leg]["alt_index"]) if by_leg.get(leg) else 0) for leg in ("loaded", "return")},
             "from": s or None, "to": e or None,
             "when": _when(s or None, e or None),
             "because": [names.get(z) or z for z in zids],
@@ -397,6 +399,27 @@ def _diversions(route_id, used, legs, leg_words, vehicle_text):
             "back_on": back, "limits_status": lim_status, "limits_lines": lim_lines,
         })
     return out
+
+
+def take_care(S):
+    """
+    25 Nov 2026 (the Look-ahead rethink, card 4, Q12 to Q16): the Route sheet's "Take care on this route" block, in
+    place of "Lorry limits: this lorry is over …": every limit this lorry is at or over and every school, hospital and
+    health centre within 250 m, uncut, by route_points from stored data only; each diversion or peak-hours page its
+    own block (dv["take_care"]). Built for the PDF only (the route analysis reads sheet() and never needs it).
+    Returns the page-1 block, or None for a sheet with no lorry drawn.
+    """
+    import route_points as rp
+    if not S.get("vehicle"):
+        return None
+    ctx = rp.Context()
+    P = rp.points(S["route_id"], S["vehicle"], ctx=ctx, see_map=False)
+    for dv in S.get("diversions") or []:
+        if dv.get("alts"):
+            dv["take_care"] = rp.points(S["route_id"], S["vehicle"], alts=dv["alts"], ctx=ctx, see_map=False)
+    P["credit"] = rp.credit(ctx)
+    P["credit_sources"] = sorted(ctx.sources_used)
+    return P
 
 
 def _busy_roads(route_id, used, legs, leg_words, vehicle_text, origin_name=None):
@@ -433,6 +456,7 @@ def _busy_roads(route_id, used, legs, leg_words, vehicle_text, origin_name=None)
         alts = sorted({0, int(u["alt"])})
         lim_status, lim_lines = _limits_words(route_id, used, vehicle_text, alts=alts)
         out.append({
+            "alts": {leg: (int(u["alt"]) if leg in mine else 0) for leg in ("loaded", "return")},     # 25 Nov 2026 (card 4)
             "kind": "busy", "from": None, "to": None,
             "when": f"Weekdays {u['from']}–{u['to']}",
             "title": f"Weekdays {u['from']}–{u['to']}: take this road",
