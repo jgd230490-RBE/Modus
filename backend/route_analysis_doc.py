@@ -37,7 +37,7 @@ SECTIONS = [  # (key, letter, title) — the order in the file and in the dialog
     ("limits", "A", "Restrictions and lorry limits"),
     ("community", "B", "Community places"),
     ("collisions", "C", "Collisions"),
-    ("cycle", "D", "Cycle routes and left turns"),
+    ("cycle", "D", "Cycle routes and left-hand turns"),
     ("hours", "E", "Busy-hour times"),
     ("diversions", "F", "Diversions"),
     ("assessor", None, "The page for the assessor"),

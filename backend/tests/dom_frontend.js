@@ -2730,10 +2730,11 @@ async function routesDriversDom(){
   ok("⭐ ROUTES DOM: the footnote says a planning figure, explains the 0, and carries the 13 h note for a 15 h shift",
      // NARROWED 22 Oct 2026 (UI fix 7, the user: fewer words): the footnote is one short paragraph, the rule the same.
      // The build's own first run found "fit a15 h" here (JSX drops the space at a line break before {…}): asserted below.
-     foot.includes("0 = one lorry a trip)") && foot.includes("A planning figure.") && foot.includes(NOTE)
-     // found in the Chrome check (18 Oct): JSX dropped the space at the line break — "modelled.t/month"
-     && foot.includes(NOTE + " t/month at 22 working days") && !/\.t\/month/.test(foot)
-     && foot.includes("round trips that fit a 15 h shift with the legal break and at most 9 h driving") && !/fit a15/.test(foot), foot.slice(-700));
+     // REVERSED 26 Nov 2026 (routes rethink C3, Q1): the long sentences (0 = one lorry a trip, t/month, the shift rule) moved to the
+     // "i" box and the user guide; the line keeps "A planning figure." and the data's own shift note, and says none of them
+     foot.includes("Cycle = out + back + turnaround. A planning figure.") && foot.includes(NOTE)
+     && !foot.includes("0 = one lorry a trip") && !/t\/month at/.test(foot) && !foot.includes("legal break and at most 9 h driving")
+     && !/turnaround \(load, unload/.test(foot) && foot.includes("§ fewer trips than the shift allows"), foot.slice(-700));
   act(() => { root.unmount(); }); host.remove();
 }
 

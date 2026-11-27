@@ -115,7 +115,7 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
        && tile("km") === "292 mi more" && tile("eur") === "£2,560 more", [tile("kg"), tile("min"), tile("km"), tile("eur")].join(" | "));
     ok("⭐ what a choice adds is in red; what it saves is not", m.host.querySelector('[data-rc-tile="min"] b.rc-more')
        && !m.host.querySelector('[data-rc-tile="kg"] b.rc-more'));
-    ok("⭐ the passes line, each part its own figure", t.includes("A lorry passes, planned: 6,768 fewer left turns · 106 fewer cycle routes met · 71 fewer places"), t);
+    ok("⭐ the passes line, each part its own figure", t.includes("A lorry passes, planned: 6,768 fewer left-hand turns · 106 fewer cycle routes met · 71 fewer community"), t);
     ok("⭐ R013's row: the choice, its ends, since, all lorry types, '35 of 212'",
        t.includes("R013 · Alt 2, weekdays 16:00–19:00") && t.includes("Brook Pit → Harborough Compound")
        && t.includes("Since 6 Nov 2026 · all lorry types") && t.includes("35 of 212"));
@@ -129,7 +129,7 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
     ok("⭐ R013 planned: 223 kg less, 1.0 h less, 200 mi less, £301 less, 177 more, 106 fewer, 71 fewer",
        r13 && JSON.stringify(cellsOf(r13, 1)) === JSON.stringify(["223 kg less", "1.0 h less", "200 mi less", "£301 less", "177 more", "106 fewer", "71 fewer"]),
        r13 && cellsOf(r13, 1).join(" | "));
-    ok("...its added left turns in red", r13 && [...r13.querySelectorAll("td.rc-more")].map(c => c.textContent).join("|") === "5 more|177 more");
+    ok("...its added left-hand turns in red", r13 && [...r13.querySelectorAll("td.rc-more")].map(c => c.textContent).join("|") === "5 more|177 more");
     const r14 = m.host.querySelector('[data-rc-row="M:R014"]');
     ok("⭐ R014: 'Alt 1 made the main route', its lorry, a trip with 'the same' at nought",
        t.includes("R014 · Alt 1 made the main route") && t.includes("Since 17 Nov 2026 · ")
@@ -180,8 +180,8 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
     const T2 = Object.assign({}, TOT, { cycle_meets: null, counts_missing: true });
     const m = await mount({ rows: [r], totals: { planned: T2, so_far: Z() }, diversions: 0, collision_period: null, day: "2026-11-17" });
     const t = m.text();
-    ok("⭐ a count not held reads a dash for that figure only; left turns and places still show",
-       t.includes("A lorry passes, planned: 6,768 fewer left turns · — cycle routes met · 71 fewer places")
+    ok("⭐ a count not held reads a dash for that figure only; left-hand turns and places still show",
+       t.includes("A lorry passes, planned: 6,768 fewer left-hand turns · — cycle routes met · 71 fewer community")
        && [...m.host.querySelector('[data-rc-row="M:R014n"]').querySelectorAll("tr")[1].querySelectorAll("td.num")].map(c => c.textContent).slice(4).join("|") === "6,945 fewer|—|the same", t);
     m.done();
   }
@@ -192,8 +192,8 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
     ok("⭐ a phone: the four totals and a short card a choice; no table, no download (Q5)",
        m.host.querySelectorAll("[data-rc-tile]").length === 4 && m.host.querySelectorAll("[data-rc-pcard]").length === 2
        && !m.host.querySelector("[data-rc-table]") && !m.host.querySelector("[data-rc-sheet]") && !m.host.querySelector("[data-chart-tools]"));
-    ok("⭐ ...the cards in the draft's words", t.includes("R013 · Alt 2, 16:00–19:00") && t.includes("35 loads planned: 223 kg less, 1.0 h less, 177 more left turns")
-       && t.includes("R014 · Alt 1 the main route") && t.includes("1,389 loads planned: 11.4 t less, 55.6 h more, 6,945 fewer left turns"), t);
+    ok("⭐ ...the cards in the draft's words", t.includes("R013 · Alt 2, 16:00–19:00") && t.includes("35 loads planned: 223 kg less, 1.0 h less, 177 more left-hand turns")
+       && t.includes("R014 · Alt 1 the main route") && t.includes("1,389 loads planned: 11.4 t less, 55.6 h more, 6,945 fewer left-hand turns"), t);
     ok("...the short tile name on a phone", (m.host.querySelector('[data-rc-tile="eur"] .rc-tk') || {}).textContent === "Fair cost");
     m.done();
   }
@@ -204,9 +204,11 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
     const m = await mount({ rows: [sameKg, same], totals: { planned: TOT, so_far: Z() }, diversions: 0, collision_period: null, day: "2026-11-17" }, { phone: true });
     const t = m.text();
     ok("⭐ Q2: a phone card says WHAT is the same: 'lorry time the same', never 'the same' alone",
-       t.includes("1,389 loads planned: 11.4 t less, lorry time the same, 6,945 fewer left turns"), t);
-    ok("⭐ Q2: ...'carbon the same' and 'left turns the same' too; a changed figure reads as before",
-       t.includes("35 loads planned: carbon the same, 1.0 h less, left turns the same"), t);
+       t.includes("1,389 loads planned: 11.4 t less, lorry time the same, 6,945 fewer left-hand turns"), t);
+    ok("⭐ Q2: ...'carbon the same' and 'left-hand turns the same' too; a changed figure reads as before",
+       t.includes("35 loads planned: carbon the same, 1.0 h less, left-hand turns the same"), t);
+    ok("⭐ GONE (routes rethink Q9, C3): the record says 'Left-hand turns' and 'Community', never 'Left turns' or 'Places'",
+       /rc-pass/.test(t) === false || (!/left turns/.test(t) && !/places/.test(t)) , t);
     m.done();
   }
   console.log(`ui_fix_route_record.js: ${pass} passed, ${fail.length} failed`);

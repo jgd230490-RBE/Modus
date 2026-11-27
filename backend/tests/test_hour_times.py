@@ -445,13 +445,18 @@ ok("6. the analysis read carries the hours; the plan, clear and run are admin-on
    and "budget_s=network.BAKE_BUDGET_S" in _m.split("def hour_times_bake(")[1].split("\n@app")[0])
 _fe = read("frontend/index.html")
 _ra = _fe.split("function RouteAnalysis(")[1].split("\nfunction ")[0]
-ok("⭐ 6. the Routes table: a column a screen hour, the quicker cell green and bold, the note under the table",
+# NARROWED 26 Nov 2026 (claude/routes-all-figures-marks, John's yes to S1): the quicker cell is no longer green and bold: the
+# rule's own shape (dot / diamond) goes before the figure on the card's lorry only (ui_fix_routes_all_marks.js)
+ok("⭐ 6. the Routes table: a column a screen hour, the rule's shape before a marked figure (no green bold), the note under the table",
    "{hourCols.map(h => <th key={h} className={head} data-hour-col={h}>{h}</th>)}" in _ra
-   and 'data-quick={q ? "1" : undefined}' in _ra and 'color: "var(--ok-text)", fontWeight: 700' in _ra
-   and "= the cycle for a lorry setting off then on a weekday. Green, bold: the quicker option at" in _ra
-   and "Other lorries scaled from the Artic Tipper." in _ra)
-ok("6. a cell is marked quicker only where another option of the same lorry has a time at that hour",
-   "data.rows.filter(x => x.profile === r.profile && x.hours && x.hours[h] != null).length > 1" in _ra)
+   and 'figMark(r, "busy_" + h)' in _ra and "data-quick" not in _ra and 'fontWeight: 700' not in _ra
+   # REVERSED 26 Nov 2026 (routes rethink C3, Q1): the note under the table left the screen; its words are in the "i" box's guide paragraph
+   # NARROWED 27 Nov 2026 (the Routes Group C batch): C4's dot / diamond sentence is in that guide paragraph, not under the table
+   and "= the cycle for a lorry setting off then on a weekday" not in _ra and "data-hour-note" not in _ra
+   and "the cycle for a lorry setting off then on a weekday, and other lorries are scaled from the Artic Tipper" in open("frontend/help/index.html", encoding="utf-8").read()
+   and "green and bold" not in open("frontend/help/index.html", encoding="utf-8").read())
+ok("6. a cell is marked only for the card's lorry, from the rule's own row for that option",
+   "r.profile !== best.route.lorry" in _ra and "o.rows.map(x => [x.key, x.mark])" in _ra)
 ok("⭐ 6. 0d's busy-hours line gains the time difference at 08:00 and 17:00 (the tipper's)",
    "{busyGap(o.alt)}" in _ra and "a round trip at 08:00 and at 17:00." in _ra)
 _dm = _fe.split("const hourBake = async")[1].split("const bulkBake = async")[0]
@@ -469,12 +474,12 @@ ok("6. the header's buttons wrap as whole buttons; the new one keeps its words o
    and 'data-hour-bake style={{ whiteSpace: "nowrap" }}' in _fe and "<RoutingMenu busy={routeBusy}>" in _fe)
 _shown = (re.findall(r"setRouteMsg\(`([^`]*)`\)", _dm) + re.findall(r"confirm\(`([^`]*)`", _dm)
           + re.findall(r"` It takes [^`]*`", _ra)
-          + [_ra.split("data-hour-note>")[1].split("</p>")[0], "Busy-hour times · calls"])
+          + ["Busy-hour times · calls"])   # the hour note left the screen (26 Nov 2026, C3)
 # NARROWED 23 Nov 2026 (claude/working-list): the run's own line while it runs ("Busy-hour times: 240 of 854 worked out")
 # is made on the server now (working.line; its words are checked in test_working.py §11), so one message fewer is a
 # template here: 5 -> 4
 ok("6. the words the screen shows name no supplier and no back end",
-   len(_shown) >= 4 and not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b", " ".join(_shown)),
+   len(_shown) >= 3 and not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b", " ".join(_shown)),
    str(_shown))
 ok("6. the table is registered five times (schema, key, tenanted, package order, audit)",
    "route_hour_times" in db.TENANTED_TABLES and "route_hour_times" in db._TENANT_DDL and "route_hour_times" in db._TENANT_PK

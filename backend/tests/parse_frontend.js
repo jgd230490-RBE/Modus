@@ -3408,7 +3408,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes("Routing is not set up yet, so no route can be worked out.") && !src.includes("HERE_API_KEY")
      // NARROWED 22 Oct 2026 (UI fix 7, fewer words): the admin-token line under the Locations form is gone; the cycle note is one line
      && !src.includes("The admin token is taken from the field at the top of this page.") && !src.includes("taken from the bake panel")
-     && src.includes("Saved on its own: the page's Save button does not save the target rate") && src.includes("Cycle = out + back + turnaround (load, unload and gate time ‡).")
+     && src.includes("Saved on its own: the page's Save button does not save the target rate") && /* REVERSED 26 Nov 2026 (routes rethink C3, Q1): the footnote is one line */ src.includes("Cycle = out + back + turnaround. A planning figure.")
      && !src.includes("Codes are checked by Wayscope") && src.includes("Ask your planner if you do not have one.") && src.includes('confirm("Clear ALL routes? Locations are kept. This cannot be undone.")'));
 }
 
@@ -4129,7 +4129,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 7 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column; NARROWED 17 Nov 2026 (best option step 3): + the Dashboard's Route choices record; NARROWED 17 Nov 2026 (routes-card-room): + an open route's All figures table (each branch said 6 alone: together 7) */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 8 /* NARROWED 26 Nov 2026 (routes rethink C3): + an open route's Diversions table; NARROWED 10 Nov 2026: + the Simulation's Now and gates column; NARROWED 17 Nov 2026 (best option step 3): + the Dashboard's Route choices record; NARROWED 17 Nov 2026 (routes-card-room): + an open route's All figures table (each branch said 6 alone: together 7) */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
@@ -4342,8 +4342,10 @@ ok("⭐ Config → Planning: 'Shift hours a day' is a driver's working day, at m
 ok("⭐ the Routes table: Trips/day is what fits in a driver's day (driving = out, back and gate to face), § marks a route the "
    + "rules hold below the shift alone, the cell's title gives the server's words",
    // NARROWED 22 Oct 2026 (UI fix 7, fewer words): the footnote is shorter, the rule it states is the same
-   src.includes('Trips/day = round trips that fit a{" "}')
-   && src.includes("{data.planning.shift_hours_per_day} h shift with the legal break and at most 9 h driving (§ = fewer; hover for why;")
+   // REVERSED 26 Nov 2026 (routes rethink C3, Q1: John "Yes, as recommended"): the footnote's long sentences moved to the "i" box and the guide
+   src.includes('"ro.figures": { title: "How these are worked out"') && src.includes('§ fewer trips than the shift allows')
+   && !src.includes('Trips/day = round trips that fit a{" "}') && !src.includes("(§ = fewer; hover for why;")
+   && _ug27.includes('id="ug-route-figures"')
    && src.includes('title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}')
    && !src.includes("Trips/day assumes a {data.planning.shift_hours_per_day} h"));
 // 17 Oct 2026 (the review): § only where the rules took trips off (not on a 0 the shift alone would also give), the 0
@@ -4352,8 +4354,16 @@ ok("⭐ the review: the Routes table's § marks only a route with fewer trips th
    + "(one lorry a trip), says it is a planning figure and shows the 13 h note",
    src.includes('{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}')
    && !src.includes('r.lorry_day.limited_by !== "shift" ? <span className="text-slate-500">§</span>')
-   && src.includes("0 = one lorry a trip). A planning figure.")   // NARROWED 22 Oct 2026 (UI fix 7, fewer words)
+   // REVERSED 26 Nov 2026 (routes rethink C3): the 0 (one lorry a trip) is explained in the "i" box's guide paragraph
+   && _ug27.includes("0 means one lorry a trip") && src.includes("A planning figure.{data.planning.shift_note")
    && src.includes('{data.planning.shift_note ? " " + data.planning.shift_note : ""}'));
+ok("⭐ C3 (routes rethink Q1, Q2; John 'Yes, as recommended'): the All figures footnotes are one short line + a legend + one click line, the long words are GONE from the screen, and the Diversions table sits in a named, keyboard-reachable scroll box",
+   src.includes('data-fig-note="1"') && src.includes('data-fig-marks="1"') && src.includes("Click a row to show it on the map.")
+   && !src.includes("“Use … as the main route” makes an alternative the route the plan uses.")
+   && !src.includes("= the cycle for a lorry setting off then on a weekday") && !src.includes("† includes a haul road timed at its set speed")
+   && !src.includes("t/month at {data.planning.working_days_per_month} working days")
+   && src.includes('role="region" aria-label="Diversions" data-div-scroll="1"') && /"ro\.figures": \{ title: "How these are worked out", text: "[^"]{1,230}"/.test(src)
+   && _ug27.includes("tonnes a month use the working days a month in Config".replace("t","T").replace("Tonnes","Tonnes")) );
 ok("the info boxes and the Look-ahead's details say a driver's day; the Carbon page puts charging on top of the break",
    src.includes("the trips one vehicle can do in a driver's day on its route") && src.includes("what one vehicle does in a driver's day on that route")
    && !src.includes("the trips one vehicle can do in a shift on its route") && !src.includes("what one vehicle does in a shift on that route")
@@ -4532,7 +4542,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _new = ["Rates are added together. Blank = the target rate from Config, marked \"target\".", "Printed on the route sheet and on the public map's route card.",
     "Splice — not on the map yet (default)", "Via — already on the map", "Order = the outbound direction; the return leg uses them in reverse.",
     "A one-way gate serves its own direction only. After changing a gate, press Route before reading the distances.",
-    "† includes a haul road timed at its set speed. Hover the cycle for the time without it.",
+    "† haul road at its set speed",   // REVERSED 26 Nov 2026 (C3): the legend is short
     "Click a marker to edit it, or drag it to move it. Deleting a location deletes its routes.",
     "Blank = not known. Opening stock = what was there at the start. Over capacity is flagged, never blocked.",
     "Where lorries join the public road. Blank = the marker.", "No gates yet: routes use the access gate above, or the marker.",
