@@ -464,6 +464,13 @@ ok("⭐ the fold's own words as agreed (title, empty, the diversions line, Plann
                            "on a dated diversion: a closure, not a choice, so not counted here.", "No loads recorded yet",
                            "A lorry passes, planned:", "Planned, not measured", "Fair cost (model)")))
 
+_src = read("frontend/index.html")
+_rr = read("backend/route_record.py")
+ok("⭐ C3 (routes rethink Q9): the record's columns, tip and sheet say Left-hand turns and Community; 'Left turns' and 'Places' are gone",
+   '["left_turns", "count", "Left-hand turns"]' in _src and '["places", "count", "Community"]' in _src
+   and '"Left-hand turns planned"' in _rr and '"Community planned"' in _rr and '("Community", "Schools' in _rr
+   and '"Left turns"' not in _src and '["places", "count", "Places"]' not in _src
+   and "Left turns planned" not in _rr and "Places planned" not in _rr and '("Places", "Schools' not in _rr)
 remove_scratch_db(db, TMP)
 print(f"test_route_record: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

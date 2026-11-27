@@ -1438,6 +1438,14 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .bo-c{display:flex;align-items:center;gap:8px;} .bo-n{min-width:46px;text-align:right;flex:none;}
   .bo-bar{display:inline-block;flex:none;height:7px;border-radius:3px;background:var(--bo-bar);} .bo-bar.bo-bar-use{background:var(--bo-bar-use);}
   .bo-sch td.bo-none{color:var(--muted);}
+  /* 26 Nov 2026 (Routes rethink C4, John's "Yes, as recommended" to S1): in the "All figures" table the rule's own shape
+     (dot = better, diamond = worse) goes BEFORE a figure of the card's lorry: round trip (Cycle), trips a day, carbon, and
+     the busy-hour times. No words (the card has them; a hidden word names it for a screen reader), no bar, no tint. */
+  .bo-fm{display:inline-flex;align-items:center;gap:5px;position:relative;}
+  .bo-fm i{flex:none;width:9px;height:9px;border-radius:50%;}
+  .bo-fm-ok i{background:var(--ok-text);}
+  .bo-fm-warn i{background:var(--warn-text);border-radius:0;transform:rotate(45deg) scale(.82);}
+  .bo-fm-hr{color:var(--ink);}
   .bo-mk{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap;}
   .bo-mk i{flex:none;width:9px;height:9px;border-radius:50%;}
   .bo-mk-ok{color:var(--ok-text);} .bo-mk-ok i{background:var(--ok-text);}
@@ -2267,7 +2275,8 @@ const INFO = {
     how: "Balance = the opening balance + what came in − what went out. In: the week actuals delivered there, or the approved plan where nothing was recorded. Out: the figure typed on Look-ahead → Account, or the planned use (Plan → Stockpiles).", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "dash.chart.demand": { title: "Material demand over time", text: "The planned quantity in each month, stacked by material, for the lines in view." },
   "dash.rc.planned": { title: "Planned, not measured", text: "Planned from the approved loads, so far from recorded loads. A trip's figures are those saved on the day of the choice.", guide: "route-choices-record", tech: "t1-route-choices-record" },
-  "dash.rc.places": { title: "Places", text: "Places: schools, hospitals and health centres within 250 m. Both legs of a trip.", guide: "route-choices-record" },
+  "ro.figures": { title: "How these are worked out", text: "A trip is out, back and the time at each end. Trips a day are those that fit the shift with the legal break and 9 h driving.", guide: "ug-route-figures" },
+  "dash.rc.places": { title: "Community", text: "Community: schools, hospitals and health centres within 250 m. Both legs of a trip.", guide: "route-choices-record" },
   "dash.rc.collisions": { title: "Collisions", text: "Injury collisions the police recorded on each road. A record of the road, never multiplied by loads.", guide: "route-choices-record" },
   "dash.chart.top": { title: "Top routes by tonnage", text: "The ten route lines with the most planned tonnes. Click a bar to narrow the page to that line; click it again to show every line." },
   "dash.chart.progress": { title: "Delivered against plan", text: "Planned and reported tonnes, month by month. A month nobody has reported has no delivered bar: it is not counted as zero.", tech: "t1-delivered" },
@@ -9557,7 +9566,7 @@ function rcWord(v, kind, scale){
   return [`${t} ${x > 0 ? "more" : (kind === "count" ? "fewer" : "less")}`, x > 0];
 }
 const RC_COLS = [["kg", "kg", "Carbon"], ["min", "min", "Lorry time"], ["km", "km", "Distance"], ["eur", "eur", "Fair cost"],
-                 ["left_turns", "count", "Left turns"], ["cycle_meets", "count", "Cycle routes met"], ["places", "count", "Places"]];
+                 ["left_turns", "count", "Left-hand turns"], ["cycle_meets", "count", "Cycle routes met"], ["places", "count", "Community"]];
 function RcCell({ v, kind, scale, missing }){
   const [t, more] = missing ? ["—", false] : rcWord(v, kind, scale);
   return <td className={"num" + (more ? " rc-more" : "")} data-rc-more={more ? "1" : undefined}>{t}</td>;
@@ -9628,11 +9637,11 @@ function RouteChoicesRecord({ phone }){
             {tile("eur", "eur", phone ? "Fair cost" : "Fair cost (model)", phone ? null : "planned")}
           </div>
           {phone ? rows.map(r => { const p = r.planned;
-              const bits = [["kg", "kg", "", "carbon"], ["min", "min", "", "lorry time"], ["left_turns", "count", " left turns", "left turns"]].map(([k, kind, l, name]) => { const [t, more] = rcWord(p[k], kind); return { t: t === "the same" ? `${name} the same` : t + (t === "—" ? "" : l), more }; });
+              const bits = [["kg", "kg", "", "carbon"], ["min", "min", "", "lorry time"], ["left_turns", "count", " left-hand turns", "left-hand turns"]].map(([k, kind, l, name]) => { const [t, more] = rcWord(p[k], kind); return { t: t === "the same" ? `${name} the same` : t + (t === "—" ? "" : l), more }; });
               return <div key={r.id} className="rc-pcard" data-rc-pcard={r.id}><b>{rcChoice(r, true)}</b>{r.status === "ended" && <span className="rc-end">Ended: {r.ended_words}</span>}
                 <div>{grp(Math.round(p.trips))} loads planned: {bits.map((b, i) => <React.Fragment key={i}>{i ? ", " : ""}<span className={b.more ? "rc-more" : ""}>{b.t}</span></React.Fragment>)}</div></div>; })
           : <>
-          <p className="rc-pass" data-rc-passes="1">A lorry passes, planned: {pass("left_turns", "count", "left turns")} · {pass("cycle_meets", "count", "cycle routes met")} · {pass("places", "count", "places")}<InfoTip id="dash.rc.places" /></p>
+          <p className="rc-pass" data-rc-passes="1">A lorry passes, planned: {pass("left_turns", "count", "left-hand turns")} · {pass("cycle_meets", "count", "cycle routes met")} · {pass("places", "count", "community")}<InfoTip id="dash.rc.places" /></p>
           <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="Route choices">
             <table className="tbl rc-table" data-rc-table="1">
               <caption className="sr-only">Route choices: a trip, planned and so far, against the line before</caption>
@@ -16965,7 +16974,7 @@ function RoutingMenu({ busy, children }){
 // The collision evidence is its section C. A team login lists, and gets, its own team's routes only.
 const RA_MAX = 12;
 const RA_SECTIONS = [["limits", "A", "Restrictions and lorry limits"], ["community", "B", "Community places"],
-  ["collisions", "C", "Collisions"], ["cycle", "D", "Cycle routes and left turns"], ["hours", "E", "Busy-hour times"],
+  ["collisions", "C", "Collisions"], ["cycle", "D", "Cycle routes and left-hand turns"], ["hours", "E", "Busy-hour times"],
   ["diversions", "F", "Diversions"], ["assessor", "", "The page for the assessor"]];
 const RA_KEY = "wayscope.routeAnalysis.sections";
 // 11 Nov 2026 (CLOCS card B-F5, John's yes): sections A-F are remembered as ticked; the page for the assessor is ticked
@@ -18744,15 +18753,20 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
   // quicker option of each vehicle is green and bold (John: "highlighting which route is quicker")
   const ht = data && data.hour_times;
   const hourCols = ht ? ht.screen_hours : [];
-  const quickAlt = {};
-  if(ht) for(const r of data.rows) for(const h of hourCols){
-    const v = r.hours && r.hours[h];
-    if(v == null) continue;
-    const k = `${r.profile}|${h}`;
-    if(!(k in quickAlt) || v < quickAlt[k].v) quickAlt[k] = { v, alt: r.alt_index };
-  }
-  const isQuick = (r, h) => !!(r.hours && r.hours[h] != null && quickAlt[`${r.profile}|${h}`]
-    && quickAlt[`${r.profile}|${h}`].alt === r.alt_index && data.rows.filter(x => x.profile === r.profile && x.hours && x.hours[h] != null).length > 1);
+  // 26 Nov 2026 (Routes rethink C4, S1): a mark on a figure is the RULE's row for that option, never worked out here
+  // (route_best.option_rows, the `mark` of the row with the same key); only for the lorry the card answers for, and only
+  // the round trip (Cycle), trips a day, carbon and the busy-hour times. Collisions are never marked.
+  const figMarks = {};
+  if(best && best.route) for(const o of (best.route.options || [])) if(o.rows) figMarks[o.alt] = Object.fromEntries(o.rows.map(x => [x.key, x.mark]));
+  const figMark = (r, key) => {
+    if(!best || !best.route || r.profile !== best.route.lorry) return null;
+    const m = (figMarks[r.alt_index] || {})[key];
+    return m === "ok" || m === "warn" ? m : null;
+  };
+  const figShow = (mk, inner, hr) => mk ? (
+    <span className={"bo-fm bo-fm-" + mk + (hr ? " bo-fm-hr" : "")} data-fig-mark={mk}>
+      <i aria-hidden="true" /><span className="sr-only">{mk === "ok" ? "Better: " : "Worse: "}</span>{inner}
+    </span>) : inner;
   // 0d's busy-hours line gains the time difference: the Artic Tipper (the lorry the times are worked out for)
   const busyGap = (alt) => {
     if(!ht) return "";
@@ -18870,22 +18884,21 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
                       title={r.haul_speed_applied
                         ? `Includes an assigned haul speed over ${fmtDist(r.haul_km, 1)} ${DU()} (${(r.haul_zones || []).join(", ")}). Without it this cycle would be ${r.cycle_hr_here} h.`
                         : undefined}>
-                      {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: "var(--haul-text)" }}>†</span> : null}
+                      {figShow(figMark(r, "round_trip"), <>{r.cycle_hr} h</>)}{r.haul_speed_applied ? <span style={{ color: "var(--haul-text)" }}>†</span> : null}
                     </td>
                     {hourCols.map(h => {
                       const v = r.hours ? r.hours[h] : null;
-                      const q = isQuick(r, h);
+                      const q = figMark(r, "busy_" + h);
                       return (
-                        <td key={h} className={cell} data-hour={h} data-quick={q ? "1" : undefined}
-                          style={q ? { background: "rgba(4,120,87,.12)", color: "var(--ok-text)", fontWeight: 700 } : undefined}>
-                          {v == null ? <span className="text-slate-500">—</span> : `${v.toFixed(2)} h`}
+                        <td key={h} className={cell} data-hour={h} data-fig-mark={q || undefined}>
+                          {v == null ? <span className="text-slate-500">—</span> : figShow(q, `${v.toFixed(2)} h`, true)}
                         </td>
                       );
                     })}
-                    <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{r.trips_per_day || <span className="text-slate-500">0</span>}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
+                    <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{figShow(figMark(r, "trips"), <>{r.trips_per_day || <span className="text-slate-500">0</span>}</>)}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
                     <td className={cell}>{r.tonnes_per_day}</td>
                     <td className={cell}>{r.tonnes_per_month}</td>
-                    <td className={cell}>{r.co2_kg_per_trip}</td>
+                    <td className={cell}>{figShow(figMark(r, "carbon"), <>{r.co2_kg_per_trip}</>)}</td>
                     <td className="px-2 py-1 text-right whitespace-nowrap">
                       {r.alt_index !== 0 && onPromote && (
                         <button
@@ -18903,28 +18916,17 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
               </tbody>
             </table>
             </div>
-            <p className="text-[13px] text-slate-400 mt-2">
-              Cycle = out + back + turnaround (load, unload and gate time ‡). Trips/day = round trips that fit a{" "}
-              {data.planning.shift_hours_per_day} h shift with the legal break and at most 9 h driving (§ = fewer; hover for why;
-              0 = one lorry a trip). A planning figure.{data.planning.shift_note ? " " + data.planning.shift_note : ""}{" "}
-              t/month at {data.planning.working_days_per_month} working days.
-              {data.rows.some(r => r.return_estimated) && " * return leg assumed to mirror the outbound."}
+            {/* 26 Nov 2026 (Routes rethink, C3; John: "Yes, as recommended" to Q1): the four footnote paragraphs (127 words)
+                are one short line, the marks' legend and one line about the rows; the rest is in the "i" box and the guide */}
+            <p className="text-[13px] text-slate-400 mt-2" data-fig-note="1">
+              Cycle = out + back + turnaround. A planning figure.{data.planning.shift_note ? " " + data.planning.shift_note : ""}
+              <InfoTip id="ro.figures" />
             </p>
-            {data.rows.some(r => r.haul_speed_applied) && (
-              // 22 Oct 2026 (UI fix 6, card 6): the note reads var(--haul-text) (5.05:1 on the expanded row)
-              <p className="text-[13px] mt-1" style={{ color: "var(--haul-text)" }}>
-                † includes a haul road timed at its set speed. Hover the cycle for the time without it.
-              </p>
-            )}
-            {ht && (
-              <p className="text-[13px] text-slate-400 mt-1" data-hour-note>
-                {hourCols.join(" · ")} = the cycle for a lorry setting off then on a weekday. Green, bold: the quicker option at
-                that hour.{data.rows.some(r => r.hours_scaled) ? " Other lorries scaled from the Artic Tipper." : ""}
-              </p>
-            )}
-            <p className="text-[13px] text-slate-400 mt-1">
-              Click a row to show that option on the map. “Use … as the main route” makes an alternative the route the plan uses.
+            <p className="text-[13px] text-slate-400 mt-1" data-fig-marks="1">
+              {data.rows.some(r => r.haul_speed_applied) && <span style={{ color: "var(--haul-text)" }}>† haul road at its set speed · </span>}§ fewer trips than the shift allows
+              {data.rows.some(r => r.return_estimated) ? " · * return leg assumed to mirror the outbound" : ""}
             </p>
+            <p className="text-[13px] text-slate-400 mt-1">Click a row to show it on the map.</p>
             </>}
             {busy && busy.shown && (busy.offers || []).map(o => (
               <p key={o.alt} className="text-[13px] mt-2" data-busy-hours={o.alt}>
@@ -21337,8 +21339,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const routeDiversions = (id) => (divPeriods || []).some(p => p.route_id === id) ? (
     <div data-route-diversions={id} className="mt-3">
       <p className="text-xs font-semibold text-slate-700">Diversions</p>
-      <DivRows rows={(divPeriods || []).filter(p => p.route_id === id)} prof={showProfile} canEdit={canEdit}
-        busy={divBusy} onKeep={keepMain} routes={status} />
+      {/* 26 Nov 2026 (C3, Q2 option A): the table scrolls sideways in a named box the keyboard reaches, as All figures does */}
+      <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="Diversions" data-div-scroll="1">
+        <DivRows rows={(divPeriods || []).filter(p => p.route_id === id)} prof={showProfile} canEdit={canEdit}
+          busy={divBusy} onKeep={keepMain} routes={status} />
+      </div>
     </div>) : null;
   // Q3: full screen for this route (the list, the map, the chosen route side by side)
   const besideMap = (id) => { if(selected !== id) selectRoute(id); roBeside.current = true; enterFull(); };
