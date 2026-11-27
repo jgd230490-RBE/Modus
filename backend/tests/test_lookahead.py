@@ -1333,8 +1333,10 @@ import io
 import openpyxl as _ox
 wb = _ox.load_workbook(io.BytesIO(xb))
 # 10 Sep, the human: the sheet is the SUPPLIER's — Mon–Fri only, and no stockpile list
-ok("...with four sheets: Commit week, Fuel (10 Sep evening), Clashes, About — NO Stock sheet (10 Sep)",
-   wb.sheetnames == ["Commit week", "Fuel", "Clashes", "About"])
+# NARROWED 25 Nov 2026 (the Look-ahead rethink, task C2): + "By site" second (the sites' headings and sub-totals), the
+# supplier's sheet first and unchanged in shape
+ok("...with five sheets: Commit week, By site (25 Nov), Fuel (10 Sep evening), Clashes, About — NO Stock sheet (10 Sep)",
+   wb.sheetnames == ["Commit week", "By site", "Fuel", "Clashes", "About"], str(wb.sheetnames))
 ws = wb["Commit week"]
 ok("⭐ ...sheet 1 is WEEKDAY × line: one row per Mon–Fri day per visible line, headers from the export mock",
    # G2 (16 Sep): the fifth header is the tenant's team_label — "Team" on a default tenant

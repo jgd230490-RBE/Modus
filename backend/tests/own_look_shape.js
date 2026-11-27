@@ -38,10 +38,11 @@ ok("1 corner: inline corners in the script are the small 2 / 3 px swatches, the 
 // ---------------------------------------------------------------- stage 2: status = a shape and a word, no tint
 ok("2 status: RowStatus draws an empty <i> (the shape, in CSS) and the word — no glyph, no RS_ICON",
    code.includes('<i aria-hidden="true"></i>{word}') && !code.includes("RS_ICON") && !/RS_[A-Z]+ = \{[^}]*"✓"/.test(code));
+// NARROWED 26 Nov 2026 (B1 after): each shape drops to the first line's middle (margin-top in em), the diamond too
 ok("2 status: dot = ok, diamond = warning, square = bad, ring = none (and draft), 10 px, the ring a 2 px stroke",
-   /\.row-st i\{[^}]*width:10px;height:10px;border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(css)
+   /\.row-st i\{[^}]*width:10px;height:10px;margin-top:calc\(\.675em - 5px\);border-radius:50%;background:transparent;border:2px solid var\(--st-none\);\}/.test(css)
    && /\.row-st\.rs-ok i\{background:var\(--green\);border:0;\}/.test(css)
-   && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;width:9px;height:9px;margin:0 1px;transform:rotate\(45deg\);\}/.test(css)
+   && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;width:9px;height:9px;margin:calc\(\.675em - 4\.5px\) 1px 0;transform:rotate\(45deg\);\}/.test(css)
    && /\.row-st\.rs-bad i\{background:var\(--red\);border:0;border-radius:0;\}/.test(css)
    && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--st-none\);\}/.test(css));
 // NARROWED 24 Nov 2026 (taking main 34e08ac in): the tints are gone from the token blocks and from every status; the one
@@ -81,8 +82,10 @@ ok("4 figures: .fig-strip is the one ruled strip (2 px ink on top, a hairline un
    css.includes(".fig-strip{display:grid;gap:0 !important;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);overflow:hidden;background:none;}")
    && css.includes(".fig-strip>*{border:0 !important;border-radius:0 !important;background:none !important;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line) !important;margin:-1px 0 0 -1px;min-width:0;}"));
 ok("4 figures: the Look-ahead's tiles and the Submit page's six figures are .fig-strip rows; the tiles carry no .card, the Submit strip no fill",
-   code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">')
-   && code.includes('<div className="px-4 py-3 min-w-0" data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
+   // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): seven figures, still one .fig-strip row (.la-figs: each cell its own top edge)
+   code.includes('<div className="fig-strip la-figs" data-fig-strip="lookahead">')
+   // NARROWED 25 Nov 2026 (B1): the cell's class adds its status edge (la-fig-warn) when it has one; still no .card
+   && code.includes('<div className={"px-4 py-3 min-w-0" + (edge ? " la-fig-" + edge : "")} data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
    && code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes("divide-x divide-slate-200 text-white kpi-num"));
 // NARROWED 24 Nov 2026 (the Dashboard rethink, A1; John's round 2): the Dashboard's ink line is each cell's top edge (2 px,
 // or 4 px in a status's colour), not the strip's border
@@ -235,8 +238,48 @@ ok("2 status: the shape is an inline block of its own; a tablet card cell keeps 
 // (the Account view's four figures had no rule at all)
 ok("4 strip: every row of Look-ahead figures (LaKpi) is a fig-strip, the Account view's too",
    (() => { const opens = []; let i = -1; while ((i = code.indexOf("<LaKpi ", i + 1)) >= 0) { const o = code.lastIndexOf("<div className=", i); opens.push(code.slice(o, code.indexOf(">", o))); }
-     return opens.length >= 11 && opens.every(t => /className="fig-strip /.test(t)); })()
-   && code.includes('<div className="fig-strip grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3" data-fig-strip="account">'));
+     // NARROWED 26 Nov 2026 (the Look-ahead rethink batch): 11 -> 10 rows of figures, B1 turned the eight tiles into one seven-figure strip
+     return opens.length >= 10 && opens.every(t => /className="fig-strip /.test(t)); })()
+   // NARROWED 26 Nov 2026 (the Look-ahead rethink batch, claude/la-rethink): B1 (card 2's second table) made the Last week
+   // figures its own labelled strip, so the Account row is that strip, not the shape branch's "account" wrapper
+   && code.includes('<div className="fig-strip la-figs la-figs-4" data-fig-strip="lookahead-last">'));
+// 26 Nov 2026 (own look B1, after): a status word that wraps kept its shape on the middle of the WHOLE block (17.5 px under
+// the first line in a cell, 52.6 px in a tablet card); the row is now top-aligned and the shape drops half a line less half itself
+ok("4 status: the row is top-aligned and each shape sits on the first line's middle (.675em = half of the 1.35 line, less half the shape)",
+   css.includes(".row-st{display:inline-flex;align-items:flex-start;gap:7px;") && !/\.row-st\{[^}]*align-items:center/.test(css)
+   && css.includes("height:10px;margin-top:calc(.675em - 5px);border-radius:50%;")
+   && css.includes("width:9px;height:9px;margin:calc(.675em - 4.5px) 1px 0;transform:rotate(45deg);}")
+   && /\.row-st\{[^}]*line-height:1\.35;/.test(css));
+// 26 Nov 2026 (own look B1, after): full screen (Routes, a site's layout) is on the page white with hairlines between its
+// columns, not cards on grey (design language, Sections); each open column is 25 px wider so what is inside keeps its width
+ok("4 full screen: the backdrop is the page white with no gap or frame (the grey and the 8 px gaps are gone)",
+   html.includes(".sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:0;gap:0 !important;background:var(--bg);align-content:stretch;}")
+   && !/\.sl-full\{[^}]*surface-3/.test(html));
+ok("4 full screen: the columns are divided by a hairline (--line) on the side facing the map, and lose their ink top rule",
+   html.includes(".sl-full>.card,.sl-full>.space-y-4,.sl-full>.space-y-3{border-top:0 !important;padding-left:12px !important;padding-right:12px !important;}")
+   && html.includes(".sl-full>[data-route-full-list],.sl-full>[data-site-layout-palette]{border-right:1px solid var(--line) !important;}")
+   && html.includes(".sl-full>[data-route-full-details],.sl-full>[data-site-layout-side],.sl-full>.space-y-4{border-left:1px solid var(--line) !important;}")
+   && html.includes(".sl-full>[data-site-layout-draw]{border-bottom:1px solid var(--line) !important;}")
+   && html.includes(".sl-full>.dm-map,.sl-full>.card.overflow-hidden{padding:0 !important;}"));
+ok("4 full screen: an open column is 25 px wider (Routes 325 | map | 405, drawing 257 | map | 325, a site 405); a folded strip stays 44 px with 7 px each side",
+   code.includes("gridTemplateColumns: `${fold.l ? 44 : 325}px minmax(0, 1fr) ${fold.r ? 44 : 405}px`")
+   && code.includes("gridTemplateColumns: `${fold.l ? 44 : 257}px minmax(0, 1fr) ${fold.r ? 44 : 325}px`")
+   && code.includes('{ gridTemplateColumns: "minmax(0, 1fr) 405px", gridTemplateRows: "minmax(0, 1fr)" }')
+   && !/fold\.r \? 44 : 380\}px|fold\.l \? 44 : 232\}px/.test(code)
+   && html.includes('.sl-full>:has(.sl-fold[aria-expanded="false"]){padding-left:7px !important;padding-right:7px !important;}'));
+// 26 Nov 2026 (B1 after, the mother session's read of the Dark picture): the full-screen control's glyph was #111827 on the
+// dark button (--surface-3) in Dark too, while + and − are inverted to light; on main as well. In Dark it takes the ink.
+{
+  const lum = h => { const c = [0, 2, 4].map(i => parseInt(h.replace("#", "").slice(i, i + 2), 16) / 255)
+    .map(x => x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const tk = (n, dark) => ((html.match(new RegExp("--" + n + ":(#[0-9A-Fa-f]{6})", "g")) || []).map(m => m.split(":")[1]))[dark ? 1 : 0];
+  const ink = tk("ink", true), btn = tk("surface-3", true), r = ink && btn ? ratio(ink, btn) : 0;
+  ok("4 full screen: in Dark the ⤢ / ⤡ control's glyph is the ink on its dark button, at least 3:1 (" + r.toFixed(2) + ":1); light keeps #111827 on white",
+     html.includes('html[data-theme="dark"] .mapboxgl-ctrl-group button.sl-full-btn{color:var(--ink);}')
+     && html.includes('html[data-theme="dark"] .mapboxgl-ctrl-group{background:var(--surface-3)}') && r >= 3
+     && html.includes(".mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;}") && ratio("#111827", "#FFFFFF") >= 3);
+}
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);

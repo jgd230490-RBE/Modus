@@ -242,11 +242,19 @@ const ll = (px) => px.map(([x, y]) => [x / 1000, y / 1000]);
 const GEO = (rid) => ({ type: "FeatureCollection", features: [[0, USE_PX], [1, ALT1_PX], [2, ALT2_PX]].flatMap(([alt, px]) => ["loaded", "return"].map(lg => (
   { type: "Feature", properties: { route_id: rid, vehicle_profile: P, leg: lg, alt_index: alt }, geometry: { type: "LineString", coordinates: lg === "loaded" ? ll(px) : ll(px).slice().reverse() } })))
   .concat([{ type: "Feature", properties: { route_id: rid, vehicle_profile: RIG, leg: "loaded", alt_index: 0 }, geometry: { type: "LineString", coordinates: ll(USE_PX) } }]) });
-const OPT = (alt, label, o) => Object.assign({ alt, label, return_alt: alt, ruled_out: [], added_limits: [], searched: true, heads: {}, parts: {}, n5: false,
+const OPT0 = (alt, label, o) => Object.assign({ alt, label, return_alt: alt, ruled_out: [], added_limits: [], searched: true, heads: {}, parts: {}, n5: false,
   counts: { km: 64.71, drive_min: 66.5, cycle_min: 100.5, trips: 5, co2_kg: 56, busy_min: {}, collisions: 39, goods: 1, left_turns: 9, cycle_meets: 4, cycle_beside_km: 0.17, places: 2 },
   pct: { left_turns: -10, cycle_meets: -33, cycle_beside_km: null, places: -71 }, head_words: { people: "fewer", time: "quicker", busy: "not counted", carbon: "same" },
   part_words: { collisions: "same", goods: "same", cycle: "fewer", community: "fewer" },
   sentences: [`${label} had 39 collisions on it against 39 on the route in use, 2021–2025.`, `${label} had 1 collision involving a goods vehicle over 3.5 t on it against 4 on the route in use, 2021–2025.`] }, o || {});
+// 25 Nov 2026 (the Routes page rethink, the schedule): the card prints the rule's own `rows` (route_best.option_rows);
+// two rows in the rule's shape stand in for them here (the rule's rows are checked in test_route_best §17)
+const OPT_ROWS = (x) => (x.ruled_out || []).length ? null : [
+  { key: "collisions", label: "Collisions on the road, 2021–2025", sub: false, unit: "count", in_use: 39, option: x.counts.collisions, in_use_text: "39",
+    option_text: String(x.counts.collisions), mark: "plain", words: "", bars: "grey", none: null },
+  { key: "round_trip", label: "Round trip, min", sub: false, unit: "min", in_use: 104, option: x.counts.cycle_min, in_use_text: "104",
+    option_text: String(x.counts.cycle_min), mark: "none", words: "the same", bars: "ink", none: null }];
+const OPT = (alt, label, o) => { const x = OPT0(alt, label, o); if (!(o && "rows" in o)) x.rows = OPT_ROWS(x); return x; };
 const USE0 = { loaded: { alt: 0, label: "The main route", why: "main route", status: null }, return: { alt: 0, label: "The main route", why: "main route", status: null } };
 const CU = { km: 66.65, drive_min: 70, cycle_min: 104, trips: 5, co2_kg: 57.7, collisions: 39, goods: 4, left_turns: 10, cycle_meets: 6, cycle_beside_km: 0.24, places: 7, busy_min: {} };
 const BEST1 = { day: "2026-11-17", checks: {}, route: { route: "R001", answer: "Suggested", option: "Alt 1", alt: 1, why: "3.5 min quicker a round trip, with 2 fewer cycle routes met.",
@@ -348,7 +356,9 @@ w.ResizeObserver = function(){ this.observe = () => {}; this.disconnect = () => 
          && JSON.stringify(MAP.filt["route-line"]) === JSON.stringify(["all", ["!=", ["get", "failed"], true], ["!=", ["get", "route_id"], "R001"], ["==", ["get", "route_id"], "R001"]])
          && JSON.stringify(MAP.filt["route-arrows"]) === JSON.stringify(MAP.filt["route-line"])), JSON.stringify(MAP.filt["route-line"]));
     ok("⭐ DOM: the card shows the option the rule names (Alt 1) with a tab an option, Alt 1's selected, and Make primary on it",
-       tabs().map(t => t.textContent + ":" + t.getAttribute("aria-selected")).join() === "Alt 1:true,Alt 2:false" && /Alt 1 had 39 collisions/.test(card())
+       tabs().map(t => t.textContent + ":" + t.getAttribute("aria-selected")).join() === "Alt 1:true,Alt 2:false"
+       // REVERSED 25 Nov 2026 (the Routes page rethink, Q12): the rows are the schedule, headed by the option shown (it read the rule's sentence "Alt 1 had 39 collisions …")
+       && TRY(() => q(".bo-sch thead th.bo-pick").textContent === "Alt 1")
        // REVERSED 24 Nov 2026 (the Routes page rethink, Q7 to Q9; John: "Yes, as recommended"): "Use Alt 1 as the main route" (it read "Make Alt 1 primary")
        && TRY(() => q("button[data-bo-promote]").textContent === "Use Alt 1 as the main route") && TRY(() => q("[role=tablist]").getAttribute("aria-label") === "Option shown"));
     ok("⭐ DOM R1: the tabs add the options' names only to the card (2 words an option), nothing else",
@@ -358,8 +368,10 @@ w.ResizeObserver = function(){ this.observe = () => {}; this.disconnect = () => 
     moved.length = 0;
     await press(lab("Alt 2"));
     ok("⭐ DOM: a click on 'Alt 2 · 3 min longer' picks Alt 2: its label is the pressed one, the card's tab and rows are Alt 2's, the headline answer stays",
-       pressed() === "Alt 2 · 3 min longer" && tabs().map(t => t.getAttribute("aria-selected")).join() === "false,true" && /Alt 2 had 39 collisions/.test(card())
-       && !/Alt 1 had 39 collisions/.test(card()) && TRY(() => q(".bo-ans b").textContent === "Alt 1") && /106\.8 min a round trip/.test(card()), card().slice(0, 300));
+       pressed() === "Alt 2 · 3 min longer" && tabs().map(t => t.getAttribute("aria-selected")).join() === "false,true"
+       // REVERSED 25 Nov 2026 (the Routes page rethink, Q12): the schedule's option column is Alt 2's (it read the sentences "Alt 2 had 39 collisions …" and "106.8 min a round trip")
+       && TRY(() => q(".bo-sch thead th.bo-pick").textContent === "Alt 2") && TRY(() => q('[data-bo-row="round_trip"] td.bo-pick').textContent === "106.8")
+       && TRY(() => q(".bo-ans b").textContent === "Alt 1"), card().slice(0, 300));
     ok("⭐ DOM: on another option's tab there is no Make primary (it is the suggested option's alone), and the map button names the option shown",
        !q("button[data-bo-promote]") && TRY(() => q("button[data-bo-show]").textContent === "Show Alt 2 on map"));
     ok("⭐ DOM: the pick did not move the page (no scroll to the panel or the map)", moved.length === 0, moved.length);

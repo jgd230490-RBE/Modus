@@ -1110,7 +1110,11 @@ if (loaded) {
     }
     ok("...with the KPI strip, the clash rail and one row per line",
       // 13 Oct 2026 (W6, narrowed): one RowDetails chevron a line, not a ▶
-      commitOut.includes("planned this week") && commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, task A): the rail is the flags line with the rail's own count, no "+N more";
+      // the sites open at a desk, so every line keeps its one chevron
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the strip's first figure is labelled "Planned" (was "planned this week" under it)
+      commitOut.includes('data-la-fig="Planned"') && !commitOut.includes("planned this week") && commitOut.includes('data-la-flagline="' + fixture.clashes.count + '"')
+      && !commitOut.includes("+" + (fixture.clashes.count - 3) + " more")
       && (commitOut.match(/class="rd-chev"/g) || []).length === fixture.commit.lines.length);
     // 10 Oct 2026 NARROWED: the 9 px "qty · tr · veh" sub-label went with the one-off styles; the five
     // day columns are counted by their headers (a day name and number), and the caption says the rest
@@ -1141,7 +1145,8 @@ if (loaded) {
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "account" }));
     ok("...with the four KPI cards and the held / applied / waiting states of the fixture",
       // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the cards in words, Delivered / Added n t / Waiting
-      acctOut.includes("lines delivered last week, within 2 % of plan") && acctOut.includes("can add") && !acctOut.includes("calibrate")
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): Last week's four figures labelled: Delivered · within 2 % of plan, Moved, Short, Can be added
+      acctOut.includes('data-la-fig="Delivered"') && acctOut.includes("within 2 % of plan") && acctOut.includes('data-la-fig="Can be added"') && !acctOut.includes("calibrate")
       && acctOut.includes(">Delivered<") && acctOut.includes(">Added ") && acctOut.includes(">Waiting<") && !acctOut.includes(">held<") && !acctOut.includes("applied · "));
     // NARROWED 11 Nov 2026 (CLOCS card C-F10): the Account opens on Tonnes (no money column); the cost box is the Cost view's
     const acctCostOut = render("the Account view renders its Cost columns (Show Cost)",
@@ -1165,7 +1170,10 @@ if (loaded) {
     spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false, short_flag: true };
     const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account", initialAcctShow: "cost" }));   // NARROWED 11 Nov 2026 (C-F10)
-    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
+    // NARROWED 25 Nov 2026 (the Look-ahead rethink, task C2): the row sits under its site, so its class may carry la-xsite /
+    // la-xln (and a one-row site its data-la-site); the wash is the same inline style
+    const _spAt = spOut.search(/<tr class="border-t border-slate-100 align-middle( la-xsite| la-xln)?"( data-la-site="[^"]*")? style="background:rgba\(217,119,6,\.06\)">/);
+    const spRow = _spAt < 0 ? "" : spOut.slice(_spAt);
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
       spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-sec btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
       && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2); REVERSED 11 Nov 2026 (D-F4): btn-sec, an outline button
@@ -1186,15 +1194,17 @@ if (loaded) {
     const hzOut = render("the Horizon view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "horizon" }));
     ok("...with the role labels on the columns and no Confirm button",
-      hzOut.includes("COMMIT") && hzOut.includes("MAKE-READY") && hzOut.includes("EARLY WARNING")
+      // NARROWED 25 Nov 2026 (B1, Q17): the roles in the tabs' words ("This week" for COMMIT), shown in capitals by the class
+      hzOut.includes(">This week<") && hzOut.includes(">Make-ready<") && hzOut.includes(">Early warning<") && !hzOut.includes(">COMMIT<")
       && !hzOut.includes(">Confirm week<"));
     ok("...and NO stockpile grid under it any more (10 Sep)", !hzOut.includes("max · opening") && !hzOut.includes("Type what came out"));
     // 22 Oct 2026 (UI fix 6, card 3; finding #11 and the user's yes to finding #37)
     const hzT = hzOut.slice(hzOut.indexOf("<table"));
     ok("⭐ UI FIX 6 card 3: the Horizon's role words, month line and outcome lines are 12 px — no 9 or 10 px text left in the table; the commit week's heading is text-blue-700 (once) and its role word slate-600",
       hzT.length > 1000 && !/text-\[(9|10)px\]/.test(hzT)
-      && hzT.includes('<div class="text-xs uppercase tracking-wide text-slate-600">COMMIT</div>')
-      && hzT.includes('<div class="text-xs uppercase tracking-wide text-slate-400">MAKE-READY</div>')
+      // NARROWED 25 Nov 2026 (B1, Q17): the role words in the tabs' words, in capitals by the class
+      && hzT.includes('<div class="text-xs uppercase tracking-wide text-slate-600">This week</div>')
+      && hzT.includes('<div class="text-xs uppercase tracking-wide text-slate-400">Make-ready</div>')
       && /<div class="font-semibold text-blue-700">W\d+ · /.test(hzT) && (hzT.match(/text-blue-700/g) || []).length === 1
       && hzT.includes('<div class="text-xs font-normal text-slate-400">') && /<div class="text-xs tabular-nums">/.test(hzT)
       && !hzT.includes('style="color:var(--navy)"'));
@@ -1224,12 +1234,15 @@ if (loaded) {
         h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "commit" }));
       // NARROWED (G2): the date is labelled by where the price came from — "bulletin" when
       // fetched, "typed" when an admin typed it (this fixture's index is typed: source manual)
-      ok("...the compact widget is in the KPI strip with the index, its dated source and the BAF %",
-        fOut.includes('data-fuel-widget="compact"') && fOut.includes("€" + fuelFix.costing.index_eur_per_l.toFixed(3) + "/L")
-        && fOut.includes("diesel EE · " + (fuelFix.costing.index_source === "manual" ? "typed" : "bulletin"))
-        && fOut.includes(bafLbl));
-      ok("...the planned € card counts the target-priced lines and prints the + BAF total beside the quote",
-        fOut.includes(`· ${fuelFix.commit.totals.eur_target_lines} at target`) && fOut.includes("+ BAF €")
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the compact widget is the "Diesel, per litre" cell: the price, then "typed" and its date
+      // as its one second line; the country, "/L" and the surcharge % left the strip (Last week's Fuel card says the surcharge)
+      ok("...the compact widget is in the strip with the index and its dated source, and no surcharge %",
+        fOut.includes('data-fuel-widget="compact"') && fOut.includes(">€" + fuelFix.costing.index_eur_per_l.toFixed(3) + "<")
+        && fOut.includes((fuelFix.costing.index_source === "manual" ? "typed " : "") + (() => { const d = new Date(String(fuelFix.costing.index_bulletin_date).slice(0, 10) + "T00:00:00"); return d.getDate() + " " + ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]; })())
+        && !fOut.includes("diesel EE · ") && !fOut.includes(bafLbl) && !fOut.includes("BAF"));
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the target lines and the fuel surcharge are in the Planned cost "i" (its value), not on the strip
+      ok("...the Planned cost figure prints the quote; its \"i\" counts the target-priced lines and gives the fuel surcharge",
+        fOut.includes('data-la-fig="Planned cost"') && fOut.includes('la-fig-cost') && !fOut.includes("+ BAF €")
         && fOut.includes("€" + Math.round(fuelFix.commit.totals.eur).toLocaleString("en-US")));
       ok("...nothing renders as 'undefined' or 'NaN'", !/undefined|NaN/.test(fOut));
       const fAcct = render("the Account view renders with the fuel fixture",
@@ -1237,11 +1250,13 @@ if (loaded) {
       const nTarget = fuelFix.account.rows.filter(r => r.rate_source === "target").length;
       ok("...the strip widget sits above the KPI cards with typeable yard and share boxes for a planner",
         // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): a titled Fuel card with two labelled boxes
-        fAcct.includes('data-fuel-widget="strip"') && fAcct.indexOf('data-fuel-widget="strip"') < fAcct.indexOf("lines delivered last week, within 2 % of plan")
+        // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the first figure labelled "Delivered"
+        fAcct.includes('data-fuel-widget="strip"') && fAcct.indexOf('data-fuel-widget="strip"') < fAcct.indexOf('data-la-fig="Delivered"')
         && fAcct.includes("Yard price per litre") && fAcct.includes("Fuel share of the cost") && (fAcct.match(/inputmode="decimal"/gi) || []).length >= 2);
-      ok("...every target-priced account row carries the 'target' chip and every priced row a + BAF line",
+      // NARROWED 25 Nov 2026 (B1, Q18): "+ fuel surcharge", never "BAF", on the Look-ahead's screens
+      ok("...every target-priced account row carries the 'target' chip and every priced row a + fuel surcharge line",
         (fAcct.match(/>target<\/span>/g) || []).length === nTarget && nTarget >= 1
-        && (fAcct.match(/\+ BAF €/g) || []).length === fuelFix.account.rows.filter(r => r.planned_eur_adj != null).length);
+        && (fAcct.match(/\+ fuel surcharge €/g) || []).length === fuelFix.account.rows.filter(r => r.planned_eur_adj != null).length && !/\+ BAF/.test(fAcct));
       const fSub = render("the Account view renders for a SUBMITTER with the fuel fixture",
         h(LookAhead, { meta: laMeta, who: "t", access: submitter, initialPage: fuelFix, initialView: "account" }));
       ok("...whose widget shows the yard and share as text, not inputs",
@@ -1263,8 +1278,11 @@ if (loaded) {
       ok("...the Account view has a 'Fair € (model)' column with a figure on every baked row and — on the unbaked one",
         fAcct.includes("Fair € <span") && nFair >= 1
         && (fAcct.match(/title="No fair price: the route is not routed yet/g) || []).length === fuelFix.account.rows.length - nFair);   // 13 Oct 2026 (W3, narrowed): plain words
-      ok("...the KPI caption on Commit carries the fair total and how many lines it covers",
-        fuelFix.commit.totals.fair_eur != null && fOut.includes(`(model, ${fuelFix.commit.totals.fair_lines} of ${fuelFix.commit.totals.lines})`));
+      // NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, card 2): the second line is "fair price €…" when every line is priced, else "n of m priced" in its place
+      ok("...the Planned cost's second line gives the fair price, or how many lines are priced when not all are",
+        fuelFix.commit.totals.fair_eur != null && (fuelFix.commit.totals.eur_lines < fuelFix.commit.totals.lines
+          ? fOut.includes(`${fuelFix.commit.totals.eur_lines} of ${fuelFix.commit.totals.lines} priced`)
+          : fOut.includes("fair price €" + Math.round(fuelFix.commit.totals.fair_eur).toLocaleString("en-US"))) && !fOut.includes("(model, "));
       const fileDoc = { fair_price: { driver_eur_per_h: 20, vehicle_standing_eur_per_h: 16, running_eur_per_km: 0.12, margin_pct: 8,
         consumption: { l_per_100km_per_tonne: 0.4, rigid: { l_per_100km_empty: 27 }, artic: { l_per_100km_empty: 23.6 } },
         season: { winter_months: [11, 12, 1, 2, 3], winter_consumption_uplift_pct: 8, thaw_months: [3, 4] } } };
@@ -1303,7 +1321,8 @@ if (loaded) {
         fNone.includes("No diesel price yet") && fNone.includes("No diesel price to work it from") && !/undefined|NaN/.test(fNone));
       const fStale = render("the widget renders a stale index", h(FuelWidget, { who: "t", access: planner, mode: "compact",
         initial: { ...fuelFix.costing, index_eur_per_l: null } }));
-      ok("...a compact card with no index says so instead of a price", fStale.includes("Index unavailable"));
+      // NARROWED 26 Nov 2026 (John, "As recommended" to the Look-ahead batch page, Q2): the compact card says "No price"
+      ok("...a compact card with no index says so instead of a price", fStale.includes("No price") && !fStale.includes("Index unavailable"));
     }
 
     // the empty page: no lines, no account, no horizon — every view has an EmptyState

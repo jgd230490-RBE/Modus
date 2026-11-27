@@ -304,7 +304,8 @@ const SENT = "Busy-hour times are running. Route all can start when they finish.
   ok("7. ...a new or edited route and a moved site bake with no row (they are not in the list)",
      code.includes("await bakeOneRoute(a.id, a.profiles);") && (code.match(/workStart\("route_again"/g) || []).length === 1);
   ok("⭐ 7. the Look-ahead's closures check reads '<its name>: checking' (card 2), and its refusal shows beside its button",
-     code.includes('{ttRunning ? `${ttName.split(" (")[0]}: checking`') && code.includes('{ttBusy && !ttRunning && <span role="status" data-work-busy="closures">{ttBusy}</span>}')
+     // NARROWED 26 Nov 2026 (the Look-ahead rethink, B1, card 2): the name up to its bracket is ttFirst, "checking…"
+     code.includes('{ttRunning ? `${ttFirst}: checking…`') && code.includes('const ttFirst = ttName.split(" (")[0].trim() || "Road restrictions";') && code.includes('{ttBusy && !ttRunning && <span role="status" data-work-busy="closures">{ttBusy}</span>}')
      && code.includes("const b = workBusy(e); if(b) setTtBusy(b); else setErr(errSay(\"Couldn't start the road-restriction check.\", e));"));
   ok("⭐ 7. the refusal is shown alone where each second job is pressed: Zones (save, delete), Use Alt 1 as the main route (it read Make primary; John, 25 Nov: Yes, that name), a haul road, the Organisation file",
      code.includes('catch(e){ setZoneMsg(workBusy(e) || errSay("Not saved.", e)); }') && code.includes('catch(e){ setZoneMsg(workBusy(e) || errSay("Not deleted.", e)); }')

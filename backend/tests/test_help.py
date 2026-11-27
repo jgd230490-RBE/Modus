@@ -365,11 +365,23 @@ ok("Forecasts: the filter row, the Cost column, the ⋯ menu with Edit in Submit
    and "<strong>Mine only</strong>" in src and "the count chips are clickable" not in src
    and "<td>no team</td>" not in src)
 
+# 26 Nov 2026 (the Look-ahead rethink batch): the glossary's key column never wraps (td.k nowrap), so a long key widened the
+# table past a phone and the audit's axe found a sideways scroller with no keyboard access (help @390). A key line stays
+# within 33 characters (the longest on main ad152be, which fits at 390 px); a longer key is broken with <br>.
+_gk_lines = [re.sub(r"<[^>]+>", "", x) for k in re.findall(r'<td class="k">(.*?)</td>', src) for x in re.split(r"<br\s*/?>", k)]
+ok("the glossary: no key line over 33 characters (the key column does not wrap)",
+   len(_gk_lines) >= 40 and max(len(x) for x in _gk_lines) <= 33
+   and '<td class="k">Last week /<br>This week /<br>Next week /<br>Weeks ahead</td>' in src)
+
 # Look-ahead
-ok("the Look-ahead: this week by default, the next week switch, the remembered view, check now on the Look-ahead",
-   "<strong>Commit · this week</strong>" in src and "<strong>Commit · next week</strong>" in src
-   and "The page opens on the view you used last" in text and "<strong>check now</strong> (or <strong>re-check</strong>)" in src
-   and "Switch the pill to" not in text)
+# NARROWED 25 Nov 2026 (the Look-ahead rethink, B1, Q17 / Q18 / card 2): the four tabs Last week · This week · Next week · Weeks ahead;
+# the switch and "Commit · next week" are gone; the closures line's button reads Check again / Check now
+ok("the Look-ahead: this week by default, the Next week tab, the remembered tab, Check again on the Look-ahead",
+   "<strong>Last week</strong> (what actually happened), <strong>This week</strong> (the plan by day), <strong>Next week</strong>" in src
+   and "<strong>Weeks ahead</strong> (the coming weeks as totals)" in src and "<strong>Commit · this week</strong>" not in src
+   and "<strong>Commit · next week</strong>" not in src and "this week | next week" not in src
+   and "The page opens on the tab you used last" in text and "Press <strong>Check again</strong> to check every route again" in src
+   and "<strong>check now</strong> (or <strong>re-check</strong>)" not in src and "Switch the pill to" not in text)
 # 13 Oct 2026 (W6, narrowed): the Flags column became the one Status column, ▶ the row's arrow (›) and its details,
 # and the grid's unit is the Show switch; the same facts, told as the screen now shows them
 ok("...the grid's Flags, Week and Status columns, ▶ to expand, ✎ for a typed day; the exports' Fuel sheet and the DRAFT stamp",
@@ -390,7 +402,8 @@ ok("...Account's columns and the diesel strip: Planned £, Fair £ (model), Actu
    all(s in src for s in ("<strong>Planned £</strong>", "<strong>Fair £ (model)</strong>", "<strong>Actual £</strong>",
                            "<strong>£ var</strong>", "<strong>Yard £/L</strong>", "<strong>Fuel share %</strong>")))
 ok("...the first confirm locks the fuel-surcharge base, and a team code confirms its own lines (costing.lock_baf_base_if_empty)",
-   "locks the base for the fuel surcharge (BAF)" in text and "Confirm week confirms your team's lines only" in text)
+   # NARROWED 25 Nov 2026 (B1, Q18): "fuel surcharge" without "(BAF)" in the Look-ahead chapter (Config's own words keep BAF)
+   "locks the base for the fuel surcharge; later confirms" in text and "Confirm week confirms your team's lines only" in text)
 
 # the public map after PRs #20-#29
 # NARROWED 19 Oct 2026: "Layers and basemap" is "More layers" on the panel and in the guide
@@ -529,7 +542,7 @@ ok("\U0001f534 the Dashboard: no claim that it calculates nothing of its own; th
 # Submit forecast, Forecasts, approval
 ok("Submit / Forecasts: the Route reference picker; Horizon keeps a re-pended line; Refresh reads the list again",
    "where two routes join the same pair, it becomes a list to pick from" in text
-   and "Horizon still shows its weeks, marked \"month is now Pending\"" in text
+   and "Weeks ahead still shows its weeks, marked \"month is now Pending\"" in text   # NARROWED 25 Nov 2026 (B1, Q17): the tab's name
    and "<strong>Refresh</strong> reads the list again." in src and "<strong>Refresh</strong> reloads the page." not in src)
 ok("\U0001f534 rejecting or re-pending a month deletes NO weeks (main.py: 'Rejecting or reopening deletes NOTHING')",
    "deletes <strong>none</strong> of its weeks, typed actuals included" in src
@@ -553,8 +566,11 @@ ok("the Look-ahead: weekends are held at 0 and not shown (the grid is Monday to 
    and "default to zero" not in text and "0 unless typed" not in text
    and "Saturday and Sunday are held at 0 and not shown" in fe_src)   # 13 Oct 2026 (W3, narrowed): the screen's note moved into the commit grid's info box
 ok("...the KPI strip is a list; the check line's two other states; Esc saves a day",
-   "The <strong>KPI strip</strong> reads:</p>\n<ul>" in src and "not checked since the route was worked out" in text and "not checked since the route was worked out" in fe_src   # 13 Oct 2026 (W3, narrowed): the screen's words
-   and "showing the last check" in text and "the stored result stands" not in text and "Esc, or clicking elsewhere, saves too" in text   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the screen's new words
+   # NARROWED 25 Nov 2026 (B1, card 2): seven labelled figures; the closures line's words without source, ISO date or UTC
+   "Seven <strong>figures</strong> run along the top, each with its label over it:</p>\n<ul>" in src
+   and "not checked since they were re-routed" in text and 'not checked since ${ttUnchecked === 1 ? "it was" : "they were"} re-routed' in fe_src
+   and "not checked since the route was worked out" not in text and "not checked since the route was worked out" not in fe_src
+   and "showing the last one" in text and "showing the last one" in fe_src and "the stored result stands" not in text and "Esc, or clicking elsewhere, saves too" in text   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the screen's new words
    and 'e.key === "Enter" || e.key === "Escape") e.currentTarget.blur()' in fe_src)
 
 # the public map
@@ -865,7 +881,9 @@ ok("⭐ the guide's Commit view explains Gates this week, the 85 % step and the 
    "<p><strong>Gates this week</strong>, under the grid," in src and "the dashed gold line 85 % of that" in src
    and "These are planned arrivals spread evenly over the gate's open hours; no hourly peak is known." in src
    and "<tr><td>Gate over capacity</td>" in src and "<tr><td>Gate near capacity</td>" in src   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
-   and src.index("<tr><td>Route cap</td>") < src.index("<tr><td>Gate over capacity</td>") < src.index("<tr><td>Share</td>"))
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, B1): the share flag reads "<team word> share", so the guide's row is "… share"
+   and src.index("<tr><td>Route cap</td>") < src.index("<tr><td>Gate over capacity</td>") < src.index("<tr><td>… share</td>")
+   and "<tr><td>Share</td>" not in src)
 
 ok("⭐ W10: the guide offers the CLP pack beside the month and says what it holds; the technical guide names its two reads",
    "<strong>CLP pack (PDF)</strong> and <strong>CLP pack (XLSX)</strong>, beside the month" in src
@@ -1523,12 +1541,15 @@ ok3("WORKS AREA (2.1-12): technical T1 has the two addresses, the outline rule a
                              "<code>zones.from_phase_id</code> / <code>from_phase_version</code>", "<code>layout_changed</code>", "<code>zone_changed</code>")))
 
 # 8 Nov 2026 (v2.1 task 2.1-13): the two week maps' words (no team colours, no dark / red dot pair any more)
-ok("2.1-13: the guide says what the Dashboard's Today map shows: bold today, green out / amber back, the week faded, names, gates, tags, the key",
-      all(w in _ug0d for w in ("<strong>Today on the map</strong>", "out (loaded) in green and back (empty) in amber",
-                               "lines later this week faded grey", "zoom in for the gates", "The key is under the map.")))
+# REVERSED 26 Nov 2026 (lines-prints Q1, Q2; John: "Yes, as recommended"): dark grey out, light grey back, the week paler
+ok("2.1-13 (REVERSED 26 Nov): the guide says what the Dashboard's Today map shows: bold today, dark grey out / light grey back, the week paler, names, gates, tags, the key",
+      all(w in _ug0d for w in ("<strong>Today on the map</strong>", "out (loaded) in dark grey and back (empty) in light grey",
+                               "lines later this week thinner and paler", "zoom in for the gates", "The key is under the map."))
+      and "out (loaded) in green and back (empty) in amber" not in _ug0d and "lines later this week faded grey" not in _ug0d)
 ok("2.1-13: the Look-ahead's week map no longer reads as team colours with a dark and a red dot",
       "draws this week's lines in their team colour, with a dark dot at the origin and a red dot" not in _ug0d
-      and "draws this week's lines, out (loaded) in green, with the week's load on a tag" in _ug0d)
+      and "draws this week's lines, out (loaded) in dark grey, with the week's load on a tag" in _ug0d   # REVERSED 26 Nov (was "in green")
+      and "draws this week's lines, out (loaded) in green" not in _ug0d)
 # 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8): 9.2's map item, few words, no back end; technical T1 "The Routes page's map"
 _ug25 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
 _tg25 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
@@ -1555,7 +1576,7 @@ ok("ROUTES PAGE: 9.2's map item names no back end (no API, endpoint, geometry, s
    bool(_m25) and not re.search(r"\b(API|endpoint|geometry|server|token|HERE|/api/)\b", _m25))
 ok("ROUTES PAGE: technical T1 has the reads, the layer names and the full-screen columns",
    all(w in _tg25 for w in ('id="t1-routes-page"', "<code>GET /api/routes/geojson?profile=&amp;leg=&amp;alt_index=</code>", "<code>rlEnsure()</code>",
-                            "<code>/api/community</code>", "<code>/api/collisions</code>", "<code>300px | map | 380px</code>", "<code>routesPageDom</code>")))
+                            "<code>/api/community</code>", "<code>/api/collisions</code>", "<code>325px | map | 405px</code>", "<code>routesPageDom</code>")))   # NARROWED 26 Nov 2026 (own look B1 after): 300 | map | 380 became 325 | map | 405
 # 9 Nov 2026 (v2.1 2.1-11b): the movement count, in both guides; "two-way" retired from the user guide
 _tg_cnt = open(TECH, encoding="utf-8").read()
 ok("COUNT (2.1-11b): the user guide names the Config switch and what it changes, and the Dashboard card",

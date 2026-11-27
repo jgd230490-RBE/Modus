@@ -522,7 +522,8 @@ pp = fe[fe.index("const POUR_WORD = {"):fe.index("// ===========================
 # what a person can read: the slice without its comments (// lines and {/* */} blocks)
 pp_words = re.sub(r"\{/\*.*?\*/\}", "", re.sub(r"(?m)^\s*//.*$", "", pp), flags=re.S).replace("${API}", "")
 ok("⭐ Plan → Pours: in the Plan group after Stockpiles, its icon, a desk page",
-   '{ id: "pours", label: "Pours", glyph: "◒" }' in fe and "\n  pours: \"M" in fe
+   # NARROWED 26 Nov 2026 (own look, icons step 1): no glyph on a NAV entry; the icon is a { d: ... } drawing
+   '{ id: "pours", label: "Pours" }' in fe and "\n  pours: { d: \"M" in fe
    and '{page === "pours" && !narrow && <PoursPage meta={meta} access={role} who={who} />}' in fe)
 ok("the page reads /pours and /pours/lines once each; the form asks /pours/preview; writes POST / PATCH / DELETE",
    pp.count("fetch(`${API}/pours`)") == 1 and pp.count("fetch(`${API}/pours/lines`)") == 1
@@ -538,7 +539,9 @@ ok("🔴 the Pours page names no standard, no supplier and no back end (sources 
    not re.search(r"BS 8500|EN 206|Concrete Society|Holcim|Series 1700|\bAPI\b|endpoint|server|\bHERE\b", pp_words),
    str(re.findall(r"BS 8500|EN 206|Concrete Society|Holcim|Series 1700|\bAPI\b|endpoint|server|\bHERE\b", pp_words)))
 ok("⭐ the Look-ahead grid's POUR mark on the pour's day; the phone card's on the day shown",
-   "const poursAt = useMemo(" in fe and 'className="pour-mark" data-pour-mark={d.day_date}' in fe
+   # NARROWED 25 Nov 2026 (the Look-ahead rethink, task A; card 1): the mark reads "pour" in plain amber words, on the grid and the phone
+   "const poursAt = useMemo(" in fe and 'className="pour-mark la-pour" data-pour-mark={d.day_date}' in fe
+   and '<span className="pour-mark la-pour">pour</span>' in fe and ">POUR</span>" not in fe
    and "const pourLines = new Set(((page && page.pours) || []).filter(p => p.pour_date === shown)" in fe)
 ok("Config → Planning: the two limits, blank = 120 and 30, the hint says the specification wins",
    'data-cfg={"pours-" + k}' in fe and '"transit_limit_min", "Concrete: loading to the end of discharge, at most (minutes)", "120"' in fe
