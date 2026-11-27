@@ -568,7 +568,21 @@ if hasattr(SL, "for_public_map"):    # PR 4 (claude/site-layout-public): the pub
 # every public read, called with the map password's cookie as the public map would, the demo loaded, pictures pinned
 LEAK = re.compile(r"PI0\d\d|/pictures/|image_b64|site_layout_pictures|\"pictures\"|iVBORw0KGgo|/9j/")
 as_code(None)
+# 27 Nov 2026 (claude/route-pieces): /api/public/route-pieces needs a route (a required argument) and answers 404 for a
+# route with no stored line; the demo package stores none, so R044 (L001 to L019, the pictured site) is given two lines
+# here, the usual one and a way round, and the sweep calls the read for it like every other public read.
+import network  # noqa: E402
+L001 = next(r for r in PKG["tables"]["locations"] if r["id"] == "L001")
+_a, _b = (L001["lon"], L001["lat"]), (L019["lon"], L019["lat"])
+_line0 = [[_a[0] + (_b[0] - _a[0]) * i / 20, _a[1] + (_b[1] - _a[1]) * i / 20] for i in range(21)]
+_line1 = [list(pt) for pt in _line0]
+for i in range(8, 13):
+    _line1[i] = [_line1[i][0], _line1[i][1] + 0.01]        # about 1.1 km off the usual line for a stretch
+for _alt, _ln in ((0, _line0), (1, _line1)):
+    network._upsert_geom("R044", network.DEFAULT_PROFILE, json.dumps(_ln), 30.0, 0.6, None, leg="loaded", alt_index=_alt)
+PUB_ARGS = {"route": "R044"}
 called, leaked, skipped = [], [], []
+answers = {}
 _offline = None
 try:
     from portable import offline   # noqa: E402
@@ -589,6 +603,8 @@ for path, fn in PUB:
             kw[name] = _Request(cookies=MAPC, path=path)
         elif name == "month" and prm.default is inspect.Parameter.empty:
             kw[name] = "2027-08"
+        elif name in PUB_ARGS and prm.default is inspect.Parameter.empty:
+            kw[name] = PUB_ARGS[name]
         elif prm.default is inspect.Parameter.empty:
             good = False
     if not good:
@@ -608,6 +624,7 @@ for path, fn in PUB:
     else:
         text = json.dumps(out, default=str)
     called.append(path)
+    answers[path] = text
     if LEAK.search(text):
         leaked.append(path)
     # the same read for a month the pictures show in
@@ -623,6 +640,14 @@ for path, fn in PUB:
 ok("4. every public read was called (none skipped for a required argument)", len(called) >= 15 and not skipped,
    f"called {len(called)}, skipped {skipped}")
 ok("4. NO public read carries a picture, its id, its address or its image", not leaked, str(leaked))
+try:
+    _rp = json.loads(answers.get("/api/public/route-pieces", "{}"))
+except ValueError:
+    _rp = {}
+ok("4. /api/public/route-pieces was called for R044 and answered its own shape (the way round, alt 1, with its piece)",
+   _rp.get("route") == "R044" and [o.get("alt") for o in (_rp.get("options") or [])] == [1]
+   and bool(_rp["options"][0].get("pieces")),
+   str(answers.get("/api/public/route-pieces", "not called"))[:300])
 st, meta = http(main.meta, _Request(cookies=MAPC))
 ok("4. /api/meta's public shape carries no picture either", st == 200 and not LEAK.search(json.dumps(meta, default=str)))
 
