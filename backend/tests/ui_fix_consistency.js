@@ -41,7 +41,8 @@ const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.
 // REVERSED 24 Nov 2026 (own look, B1 stage 2; John's yes to the second and third mockups): the status chip is no longer a
 // tinted pill: a SHAPE (10 px) and a WORD, no background, no padding, no corner; the --st-*-bg tints are gone from both looks
 ok("⭐ 12: the status is a shape and a word — no tint, no pill, the word in the tone's text colour",
-   /\.row-st\{display:inline-flex;align-items:center;gap:7px;[^}]*color:var\(--st-none\);white-space:nowrap;\}/.test(css)
+   // NARROWED 26 Nov 2026 (own look B1 after): the row is top-aligned so a wrapped word keeps its shape on the first line
+   /\.row-st\{display:inline-flex;align-items:flex-start;gap:7px;[^}]*color:var\(--st-none\);white-space:nowrap;\}/.test(css)
    && !/\.row-st\{[^}]*(background|border-radius|padding)/.test(css)
    && css.includes(".row-st.rs-ok{color:var(--ok-text);}") && css.includes(".row-st.rs-warn{color:var(--warn-text);}")
    // NARROWED 24 Nov 2026 (own look B1, taking main 34e08ac in): the one place still reading the tints is the Working
