@@ -572,8 +572,10 @@ ok("⭐ ...each leg drawn: its laden leg ('Inbound Highway') dark blue and its e
    sorted((l["route_id"], l["kind"]) for l in SN["legs"]) == [("R1", "empty"), ("R1", "laden"), ("R2", "empty"), ("R2", "laden")]
    and rme.LEG_LADEN.upper() == "#0051C4" and rme.LEG_EMPTY.upper() == "#72A7FF"
    and rme.LEG_LADEN.lower() != "#059669" and rme.LEG_EMPTY.lower() != "#f59e0b"
-   and '<span class="color-dot" style="background:#3A3C41;"></span>' in read("map/index.html")
-   and '<span class="color-dot" style="background:#8E9197;"></span>' in read("map/index.html"))
+   # NARROWED 27 Nov 2026 (claude/route-line-spec): the key's dots read the route-line table's custom properties, today's pinned
+   and '<span class="color-dot" style="background:var(--rl-public-map-loaded-leg-color);"></span>' in read("map/index.html")
+   and '<span class="color-dot" style="background:var(--rl-public-map-empty-leg-color);"></span>' in read("map/index.html")
+   and "--rl-public-map-loaded-leg-color:#3A3C41;" in read("map/index.html") and "--rl-public-map-empty-leg-color:#8E9197;" in read("map/index.html"))
 ok("...no movement figures: no Volume legend, the key titled Routes, the words say no month and approved lines only",
    SN["volume_legend"] == [] and SN["map_legend_title"] == "Routes"
    and SN["filter_words"] == "2 routes · All teams · approved routes, no month · approved lines only"

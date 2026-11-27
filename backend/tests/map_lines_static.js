@@ -7,6 +7,8 @@
  */
 const fs = require("fs");
 const path = require("path");
+// 27 Nov 2026 (claude/route-line-spec): the slices below read the route-line table's copy (RLSP, ROUTE_LINE_STYLES)
+require("./lib/route_line_styles").install();
 const vm = require("vm");
 const ROOT = path.join(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
@@ -34,8 +36,11 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
 // ---------------------------------------------------------------------------------------------------------------
 console.log("A. Card 1: the approved network in ink and grey, left of travel");
 const netBlk = between("    const NET = {", "    // a month on screen = the forecast overlay is drawn");
+// NARROWED 27 Nov 2026 (claude/route-line-spec): the page reads these from the route-line table's copy (RLSP); today's
+// values stay pinned here as literals, against the copy
 ok("A1 the loaded leg is ink #3A3C41, the empty leg grey #8E9197, on a white casing",
-   /loaded: '#3A3C41', empty: '#8E9197', casing: '#ffffff',/.test(netBlk), netBlk.slice(0, 200));
+   /loaded: RLSP\.loaded_leg\.color, empty: RLSP\.empty_leg\.color, casing: RLSP\.loaded_leg\.casing,/.test(netBlk)
+   && RLSP.loaded_leg.color === '#3A3C41' && RLSP.empty_leg.color === '#8E9197' && RLSP.loaded_leg.casing === '#ffffff', netBlk.slice(0, 200));
 ok("A2 the legs are created in the look on screen (netLegPaint), never green #059669 or amber #f59e0b",
    /'id': 'outbound-lines',[\s\S]{0,300}'line-color': netLegPaint\(false\)\.color,/.test(html)
    && /'id': 'inbound-lines',[\s\S]{0,300}'line-color': netLegPaint\(true\)\.color,/.test(html)
@@ -45,15 +50,21 @@ ok("A3 the haul-road dots follow the legs (netHaulColour), and the legacy applyS
    && !/setPaintProperty\('(in|out)bound-lines', 'line-color', '#(059669|f59e0b)'\)/i.test(html)
    && /const applySolidColors = \(\) => \{[\s\S]{0,900}applyLegLook\(\);/.test(html));
 ok("A4 the core and casing ramps are the card's (7: 1.1 / 2.9, 12: 2.6 / 4.8, 16: 4.6 / 7)",
-   html.includes("const WIDTH_CORE   = ['interpolate', ['linear'], ['zoom'], 7, 1.1, 12, 2.6, 16, 4.6];")
-   && html.includes("const WIDTH_CASING = ['interpolate', ['linear'], ['zoom'], 7, 2.9, 12, 4.8, 16, 7];"));
+   html.includes("const WIDTH_CORE   = RLSP.loaded_leg.width;") && html.includes("const WIDTH_CASING = RLSP.loaded_leg.casing_width;")
+   && JSON.stringify(RLSP.loaded_leg.width) === JSON.stringify(['interpolate', ['linear'], ['zoom'], 7, 1.1, 12, 2.6, 16, 4.6])
+   && JSON.stringify(RLSP.loaded_leg.casing_width) === JSON.stringify(['interpolate', ['linear'], ['zoom'], 7, 2.9, 12, 4.8, 16, 7]));   // NARROWED 27 Nov 2026
 ok("A5 kept: both legs left of their own travel (OFFSET_OUT = OFFSET_IN, the 17 Oct ramp), handed to applyLegLook",
-   html.includes("const OFFSET_IN  = ['interpolate', ['linear'], ['zoom'], 7, -1, 12, -4, 14, -3, 17, 0];")
+   html.includes("const OFFSET_IN  = RLSP.loaded_leg.offset;")   // NARROWED 27 Nov 2026: the table's copy
+   && JSON.stringify(RLSP.loaded_leg.offset) === JSON.stringify(['interpolate', ['linear'], ['zoom'], 7, -1, 12, -4, 14, -3, 17, 0])
    && html.includes("const OFFSET_OUT = OFFSET_IN;")
    && html.includes("NET.offset = OFFSET_IN; NET.core = WIDTH_CORE; NET.casing_w = WIDTH_CASING;"));
 ok("A6 the Control Panel's two leg swatches are ink and grey; the alternatives' swatch the neutral grey",
-   /id="layer-inbound"[^\n]*background:#3A3C41;/.test(html) && /id="layer-outbound"[^\n]*background:#8E9197;/.test(html)
-   && /id="layer-alts"[^\n]*background:#A9ABB0;/.test(html));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): the swatches read the table's custom properties, today's values pinned
+   /id="layer-inbound"[^\n]*background:var\(--rl-public-map-loaded-leg-color\)/.test(html)
+   && /id="layer-outbound"[^\n]*background:var\(--rl-public-map-empty-leg-color\)/.test(html)
+   && /id="layer-alts"[^\n]*background:var\(--rl-public-map-alternative-color\)/.test(html)
+   && html.includes("--rl-public-map-loaded-leg-color:#3A3C41;") && html.includes("--rl-public-map-empty-leg-color:#8E9197;")
+   && html.includes("--rl-public-map-alternative-color:#A9ABB0;"));
 ok("A7 two tones (Q3): the loaded and the empty leg part by tone (≥ 1.8:1) and each reads on white (≥ 3:1)",
    contrast("#3A3C41", "#8E9197") >= 1.8 && contrast("#3A3C41", "#FFFFFF") >= 3 && contrast("#8E9197", "#FFFFFF") >= 3,
    [contrast("#3A3C41", "#8E9197").toFixed(2), contrast("#8E9197", "#FFFFFF").toFixed(2)]);
@@ -65,6 +76,7 @@ sb.map = {
   setPaintProperty: (l, p, v) => { sb.set.push([l, p, v]); (sb.layers[l] = sb.layers[l] || {})[p] = v; }
 };
 sb.labelsDark = () => sb.DARK;
+require("./lib/route_line_styles").install(sb);   // 27 Nov 2026: the block reads the route-line table's copy (RLSP)
 vm.createContext(sb);
 let sbErr = "";
 try {
@@ -121,14 +133,21 @@ ok("B6 the quiet grey parts from a white casing and from the forecast's lightest
 // ---------------------------------------------------------------------------------------------------------------
 console.log("C. Card 2: the forecast lines — a white casing, the five blues kept, ONE width (25 Nov: Direction 1 again)");
 ok("C1 kept: the five band blues are unchanged (one list with the bulletin's VOLUME_RAMP)",
-   html.includes("const CARBON_RAMP = ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B'];"));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   html.includes("const CARBON_RAMP = RLSP.month_line.bands;")
+   && JSON.stringify(RLSP.month_line.bands) === JSON.stringify(['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B']));
 ok("C2 the map config holds no stock blue: the forecast line Off and the brand are the sign blue, the casing white",
-   /brand:\s+"#0B4EA2"/.test(cfg) && /forecast:\s+"#0B4EA2"/.test(cfg) && /forecastCasing:\s+"#FFFFFF"/.test(cfg)
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   // (the forecast line Off and its casing left the config for the table: month_line.color, month_line.casing)
+   /brand:\s+"#0B4EA2"/.test(cfg) && !/forecast(Casing)?:/.test(cfg.replace(/\/\/[^\n]*/g, ''))
+   && RLSP.month_line.color === '#0B4EA2' && RLSP.month_line.casing === '#FFFFFF'
    && !/#2563EB|#3B82F6/i.test(cfg.replace(/\/\/[^\n]*/g, '')));
 // 25 Nov 2026 (John: "all lines should be the same thickess"): 24 Nov's width by band (Q4, Direction 2) is taken out again;
 // every forecast line and shared section is ONE width in every mode, the amount told by the five blues only (12 Oct's rule)
 ok("C3 one width in every mode: 4 px on a 6.6 px casing (John, 25 Nov: 'TRY 4 PX'; was 5 on 7.6)",
-   html.includes("const FORECAST_LINE_WIDTH = 4;") && html.includes("const FORECAST_CASING_WIDTH = 6.6;"));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   html.includes("const FORECAST_LINE_WIDTH = RLSP.month_line.width;") && html.includes("const FORECAST_CASING_WIDTH = RLSP.month_line.casing_width;")
+   && RLSP.month_line.width === 4 && RLSP.month_line.casing_width === 6.6);
 ok("C4 the forecast line and its casing, and the shared sections, are drawn at full opacity",
    /id:'forecast-casing'[^\n]*'line-opacity':1\}\}/.test(html) && /id:'forecast-layer'[^\n]*'line-opacity':1\}\}/.test(html)
    && /id: 'road-load-casing'[\s\S]{0,300}'line-opacity': 1 \}/.test(html) && /id: 'road-load-line'[\s\S]{0,300}'line-opacity': 1 \}/.test(html)
@@ -154,8 +173,9 @@ ok("C7 ...and Carbon by f_co2 on the carbon stops", acm.includes("co2 ? carbonCo
 ok("C10 the amber diversion edge keeps clear of the line: a mode change sets the rails' gap to the line's width",
    acm.includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());") && !acm.includes("'diversion-edge', 'line-width', caseW"));
 ok("C11 the edge under every forecast line: white on a light ground, the 12 Nov pale edge on a dark one, heat map on or Off",
-   fnSrc("heatEdgeColour").includes("return typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing;")
-   && html.includes("const HEAT_EDGE_DARK = '#E7E5E4';"));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   fnSrc("heatEdgeColour").includes("return typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : RLSP.month_line.casing;")
+   && html.includes("const HEAT_EDGE_DARK = RLSP.month_line.casing_dark;") && RLSP.month_line.casing_dark === '#E7E5E4');
 // the lightest, thinnest line against the Light basemap's ground and its own white casing (the brief: under 2:1 gets a
 // hairline edge). The Light basemap's land taken as #F5F5F5 (a near-white grey; to be read off the style in the browser at the pictures stage)
 const LIGHT_GROUND = "#F5F5F5";
@@ -171,7 +191,8 @@ ok("C13 the sign blue (heat map Off) parts from its white casing at ≥ 4.5:1", 
 console.log("D. The flow's lanes: replaced by the dots (Group B, map_lines_flow.js)");
 ok("D1 REVERSED 24 Nov 2026 (card 3): the lanes, their widths, their offset, their still opacity and their three lights are gone",
    !html.includes("const FLOW_WIDTHS") && !html.includes("const FLOW_OFFSET")
-   && !html.includes("const FLOW_STILL_OPACITY") && !html.includes("const FLOW_PULSES") && html.includes("const FLOW_MARK_GAP = 90;"));   // NARROWED 24 Nov 2026 (Q14, card 3b): arrowheads, not dots
+   && !html.includes("const FLOW_STILL_OPACITY") && !html.includes("const FLOW_PULSES")
+   && html.includes("const FLOW_MARK_GAP = RLSP.flow_arrow.gap;") && RLSP.flow_arrow.gap === 90);   // NARROWED 27 Nov 2026: the table's copy   // NARROWED 24 Nov 2026 (Q14, card 3b): arrowheads, not dots
 ok("D2 REVERSED 24 Nov 2026 (card 3): no lane width to fit to a line, so the heat map sets none (flowWidthExpr and hideFirst gone)",
    !/function flowWidthExpr/.test(html) && !/hideFirst/.test(html)
    && !acm.includes("'forecast-flow'") && !acm.includes("flowWidthExpr"));
@@ -179,8 +200,11 @@ ok("D2 REVERSED 24 Nov 2026 (card 3): no lane width to fit to a line, so the hea
 // ---------------------------------------------------------------------------------------------------------------
 console.log("E. Card 9: the alternatives, a thinner neutral grey");
 ok("E1 #A9ABB0 at 0.9, 7: 0.6 / 12: 1.2 / 16: 2 px, no casing; a dark ground gets its own grey",
-   /alt: '#A9ABB0', altDark: '#[0-9A-F]{6}', altOpacity: 0\.9,/.test(netBlk)
-   && netBlk.includes("altWidth: ['interpolate', ['linear'], ['zoom'], 7, 0.6, 12, 1.2, 16, 2]")
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   /alt: RLSP\.alternative\.color, altDark: RLSP\.alternative\.color_dark, altOpacity: RLSP\.alternative\.opacity,/.test(netBlk)
+   && RLSP.alternative.color === '#A9ABB0' && /^#[0-9A-F]{6}$/.test(RLSP.alternative.color_dark) && RLSP.alternative.opacity === 0.9
+   && netBlk.includes("altWidth: RLSP.alternative.width,")
+   && JSON.stringify(RLSP.alternative.width) === JSON.stringify(['interpolate', ['linear'], ['zoom'], 7, 0.6, 12, 1.2, 16, 2])
    && !html.includes("'route-alt-lines-casing'"));
 if (sb.applyLegLook) {
   layersOn(LEGS); sb.DARK = false; sb.applyLegLook();
@@ -211,11 +235,14 @@ ok("F5 the key's badge rows follow the switch (badgesOn: Labels \"All\"), and a 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("G. Card 6: the picked route in ink on a sign-blue halo, and easy to hit");
 ok("G1 the pick's paint: ink #1F2024 on white, the halo #0B4EA2 at 0.3; no green / amber left on the pick",
-   code.includes("const SEL = { core: '#1F2024', coreDark: '#F5F5F4', casing: '#ffffff', casingDark: '#1F2024', glow: '#0B4EA2', glowOpacity: 0.3 };")
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   code.includes("const SEL = { core: RLSP.pick.color, coreDark: RLSP.pick.color_dark, casing: RLSP.pick.casing, casingDark: RLSP.pick.casing_dark, glow: RLSP.pick.glow, glowOpacity: RLSP.pick.glow_opacity };")
+   && RLSP.pick.color === '#1F2024' && RLSP.pick.color_dark === '#F5F5F4' && RLSP.pick.casing === '#ffffff'
+   && RLSP.pick.casing_dark === '#1F2024' && RLSP.pick.glow === '#0B4EA2' && RLSP.pick.glow_opacity === 0.3
    && /id:'sel-core'[^\n]*'line-color':selPaint\(\)\.core,/.test(code) && /id:'sel-glow'[^\n]*'line-color':SEL\.glow,[^\n]*'line-opacity':SEL\.glowOpacity,/.test(code)
    && !/'#059669','Outbound Highway','#f59e0b'/.test(code));
 ok("G2 kept: the other routes dim as before (0.42, setRouteDim on a pick, cleared on none)",
-   code.includes("const DIM_OPACITY = 0.42;") && /setRouteDim\(routeId\);/.test(code) && /setRouteDim\(null\);/.test(code));
+   code.includes("const DIM_OPACITY = RLSP.pick.dim_opacity;") && RLSP.pick.dim_opacity === 0.42 && /setRouteDim\(routeId\);/.test(code) && /setRouteDim\(null\);/.test(code));
 let selOk = false, selDark = null, selLight = null;
 try {
   const S = vm.runInContext("({ SEL, applySelLook })", sb);
@@ -255,7 +282,7 @@ ok("G9 a click on a line keeps its own layer's handler; a near miss goes through
 // NARROWED 25 Nov 2026: the widths it kept are now the one width
 ok("G10 the hover asks the same box (the hand and the tip within 5 px of a line), and the line widths are not widened for it",
    /map\.on\('mousemove', \(e\) => \{\s*(\/\/[^\n]*\n\s*)?let features = routeHitsAt\(e\.point, interactiveLayers\);/.test(html)
-   && html.includes("const FORECAST_LINE_WIDTH = 4;"));
+   && html.includes("const FORECAST_LINE_WIDTH = RLSP.month_line.width;") && RLSP.month_line.width === 4);   // NARROWED 27 Nov 2026
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("H. Q5: a month on screen opens on Volume; a link's own layers and a picked Off still win");
@@ -295,9 +322,12 @@ ok("I3 the line samples' CSS is gone (.ml-ln), the square swatch keeps its light
    !html.includes(".ml-ln") && html.includes(".mode-legend .ml-sw{ display:inline-block; width:14px; height:14px;")
    && html.includes('html[data-look="dark"] .mode-legend .ml-steps i, html[data-look="dark"] .mode-legend .ml-sw{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }'));
 ok("I4 the leg rows in Haul routes name the new paint (ink #3A3C41, grey #8E9197; alternatives #A9ABB0)",
-   html.includes('id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:#3A3C41;">')
-   && html.includes('id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:#8E9197;">')
-   && html.includes('Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:#A9ABB0;">'));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   html.includes('id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:var(--rl-public-map-loaded-leg-color);">')
+   && html.includes('id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:var(--rl-public-map-empty-leg-color);">')
+   && html.includes('Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:var(--rl-public-map-alternative-color);">')
+   && RLSP.loaded_leg.color === '#3A3C41' && RLSP.empty_leg.color === '#8E9197' && RLSP.alternative.color === '#A9ABB0'
+   && RLSP.loaded_leg.key === 'Laden (out)' && RLSP.empty_leg.key === 'Empty (return)' && RLSP.alternative.key === 'Alternative routes');
 const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8").replace(/\r\n?/g, "\n");
 const technical = fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8").replace(/\r\n?/g, "\n");
 ok("I5 the user guide: dark and grey legs, no green and amber, the pick drawn dark over a soft blue edge, a click just beside a route counts",

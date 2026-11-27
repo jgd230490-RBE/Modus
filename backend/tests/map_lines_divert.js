@@ -7,6 +7,8 @@
  */
 const fs = require("fs");
 const path = require("path");
+// 27 Nov 2026 (claude/route-line-spec): the slices below read the route-line table's copy (RLSP, ROUTE_LINE_STYLES)
+require("./lib/route_line_styles").install();
 const ROOT = path.join(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
 const cfg = fs.readFileSync(path.join(ROOT, "map", "config.js"), "utf8").replace(/\r\n?/g, "\n");
@@ -62,9 +64,14 @@ const leg = (rid, type, coords, fc) => ({ type: 'Feature', properties: { type, r
 // ---------------------------------------------------------------------------------------------------------------
 console.log("A. The usual road (card 5, Q8): the stretch a diversion leaves, under the lines, grey with crosses");
 ok("A1 the code sits beside the amber edge, before renderMonthFrame", a > 0 && b > a);
+// NARROWED 27 Nov 2026 (claude/route-line-spec): the values are the route-line table's (RLSP, the page's copy of
+// backend/route_line_styles.py); today's values stay pinned here as literals and the page must read them from the copy
 ok("A2 grey #B4B6BA 2.6 px on a 5 px white casing, an × in #6B6E74 about every 70 px; a dark ground has its own pale pair",
-   /core: '#B4B6BA', casing: '#FFFFFF', x: '#6B6E74', coreDark: '#[0-9A-F]{6}', casingDark: '#[0-9A-F]{6}', xDark: '#[0-9A-F]{6}',/.test(block)
-   && /coreW: 2\.6, casingW: 5, xEvery: 70,/.test(block));
+   /core: RLSP\.usual_road\.color, casing: RLSP\.usual_road\.casing, x: RLSP\.usual_road\.x, coreDark: RLSP\.usual_road\.color_dark, casingDark: RLSP\.usual_road\.casing_dark, xDark: RLSP\.usual_road\.x_dark,/.test(block)
+   && /coreW: RLSP\.usual_road\.width, casingW: RLSP\.usual_road\.casing_width, xEvery: RLSP\.usual_road\.x_every,/.test(block)
+   && RLSP.usual_road.color === '#B4B6BA' && RLSP.usual_road.casing === '#FFFFFF' && RLSP.usual_road.x === '#6B6E74'
+   && ['color_dark', 'casing_dark', 'x_dark'].every(k => /^#[0-9A-F]{6}$/.test(RLSP.usual_road[k]))
+   && RLSP.usual_road.width === 2.6 && RLSP.usual_road.casing_width === 5 && RLSP.usual_road.x_every === 70);
 {
   const m = stubMap(); const E = load(BASE(m, { DIV: { orig: new Map([['R1|Inbound Highway', { coords: mainL }]]) } }));
   E.updateDiversionEdge({ features: [leg('R1', 'Inbound Highway', divL)] });
@@ -126,14 +133,17 @@ console.log("B. The way round: two amber rails outside the one line");
   const railAt = (lw, cw) => load(BASE(stubMap(), { FORECAST_LINE_WIDTH: lw, FORECAST_CASING_WIDTH: cw })).DIV_EDGE.rail;
   const beyond = (lw, cw) => railAt(lw, cw) - (cw - lw) / 2;
   ok("B1 amber #F59E0B, round caps, the gap the line's own width; each rail 1.7 px of amber beyond the casing at 4 on 6.6 AND at 5 on 7.6 (at least 2 px of amber each side of the line)",
-     /const DIV_EDGE = \{ colour: '#F59E0B', near_m: 25, beyond: 1\.7,\n\s*get rail\(\)\{ return \(FORECAST_CASING_WIDTH - FORECAST_LINE_WIDTH\) \/ 2 \+ this\.beyond; \},/.test(block)
+     /const DIV_EDGE = \{ colour: RLSP\.way_round\.color, near_m: RLSP\.way_round\.near_m, beyond: RLSP\.way_round\.beyond,\n\s*get rail\(\)\{ return \(FORECAST_CASING_WIDTH - FORECAST_LINE_WIDTH\) \/ 2 \+ this\.beyond; \},/.test(block)
+     && RLSP.way_round.color === '#F59E0B' && RLSP.way_round.near_m === 25 && RLSP.way_round.beyond === 1.7   // NARROWED 27 Nov 2026: the table's copy
      && Math.abs(beyond(4, 6.6) - 1.7) < 1e-9 && Math.abs(beyond(5, 7.6) - 1.7) < 1e-9 && railAt(4, 6.6) >= 2
      && /'line-cap': 'round'/.test(fnSrc("ensureDiversionEdge")) && fnSrc("ensureDiversionEdge").includes("'line-gap-width': divEdgeGap(),"),
      [railAt(4, 6.6), railAt(5, 7.6)]);
   ok("⭐ B1b no line width written as a number in the diversion code (no 5 / 7.6 / 11 / 10 px figure): widths come from the constants",
      !/(rail|line-gap-width|line-width)['"]?\s*:\s*(5|7\.6|11|10|4|6\.6)\b/.test(block));
-  const lw = html.match(/const FORECAST_LINE_WIDTH = ([\d.]+);/), du = block.match(/coreW:\s*([\d.]+)/),
-        bz = html.match(/id:'busy-core'[^\n]*'line-width':([\d.]+)/);
+  // NARROWED 27 Nov 2026 (claude/route-line-spec): the three widths are the table's (the page reads each from its copy)
+  const lw = html.includes("const FORECAST_LINE_WIDTH = RLSP.month_line.width;") && [0, String(RLSP.month_line.width)],
+        du = /coreW: RLSP\.usual_road\.width,/.test(block) && [0, String(RLSP.usual_road.width)],
+        bz = /id:'busy-core'[^\n]*'line-width':RLSP\.peak_hours_road\.width/.test(html) && [0, String(RLSP.peak_hours_road.width)];
   ok("B1c the usual road and the busy-hours road stay thinner than the one forecast line",
      !!(lw && du && bz) && +du[1] < +lw[1] && +bz[1] < +lw[1], [lw && lw[1], du && du[1], bz && bz[1]]);
 }
@@ -171,13 +181,19 @@ ok("⭐ B2 gone: no band width in the diversion code (no dv_gap, no cut by width
 ok("B8 a mode change (a council view) sets the gap again (applyCarbonMode)",
    fnSrc("applyCarbonMode").includes("map.setPaintProperty('diversion-edge', 'line-gap-width', divEdgeGap());"));
 ok("B9 amber is the way round's alone: the busy-hours road and its hours carry none",
-   !/#F59E0B|#f59e0b|amber/i.test(fnSrc("busyInk") + fnSrc("busySample")) && html.includes("const BUSY_ROAD_COLOR = CONFIG.COLORS.brand;"));
+   !/#F59E0B|#f59e0b|amber/i.test(fnSrc("busyInk") + fnSrc("busySample"))
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): the table's sign blue (was CONFIG.COLORS.brand, the same #0B4EA2)
+   && html.includes("const BUSY_ROAD_COLOR = RLSP.peak_hours_road.color;") && RLSP.peak_hours_road.color === '#0B4EA2');
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log("C. Busy hours with no click (card 5, Q9)");
 ok("C1 the sign blue (#0B4EA2), thin on a white casing; its hours in ink with a halo, a pale ink on a dark ground",
-   /brand:\s*"#0B4EA2"/.test(cfg) && fnSrc("busyInk").includes("return { ink: dark ? '#F4F4F5' : '#1F2024', halo: dark ? '#1F2024' : '#ffffff' };")
-   && html.includes("'line-color':BUSY_ROAD_COLOR,'line-width':2.6"));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): read from the route-line table's copy (RLSP); today's values pinned
+   /brand:\s*"#0B4EA2"/.test(cfg) && RLSP.peak_hours_road.color === '#0B4EA2'
+   && fnSrc("busyInk").includes("const P = RLSP.peak_hours_road;") && fnSrc("busyInk").includes("return { ink: dark ? P.label_dark : P.label, halo: dark ? P.label_halo_dark : P.label_halo };")
+   && RLSP.peak_hours_road.label_dark === '#F4F4F5' && RLSP.peak_hours_road.label === '#1F2024'
+   && RLSP.peak_hours_road.label_halo_dark === '#1F2024' && RLSP.peak_hours_road.label_halo === '#ffffff'
+   && html.includes("'line-color':BUSY_ROAD_COLOR,'line-width':RLSP.peak_hours_road.width") && RLSP.peak_hours_road.width === 2.6);
 {
   const bs = html.indexOf("    const BUSY_ROAD_COLOR"), be = html.indexOf("    function fillBusyRoads(");
   const busy = (TL, focus, filt, feats) => new Function("TL", "councilFocus", "divOverlayPasses", "a1_data", "CONFIG", "netDark",

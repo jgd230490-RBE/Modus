@@ -10,6 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const RLS = require("./lib/route_line_styles");   // 27 Nov 2026 (claude/route-line-spec): the page's copy of the route-line table
 const ROOT = path.join(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
 
@@ -31,16 +32,20 @@ function lum(hex) {
 }
 const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 
-const rampM = html.match(/const CARBON_RAMP = \[([^\]]+)\];/);
-const RAMP = rampM ? rampM[1].match(/#[0-9A-Fa-f]{6}/g) : [];
-const edgeM = html.match(/const HEAT_EDGE_DARK = '(#[0-9A-Fa-f]{6})';/);
-const EDGE = edgeM ? edgeM[1] : null;
+// NARROWED 27 Nov 2026 (claude/route-line-spec): the ramp and the dark edge are the route-line table's (the page reads its copy,
+// RLSP.month_line); the values below are read from that copy, and the page must take them from it
+const RLSP = RLS.load("map").public_map;
+const RAMP = html.includes("const CARBON_RAMP = RLSP.month_line.bands;") ? RLSP.month_line.bands : [];
+const EDGE = html.includes("const HEAT_EDGE_DARK = RLSP.month_line.casing_dark;") ? RLSP.month_line.casing_dark : null;
 const DARK_GROUND = "#292929";   // Mapbox Dark v11's land, the darkest of the dark grounds measured on the card
 
 console.log("A. One list of blues kept (no separate Dark list: option (c) stays open to John)");
 ok("A1 kept: CARBON_RAMP is still the one list of A-F2b's five blues",
    RAMP.join(",") === "#72A7FF,#006AFD,#0051C4,#00388E,#00215B", RAMP);
-ok("A2 kept: no second ramp for dark grounds", (html.match(/const [A-Z_]*RAMP[A-Z_]* = \[/g) || []).filter(x => !/AREA_RAMP/.test(x)).length === 1);
+// NARROWED 27 Nov 2026: the one ramp is the table's list (`= RLSP.month_line.bands`), still the only ramp but the areas'
+ok("A2 kept: no second ramp for dark grounds",
+   (html.match(/const [A-Z_]*RAMP[A-Z_]* = (\[|RLSP\.)/g) || []).filter(x => !/AREA_RAMP/.test(x)).length === 1
+   && Object.keys(RLSP).filter(r => Array.isArray(RLSP[r].bands)).length === 1);
 
 console.log("B. A pale edge on a dark ground");
 ok("B1 HEAT_EDGE_DARK is a pale colour that parts from the dark ground and from the darkest band (≥ 3:1 each)",
@@ -50,13 +55,14 @@ ok("B1 HEAT_EDGE_DARK is a pale colour that parts from the dark ground and from 
 // NARROWED 24 Nov 2026 (John, the route lines rethink, card 2): the light ground's edge is the map config's own
 // forecastCasing, now WHITE (it was the near-black ink); read from map/config.js, not assumed
 const CFG = fs.readFileSync(path.join(ROOT, "map", "config.js"), "utf8");
-const LIGHT_EDGE = (CFG.match(/forecastCasing:\s+"(#[0-9A-Fa-f]{6})"/) || [])[1];
-const sb = { CONFIG: { COLORS: { forecastCasing: LIGHT_EDGE } }, DARK: false, set: [],
+// NARROWED 27 Nov 2026: the light edge left the config for the table (RLSP.month_line.casing)
+const LIGHT_EDGE = !/forecastCasing/.test(CFG.replace(/\/\/[^\n]*/g, "")) ? RLSP.month_line.casing : null;
+const sb = { RLSP, DARK: false, set: [],
              map: { getLayer: () => true, setPaintProperty: (l, p, v) => sb.set.push([l, p, v]) } };
 sb.labelsDark = () => sb.DARK;
 vm.createContext(sb);
 try {
-  vm.runInContext("const HEAT_EDGE_DARK = '" + EDGE + "';\n" + fnSrc("heatEdgeColour") + "\n" + fnSrc("restyleHeatEdge")
+  vm.runInContext("const HEAT_EDGE_DARK = RLSP.month_line.casing_dark;\n" + fnSrc("heatEdgeColour") + "\n" + fnSrc("restyleHeatEdge")
                   + "\nthis.heatEdgeColour = heatEdgeColour; this.restyleHeatEdge = restyleHeatEdge; this.setOn = v => { HEAT_LINES_ON = v; };", sb);
 } catch (e) { console.log("  sandbox: " + e.message); }
 const hec = sb.heatEdgeColour || (() => null);

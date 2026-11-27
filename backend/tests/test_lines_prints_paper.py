@@ -121,7 +121,9 @@ for fn in ("_ce_time_of_day", "_ce_cycle_by_hour"):
 # ---- Q9: the dashed usual road --------------------------------------------------------------------------------------
 ra = read("backend/route_analysis_render.py")
 ok("Q9: the diversions pages still draw the usual road dashed in its grey", ra.count("_legs(doc, P, R, dashed=True)") == 2
-   and 'USUAL_GREY = "#71717A"' in ra)
+   # NARROWED 27 Nov 2026 (claude/route-line-spec): the grey is the route-line table's (usual_road, route_analysis)
+   and 'USUAL_GREY = _RLS.get("usual_road", "route_analysis", "color")' in ra
+   and __import__("route_line_styles").get("usual_road", "route_analysis", "color") == "#71717A")
 
 # ---- Q5: the words that name a colour --------------------------------------------------------------------------------
 ok("⭐ Q5: the route sheet says 'Then follow the light blue route back to A', never the amber one",

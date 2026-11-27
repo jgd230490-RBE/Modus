@@ -12,10 +12,18 @@
  */
 const fs = require("fs");
 const path = require("path");
+// 27 Nov 2026 (claude/route-line-spec): the slices below read the route-line table's copy (RLSP, ROUTE_LINE_STYLES)
+require("./lib/route_line_styles").install();
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const FILE = path.join(ROOT, "map", "index.html");
-const html = fs.readFileSync(FILE, "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
+// NARROWED 27 Nov 2026 (claude/route-line-spec): the route lines' values are the route-line table's (the page reads its copy:
+// RLSP.role.field, var(--rl-…)). The pins below were written against literal values: they read the page with each of those
+// reads put back as the value it reads (RLS.resolve), so they still pin today's values; the block "ROUTE-LINE TABLE" checks
+// that the raw page really takes them from the copy (htmlRaw)
+const RLS = require("./lib/route_line_styles");
+const htmlRaw = fs.readFileSync(FILE, "utf8").replace(/\r\n?/g, "\n");
+const html = RLS.resolve(htmlRaw);   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 
 let pass = 0;
 const fail = [];
@@ -612,8 +620,11 @@ ok("REBRAND (29 Sep): the retired G2 ink #0F172A is gone from the map, its confi
 // NARROWED 24 Nov 2026 (John, the route lines rethink, Q1 / Q4): the stock blues leave the map's config: the forecast line
 // (heat map Off) and the brand are the sign blue #0B4EA2, the forecast casing is WHITE (it was the ink); still no orange
 ok("REBRAND: the map's brand ink is #1F2024 and its forecast routes stay blue (no orange on the map) (NARROWED 24 Nov 2026: the sign blue on a white casing)",
-  /brandDark:\s+"#1F2024"/.test(cfgSrc) && /forecastCasing:\s+"#FFFFFF"/.test(cfgSrc)
-  && /brand:\s+"#0B4EA2"/.test(cfgSrc) && /forecast:\s+"#0B4EA2"/.test(cfgSrc) && !/#FF8C14/i.test(cfgSrc)
+  // NARROWED 27 Nov 2026 (claude/route-line-spec): the forecast line and its casing left the config for the route-line
+  // table (RLSP.month_line, the page's copy); the config keeps the brand pair, today's line values are pinned on the copy
+  /brandDark:\s+"#1F2024"/.test(cfgSrc) && !/forecastCasing:/.test(cfgSrc.replace(/\/\/[^\n]*/g, ''))
+  && /brand:\s+"#0B4EA2"/.test(cfgSrc) && !/\bforecast:/.test(cfgSrc.replace(/\/\/[^\n]*/g, '')) && !/#FF8C14/i.test(cfgSrc)
+  && RLS.load("map").public_map.month_line.color === "#0B4EA2" && RLS.load("map").public_map.month_line.casing === "#FFFFFF"
   && !/#2563EB|#3B82F6/i.test(cfgSrc.replace(/\/\/[^\n]*/g, '')));
 // 11 Oct 2026 NARROWED (the user): "corridor map" is now "public map" wherever a person reads the name
 ok("REBRAND: the map is titled Wayscope, defaults its tenant to Wayscope, and never says Modus",
@@ -2796,7 +2807,9 @@ ok("reduced motion: no motion while playing when it matches — the arrowheads s
      && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 3 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 3
      && code.includes("'line-width': DIV_EDGE.rail,")
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
-  ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
+  // NARROWED 27 Nov 2026 (claude/route-line-spec): the forecast colour is the route-line table's (RLSP.month_line.color)
+  ok("...and the routes stay blue: the forecast colour is untouched", (htmlRaw.match(/'line-color':\s?RLSP\.month_line\.color,/g) || []).length === 2
+     && RLS.load("map").public_map.month_line.color === "#0B4EA2");
   // the drawer's half of review bug (d)
   // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the route's story is
   // built from the month figures, every line of the route in every month (routeFigures adds the lines' loads and vehicles,
@@ -3415,8 +3428,10 @@ ok("reduced motion: no motion while playing when it matches — the arrowheads s
      && /id: 'road-load-casing', type: 'line', source: 'road-load-source',[\s\S]{0,200}'line-width': FORECAST_CASING_WIDTH,/.test(blkCode)
      && blkCode.includes("map.setPaintProperty('road-load-line', 'line-width', FORECAST_LINE_WIDTH);"));
   ok("⭐ C1: routes stay blue — the road-load line is the plan blue (CONFIG.COLORS.brand) under an ink casing",
-     /id: 'road-load-line'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.brand,/.test(blkCode)
-     && /id: 'road-load-casing'[\s\S]{0,200}'line-color': CONFIG\.COLORS\.forecastCasing,/.test(blkCode));
+     // NARROWED 27 Nov 2026 (claude/route-line-spec): the pair is the route-line table's (RLSP.shared_section), today's pinned
+     /id: 'road-load-line'[\s\S]{0,200}'line-color': RLSP\.shared_section\.color,/.test(htmlRaw)
+     && /id: 'road-load-casing'[\s\S]{0,200}'line-color': RLSP\.shared_section\.casing,/.test(htmlRaw)
+     && RLS.load("map").public_map.shared_section.color === "#0B4EA2" && RLS.load("map").public_map.shared_section.casing === "#FFFFFF");
   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels) ("labels too wordy and noisy — a small icon label with a legend"): the run's
   // label is its NUMBER on a badge with a two-way arrow (mv-badge), what it counts in the key; none under 1 a day
   ok("⭐ C1: ONE label per run with its OWN text expression (the number, on the arrow badge), never the per-route f_avg concat",
@@ -3561,14 +3576,15 @@ ok("reduced motion: no motion while playing when it matches — the arrowheads s
   // NARROWED 25 Nov 2026 (John: "all lines should be the same thickess"; 24 Nov reversed, 25 Nov restored: one width): one width in every mode again (the council view's thin grey aside)
   ok("⭐ heat map: Volume paints routes (f_avg) and shared sections (rl_mv) on the volume stops; Carbon paints the routes only; one width in every mode (NARROWED 25 Nov 2026)",
      // NARROWED 12 Oct 2026 (night): the council view (By council on) paints the routes thin and grey before either mode
-     blkCode.includes("const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;")
+     // NARROWED 27 Nov 2026 (claude/route-line-spec): the Off colour is the route-line table's (RLSP.month_line.color)
+     htmlRaw.includes("const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : RLSP.month_line.color;")
      && !blkCode.includes("bandW") && blkCode.includes("const caseW = FORECAST_CASING_WIDTH;")
      && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : FORECAST_LINE_WIDTH);")
      // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default): the sections on the stops in the count (rlStops(): VOLUME_STOPS × PV())
      && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', rlStops()));")
      && !blkCode.includes("carbonColor('rl_co2'") && !blkCode.includes("paintRuns")
      // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
-     && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
+     && (htmlRaw.match(/'line-color':\s?RLSP\.month_line\.color,/g) || []).length === 2);
   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the carbon badge reads "CO₂ 24" (one decimal under 10), the unit in the
   // key; a route with no figure gets NO badge (the filter), its grey line and the key say "no figure"
   ok("⭐ C1: the route label switches to the '… t CO₂e' badge in carbon mode (its own layer, on the loaded leg: one label per route)",
@@ -3986,7 +4002,8 @@ ok("reduced motion: no motion while playing when it matches — the arrowheads s
         // NARROWED 12 Oct 2026 (evening): one width now, not "volume widths"; and the "Off" button shows picked
         ok("heat map: with neither mode picked, refreshMapModes shows the 'Off' radio picked", el("heat-off").checked === true);
         ok("⭐ C1: both off: the forecast routes are plan blue at their one width again, the carbon labels gone (no route label: REVERSED 24 Nov 2026)",
-           fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6" && fmap.layers["forecast-layer"].paint["line-width"] === "FLW"
+           // NARROWED 27 Nov 2026 (claude/route-line-spec): the Off colour is the table's (#0B4EA2), not the stub config's
+           fmap.layers["forecast-layer"].paint["line-color"] === "#0B4EA2" && fmap.layers["forecast-layer"].paint["line-width"] === "FLW"
            && fmap.layers["forecast-casing"].paint["line-width"] === "FCW" && !fmap.layers["carbon-route-labels"]
            // REVERSED 24 Nov 2026 (Q6): no route label comes back (there is none)
            && fmap.layers["forecast-labels"].layout.visibility === undefined && el("carbon-legend").hidden === true && el("road-load-legend").hidden === true);
@@ -7778,7 +7795,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
 ok("BUSY HOURS: a picked route's busy-hours road ('BusyHours' features) is drawn thin blue with a white edge under the pick, its hours as a text beside it (no DOM marker); cleared with the pick",
    code.includes("if(!map.getLayer('busy-casing')) map.addLayer({id:'busy-casing',type:'line',source:'busy-route'")
    // NARROWED 24 Nov 2026 (card 5): the sign blue (CONFIG.COLORS.brand), drawn with no click in a month its route runs
-   && code.includes("'line-color':BUSY_ROAD_COLOR,'line-width':2.6") && code.includes("const BUSY_ROAD_COLOR = CONFIG.COLORS.brand;")
+   && code.includes("'line-color':BUSY_ROAD_COLOR,'line-width':2.6") && htmlRaw.includes("const BUSY_ROAD_COLOR = RLSP.peak_hours_road.color;") && RLS.load("map").public_map.peak_hours_road.color === "#0B4EA2"   // NARROWED 27 Nov 2026: the table's
    && code.includes("type:'symbol',source:'busy-hours-at'") && code.includes("hours: f.properties.from + '–' + f.properties.to")
    // NARROWED 5 Nov 2026 (merged with main's Report a concern, whose pin IS a marker): no marker in the busy-hours code itself
    && code.includes("        showBusyRoad(rl);\n") && code.includes("        showBusyRoad(null);\n")
@@ -8714,6 +8731,19 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   const low = pairs.filter(p => !(cr(p[1], p[2]) >= p[3]));
   ok("⭐ OWN LOOK (map): every main pair measured, light and Dark: text 4.5:1, a control's edge 3:1 (" + pairs.map(p => p[0] + " " + cr(p[1], p[2]).toFixed(2)).join("; ") + ")",
      low.length === 0, low.map(p => p[0] + " " + cr(p[1], p[2]).toFixed(2)).join("; "));
+}
+
+// 27 Nov 2026 (claude/route-line-spec): the public map's route lines read the route-line table's copy (RLSP), the first
+// statement of the page's main script, and the key's samples its custom properties; every read names a real field
+{
+  const r = RLS.reads(htmlRaw);
+  ok("⭐ ROUTE-LINE TABLE (map): the page carries the table's copy and its custom properties, and reads its route lines from them",
+     /<div id="map"><\/div>\n\n<script>\n    \/\/ route-line-styles:begin/.test(htmlRaw) && /var ROUTE_LINE_STYLES = \{/.test(htmlRaw)
+     && htmlRaw.includes("const RLSP = ROUTE_LINE_STYLES.public_map;") && htmlRaw.includes('<style id="route-line-styles">html:root{--rl-public-map-')
+     && r.found.length >= 60, r.found.length);
+  ok("ROUTE-LINE TABLE (map): every read of the table names a field the copy has (a misspelt read would draw nothing)",
+     r.bad.length === 0, r.bad.join(", "));
+  ok("ROUTE-LINE TABLE (map): the page reads no other surface's part of the table", !/\bRLS_[RCS]\./.test(htmlRaw));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

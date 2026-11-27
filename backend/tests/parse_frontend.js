@@ -5378,9 +5378,13 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("<CarbonRouteChoices />"));
   ok("BUSY HOURS: the Forecasts spreadsheet gains the two busy-hours columns, summed over the line's months",
      code.includes('"Busy-hours road: trips", `Busy-hours road: saved / added ${CUR()}, kg CO2e`') && code.includes("const b = e.busy || (e.busy = { trips: 0, kg: 0, eur: 0 });"));
+  // NARROWED 27 Nov 2026 (claude/route-line-spec): the opacities are the route-line table's (RLS_S), today's pinned here
+  const RLS_S_ = require("./lib/route_line_styles").load("frontend").simulation_map;
   ok("BUSY HOURS, Simulation (Q14 = C): the busy road in the navy with a glow only in its hours, the main stretch it replaces faded, painted only when that changes; never drawn with the grey routes",
      code.includes('m.addLayer({ id: "sim-busy", type: "line", source: "sim-busy"') && code.includes('m.addLayer({ id: "sim-busy-glow", type: "line", source: "sim-busy"')
-     && code.includes('m.setPaintProperty("sim-busy-main", "line-opacity", ["case", ["all", act, ["==", ["get", "own"], 1]], 0.25, 0.75]);')
+     && code.includes('m.setPaintProperty("sim-busy-main", "line-opacity", ["case", ["all", act, ["==", ["get", "own"], 1]], SB.main_faded_opacity, RLS_S.simulation_route.opacity]);')
+     && RLS_S_.peak_hours_road.main_faded_opacity === 0.25 && RLS_S_.simulation_route.opacity === 0.75
+     && RLS_S_.peak_hours_road.on_opacity === 0.95 && RLS_S_.peak_hours_road.glow_on_opacity === 0.16
      && code.includes("if(sig !== busyOn.current){") && code.includes("if(lg.alt) return;") && code.includes("if(!busyMain[k]) lines.push("));
   ok("BUSY HOURS, Simulation: a notice when the hours start or end that fades after 4.5 s (a status region), the band and both marks on the timeline, one key line",
      code.includes("lorries now take Alt ${on[0].alt} (busy hours, weekdays)`") && code.includes("back on ${off.length === 1 ? \"its\" : \"their\"} usual road`")
@@ -5525,7 +5529,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && cm.includes("today: today ? r.today : true"));
   // REVERSED 26 Nov 2026 (lines-prints Q1, Q2; John: "Yes, as recommended"): out ink, back grey (was green and amber)
   ok("⭐ 2.1-13 (Q2, Q3; REVERSED 26 Nov): out ink and back grey, each left of its own travel; the way back only for today's lines on the Dashboard",
-     cm.includes('const CM_OUT = "#3A3C41", CM_BACK = "#8E9197"') && !cm.includes('"#059669"') && !cm.includes('"#f59e0b"') && cm.includes('"line-offset": OFF')
+     // NARROWED 27 Nov 2026 (claude/route-line-spec): the pair is the route-line table's (RLS_C), today's values pinned
+     cm.includes('const CM_OUT = RLS_C.loaded_leg.color, CM_BACK = RLS_C.empty_leg.color')
+     && (() => { const C = require("./lib/route_line_styles").load("frontend").commit_map; return C.loaded_leg.color === "#3A3C41" && C.empty_leg.color === "#8E9197"; })()
+     && !cm.includes('"#059669"') && !cm.includes('"#f59e0b"') && cm.includes('"line-offset": OFF')
      && cm.includes("if(today && fg.today && r.return_geometry && r.return_geometry.length > 1)"));
   ok("⭐ 2.1-13 (card 3): one dot a place, keyed by the location (no dark + red dot pair), with its name on top; gates only from town-level zoom (Q4)",
      cm.includes("ends[e.id || e.name] =") && !cm.includes('["dest", "#DC2626"]') && cm.includes('id: "la-names", type: "symbol", source: "la-ends"')
@@ -5541,8 +5548,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      !/€|\beur\b|_eur|fair|rate_|\brates?\b/i.test(cm) && !/IPT[1-6]/.test(cm) && !/\b(geometry|server|endpoint|token)\b/.test(cm.slice(cm.indexOf("return (\n"))));
   // REVERSED 26 Nov 2026 (lines-prints Q1, Q2): the swatches in ink, grey and the line grey (was green, amber and #9CA3AF)
   ok("2.1-13 (REVERSED 26 Nov): the key's swatches are CSS (no images), ink out, grey back, the line grey for later this week",
-     html.includes(".cm-k-out{height:4px;background:#3A3C41;}") && html.includes(".cm-k-back{height:3px;background:#8E9197;}")
-     && html.includes(".cm-k-faded{height:2px;background:#C6C8CC;opacity:.9;}") && !html.includes(".cm-k-out{height:4px;background:#059669;}"));
+     // NARROWED 27 Nov 2026 (claude/route-line-spec): the swatches read the table's custom properties, today's values pinned
+     html.includes(".cm-k-out{height:4px;background:var(--rl-commit-map-loaded-leg-color);}") && html.includes(".cm-k-back{height:3px;background:var(--rl-commit-map-empty-leg-color);}")
+     && html.includes(".cm-k-faded{height:2px;background:var(--rl-commit-map-later-this-week-color);opacity:.9;}")
+     && ["--rl-commit-map-loaded-leg-color:#3A3C41;", "--rl-commit-map-empty-leg-color:#8E9197;", "--rl-commit-map-later-this-week-color:#C6C8CC;"].every(w => html.includes(w))
+     && !html.includes(".cm-k-out{height:4px;background:#059669;}"));
 }
 
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan — each lorry's day used to the full (mockup notes/drivers-day-fill-mockup-1108 v2 + addendum) ----
@@ -5655,9 +5665,14 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // REVERSED 24 Nov 2026 (Routes rethink, Q3 and Q4; John: "Yes, as recommended"): out ink, back grey (the public map's pair), the
   // sign blue for a pick (was out green #059669, back amber #F59E0B, the halo #1D4ED8)
   ok("⭐ ROUTES PAGE (2.1-7, REVERSED 24 Nov): out ink, back grey, solid, each left of its travel, white arrows on the leg's colour; the sign blue for a pick",
-     code.includes('const LEG_OUT = "#3A3C41", LEG_BACK = "#8E9197", SEL_HALO = "#0B4EA2";') && !code.includes('const LEG_OUT = "#059669"')
+     // NARROWED 27 Nov 2026 (claude/route-line-spec): the values are the route-line table's (RLS_R), today's pinned here
+     code.includes('const LEG_OUT = RLS_R.loaded_leg.color, LEG_BACK = RLS_R.empty_leg.color, SEL_HALO = RLS_R.pick.color;') && !code.includes('const LEG_OUT = "#059669"')
+     && (() => { const R = require("./lib/route_line_styles").load("frontend").routes_map;
+                 return R.loaded_leg.color === "#3A3C41" && R.empty_leg.color === "#8E9197" && R.pick.color === "#0B4EA2"
+                   && JSON.stringify(R.loaded_leg.offset) === JSON.stringify(["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5])
+                   && R.leg_arrow.fill === "#ffffff" && R.leg_arrow.halo_width === 2; })()
      && code.includes('const LEG_COLOR_EXPR = ["match", ["get", "leg"], "return", LEG_BACK, LEG_OUT];')
-     && code.includes('const LEG_OFFSET = ["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5];')
+     && code.includes('const LEG_OFFSET = RLS_R.loaded_leg.offset;')
      && dmr.includes('id: "route-arrows", type: "symbol"') && dmr.includes('"icon-halo-color": LEG_COLOR_EXPR'));
   ok("🔴 ROUTES PAGE (2.1-7, Q3): the picked route and the analysis row's mark are no longer red",
      !/sel-line[^\n]*FAILED_COLOR|"line-color": "#DC2626"[^\n]*sel/.test(dmr) && !code.includes('ring-[color:var(--red)]/40') && !code.includes('<span style={{ color: "var(--red)" }} title="Shown on the map">'));
@@ -5744,6 +5759,21 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("🔴 TRAFFIC LIMIT: no back-end words on the new screens",
      !/\b(api|endpoint|cache|server|geometry|LineString)\b/i.test(td.replace(/fetch\(`\$\{API\}[^`]*`\)/g, "")
        .replace(/[A-Za-z_.]*geometry[A-Za-z_.]*/g, "")));
+}
+
+// 27 Nov 2026 (claude/route-line-spec): the app's three route maps read the route-line table's copy (RLS_R Routes, RLS_C
+// the Dashboard / Look-ahead map, RLS_S the Simulation), the first statement of the Babel script; every read names a field
+{
+  const RLS = require("./lib/route_line_styles");
+  const raw = fs.readFileSync(path.join(__dirname, "..", "..", "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+  const r = RLS.reads(raw);
+  ok("⭐ ROUTE-LINE TABLE (app): the page carries the table's copy and its custom properties, and reads its route lines from them",
+     /<script type="text\/babel" data-presets="react">\n\/\/ route-line-styles:begin/.test(raw)
+     && raw.includes("var RLS_R = ROUTE_LINE_STYLES.routes_map, RLS_C = ROUTE_LINE_STYLES.commit_map, RLS_S = ROUTE_LINE_STYLES.simulation_map;")
+     && raw.includes('<style id="route-line-styles">html:root{--rl-')
+     && ["RLS_R.", "RLS_C.", "RLS_S."].every(p => r.found.some(x => x.startsWith(p))) && r.found.length >= 50, r.found.length);
+  ok("ROUTE-LINE TABLE (app): every read of the table names a field the copy has", r.bad.length === 0, r.bad.join(", "));
+  ok("ROUTE-LINE TABLE (app): the app reads no public-map part of the table", !/\bRLSP\./.test(raw));
 }
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

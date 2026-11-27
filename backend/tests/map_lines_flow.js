@@ -12,6 +12,8 @@
  */
 const fs = require("fs");
 const path = require("path");
+// 27 Nov 2026 (claude/route-line-spec): the slices below read the route-line table's copy (RLSP, ROUTE_LINE_STYLES)
+require("./lib/route_line_styles").install();
 const crypto = require("crypto");
 const ROOT = path.join(__dirname, "..", "..");
 const html = fs.readFileSync(path.join(ROOT, "map", "index.html"), "utf8").replace(/\r\n?/g, "\n");
@@ -55,11 +57,15 @@ ok("A4 the marks' one layer: a symbol of one picture on its own point source, tu
 // NARROWED 25 Nov 2026 (the line's one width on trial, 5 or 4 px): the size and side step follow FORECAST_LINE_WIDTH
 ok("A5 the brief's values: 5.2 px long and across and 2.7 px left ON THE 5 px LINE (set from FORECAST_LINE_WIDTH), a 0.8 px #00215B outline (the darkest band blue), 90 px apart, 13 px a second",
    html.includes("const FLOW_MARK_SCALE = FORECAST_LINE_WIDTH / 5;")
-   && html.includes("const FLOW_MARK_SIDE = Math.round(2.7 * FLOW_MARK_SCALE * 100) / 100;")
-   && html.includes("const FLOW_MARK_LEN = Math.round(5.2 * FLOW_MARK_SCALE * 100) / 100;") && html.includes("const FLOW_MARK_W = FLOW_MARK_LEN;")
-   && !/const FLOW_MARK_(SIDE|LEN|W) = [0-9]/.test(html) && html.includes("const FLOW_MARK_RING = '#00215B';")
-   && html.includes("const FLOW_MARK_RING_W = 0.8;") && html.includes("const FLOW_MARK_GAP = 90;")
-   && html.includes("const FLOW_MARK_SPEED = 13;") && /CARBON_RAMP\s*=\s*\[[^\]]*'#00215B'\]/.test(html));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): the values are the route-line table's (RLSP); today's pinned as literals
+   && html.includes("const FLOW_MARK_SIDE = Math.round(RLSP.flow_arrow.side * FLOW_MARK_SCALE * 100) / 100;")
+   && html.includes("const FLOW_MARK_LEN = Math.round(RLSP.flow_arrow.length * FLOW_MARK_SCALE * 100) / 100;") && html.includes("const FLOW_MARK_W = FLOW_MARK_LEN;")
+   && !/const FLOW_MARK_(SIDE|LEN|W) = [0-9]/.test(html) && html.includes("const FLOW_MARK_RING = RLSP.flow_arrow.ring;")
+   && html.includes("const FLOW_MARK_RING_W = RLSP.flow_arrow.ring_width;") && html.includes("const FLOW_MARK_GAP = RLSP.flow_arrow.gap;")
+   && html.includes("const FLOW_MARK_SPEED = RLSP.flow_arrow.speed;") && html.includes("const CARBON_RAMP = RLSP.month_line.bands;")
+   && RLSP.flow_arrow.side === 2.7 && RLSP.flow_arrow.length === 5.2 && RLSP.flow_arrow.ring === '#00215B'
+   && RLSP.flow_arrow.ring_width === 0.8 && RLSP.flow_arrow.gap === 90 && RLSP.flow_arrow.speed === 13
+   && RLSP.month_line.bands[RLSP.month_line.bands.length - 1] === '#00215B');
 // the mark's sums at both widths on trial: the constants' own lines, run with each line and casing width
 const markAt = (lw) => new Function("FORECAST_LINE_WIDTH",
   (html.match(/const FLOW_MARK_SCALE = [^\n]*\n/) || [""])[0] + (html.match(/const FLOW_MARK_SIDE = [^\n]*\n/) || [""])[0]
