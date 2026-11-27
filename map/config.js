@@ -22,12 +22,11 @@ window.CONFIG = {
   // 24 Nov 2026 (John, the public map's route lines rethink, Q1 to Q4): the stock blues are gone from the map. The sign
   // blue is the one blue of a control, a pick and the forecast line with the heat map Off; a forecast line sits on a
   // WHITE casing on light grounds (index.html turns it pale on dark ones: HEAT_EDGE_DARK).
+  // 27 Nov 2026 (claude/route-line-spec): the route lines' colours left this list for the route-line table
+  // (backend/route_line_styles.py, written into index.html); "selection" was read by nothing and is gone.
   COLORS: {
     brand:             "#0B4EA2",  // the sign blue (a picked route's halo, the shared sections before they take a colour)
     brandDark:         "#1F2024",  // ink (headings)
-    forecast:          "#0B4EA2",  // the forecast line, heat map Off: one sign blue
-    forecastCasing:    "#FFFFFF",  // the white casing under a forecast line (light grounds)
-    selection:         "#DC2626",  // a clicked/selected route
     peak:              "#DC2626",  // alerts / peak values (theme red)
     green:             "#059669"   // success / confirmations
   }

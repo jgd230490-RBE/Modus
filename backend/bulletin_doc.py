@@ -126,8 +126,9 @@ COUNCIL_RAMP_MOVEMENTS = ("#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95")
 # (2.42:1, was 1.96:1) and "under 20" / "20 to 50" part on paper, in black and white and for red-green colour blindness.
 # Screens and print together: the map's CARBON_RAMP is the same list (test_bulletin holds them equal).
 VOLUME_STOPS = (10, 25, 50, 100)
-VOLUME_RAMP = ("#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B")
-ROUTE_CASING = "#1F2024"
+import route_line_styles as _RLS     # 27 Nov 2026 (claude/route-line-spec): the route lines' colours and widths
+VOLUME_RAMP = tuple(_RLS.BAND_BLUES)
+ROUTE_CASING = _RLS.get("month_line", "bulletin", "casing")
 HATCH_INK, HATCH_PAPER = "#B8B2A8", "#F3F1EC"
 NOT_REPORTED = "Not reported"
 
@@ -1418,7 +1419,7 @@ def _svg_map(S, w=720, h=420):
     lines = [(r, " ".join(f"{x:.1f},{y:.1f}" for x, y in (P(*c) for c in r["coords"]))) for r in S["map_routes"]]
     for r, pts in lines:
         out.append(f'<polyline points="{pts}" fill="none" stroke="{ROUTE_CASING}" stroke-width="{ROUTE_CASING_W}" '
-                   'stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round"/>')
+                   f'stroke-opacity="{ROUTE_CASING_OPACITY}" stroke-linecap="round" stroke-linejoin="round"/>')
     for r, pts in lines:
         out.append(f'<polyline points="{pts}" fill="none" stroke="{r["color"]}" stroke-width="{ROUTE_LINE_W}" '
                    f'stroke-linecap="round" stroke-linejoin="round"><title>{_e(r["route_id"])}: '
@@ -1427,7 +1428,7 @@ def _svg_map(S, w=720, h=420):
     for sct in S.get("map_sections") or []:
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (P(*c) for c in sct["coords"]))
         out.append(f'<polyline points="{pts}" fill="none" stroke="{ROUTE_CASING}" stroke-width="{ROUTE_CASING_W}" '
-                   'stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round" class="sec"/>'
+                   f'stroke-opacity="{ROUTE_CASING_OPACITY}" stroke-linecap="round" stroke-linejoin="round" class="sec"/>'
                    f'<polyline points="{pts}" fill="none" stroke="{sct["color"]}" stroke-width="{ROUTE_LINE_W}" '
                    f'stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by {sct["routes"]} routes: '
                    f'{_e(n0(sct["a_day"]))} {_e(S.get("count_lower") or "lorry movements a day")}</title></polyline>')
@@ -1468,7 +1469,8 @@ def _svg_tag(text):
 
 # the map's CARBON_LINE_WIDTH / CARBON_CASING_WIDTH until 16 Oct 2026, in SVG units; the map's are 6 / 8.5 since then
 # (D115: two flow lanes fit inside the line), and this map draws no lanes, so it keeps 5 / 7.5
-ROUTE_LINE_W, ROUTE_CASING_W = 5, 7.5
+ROUTE_LINE_W, ROUTE_CASING_W = _RLS.get("month_line", "bulletin_web", "width"), _RLS.get("month_line", "bulletin_web", "casing_width")
+ROUTE_CASING_OPACITY = _RLS.get("month_line", "bulletin_web", "casing_opacity")
 
 
 def _volume_legend_html(S):

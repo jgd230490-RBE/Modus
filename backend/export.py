@@ -68,6 +68,16 @@ import gate_hours
 # Wayscope theme (29 Sep): ink #1F2024 for headings, the accent red for over/short, grey for notes.
 NAVY = "1F2024"
 NAVY_RGB = (0x1F / 255, 0x20 / 255, 0x24 / 255)
+import route_line_styles as _RLS     # 27 Nov 2026 (claude/route-line-spec): every route line's colour and width
+_WEEK = _RLS.spec("week_route", "week_sheet")
+
+
+def _week_path_head():
+    """The week sheet's path overlay for the supplier's picture: width, ink and opacity from the table
+    ("path-3+1F2024-0.9(")."""
+    return f"path-{_WEEK['width']}+{_WEEK['color'].lstrip('#')}-{_WEEK['opacity']}("
+
+
 RED_RGB = (0xDC / 255, 0x26 / 255, 0x26 / 255)
 BLUE_RGB = (0x25 / 255, 0x63 / 255, 0xEB / 255)
 GREY = (0x64 / 255, 0x74 / 255, 0x8B / 255)
@@ -502,9 +512,10 @@ def mapbox_static_png(routes, size="1200x600", timeout=12, token=None):
     if not token or not routes:
         return None
     overlays = []
+    path_head = _week_path_head()
     for i, (rid, o, d, coords) in enumerate(routes):
         thin = _thin(coords)
-        overlays.append("path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(thin), safe="") + ")")
+        overlays.append(path_head + urllib.parse.quote(_encode_polyline(thin), safe="") + ")")
         overlays.append(f"pin-s-{chr(97 + (i % 26))}+1F2024({thin[0][0]:.5f},{thin[0][1]:.5f})")
         overlays.append(f"pin-s-{chr(97 + (i % 26))}+DC2626({thin[-1][0]:.5f},{thin[-1][1]:.5f})")
     # 23 Oct 2026 (the route line redesign): the lines go UNDER the road names (basemap.LABELS_LAYER), as on the map
@@ -512,7 +523,7 @@ def mapbox_static_png(routes, size="1200x600", timeout=12, token=None):
     q = f"padding=40&before_layer={basemap.LABELS_LAYER}&access_token=" + urllib.parse.quote(token)   # the bulletin's map: always Light
     url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays) + f"/auto/{size}@2x?" + q)
     if len(url) > 8000:                       # the API's URL limit; drop pins, thin harder
-        overlays = ["path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(_thin(c, 60)), safe="") + ")"
+        overlays = [path_head + urllib.parse.quote(_encode_polyline(_thin(c, 60)), safe="") + ")"
                     for (_, _, _, c) in routes]
         url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays) + f"/auto/{size}@2x?" + q)
     try:
@@ -546,7 +557,7 @@ def _draw_schematic(c, routes, x, y, w, h):
     def P(p):
         return ox + (p[0] - lo_x) * kx * scale, oy + (p[1] - lo_y) * scale
     for i, (rid, o, d, cs) in enumerate(routes):
-        c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(1.4)
+        c.setStrokeColorRGB(*_hex_rgb(_WEEK["color"])); c.setLineWidth(_WEEK["schematic_width"])
         path = c.beginPath()
         path.moveTo(*P(cs[0]))
         for p in cs[1:]:
@@ -1598,10 +1609,13 @@ def bulletin_doc_casing():
 
 # 8 Nov 2026 (v2.1 item 2.1-2; John: "the same as whats on the map, green and orange … and if they use alternatives"):
 # the no-month route map draws each leg as the public map does. Widths in page points.
-PLAN_LEG_W, PLAN_LEG_EDGE = 2.2, 1.4          # a leg and how much wider its white edge is
-PLAN_LEG_OFFSET = 1.5                         # each leg this far left of its own travel (both directions show)
-PLAN_BUSY_W, PLAN_BUSY_EDGE = 1.2, 1.4        # the busy-hours road: thinner, the plan blue, a white edge
-PLAN_DIV_HALO_W, PLAN_DIV_HALO_ALPHA = 7.0, 0.5   # the soft amber edge under a way round a closure
+# 27 Nov 2026 (claude/route-line-spec): the widths are the route-line table's (route_line_styles, surface "plan")
+PLAN_LEG_W, PLAN_LEG_EDGE = _RLS.get("loaded_leg", "plan", "width"), _RLS.get("loaded_leg", "plan", "casing_extra")   # a leg and how much wider its white edge is
+PLAN_LEG_OFFSET = _RLS.get("loaded_leg", "plan", "offset")    # each leg this far left of its own travel (both directions show)
+PLAN_BUSY_W, PLAN_BUSY_EDGE = _RLS.get("peak_hours_road", "plan", "width"), _RLS.get("peak_hours_road", "plan", "casing_extra")   # the busy-hours road: thinner, a white edge
+PLAN_DIV_HALO_W, PLAN_DIV_HALO_ALPHA = _RLS.get("way_round", "plan", "width"), _RLS.get("way_round", "plan", "opacity")   # the soft amber edge under a way round a closure
+PLAN_CASING = _RLS.get("loaded_leg", "plan", "casing")       # the white edge under a leg
+PLAN_KEYLINE, PLAN_KEYLINE_EXTRA = _RLS.get("loaded_leg", "plan", "keyline"), _RLS.get("loaded_leg", "plan", "keyline_extra")
 
 
 def _plan_leg_colour(kind):
@@ -1634,7 +1648,7 @@ def _draw_plan_legs(c, legs, P):
     c.setStrokeAlpha(1)
     road = [(lg, p) for lg, p in drawn if lg["kind"] != "busy"]
     busy = [(lg, p) for lg, p in drawn if lg["kind"] == "busy"]
-    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(PLAN_LEG_W + PLAN_LEG_EDGE)
+    c.setStrokeColorRGB(*_hex_rgb(PLAN_CASING)); c.setLineWidth(PLAN_LEG_W + PLAN_LEG_EDGE)
     for _, p in road:
         c.drawPath(p, stroke=1, fill=0)
     c.setLineWidth(PLAN_LEG_W)
@@ -1642,7 +1656,7 @@ def _draw_plan_legs(c, legs, P):
         c.setStrokeColorRGB(*_hex_rgb(_plan_leg_colour(lg["kind"])))
         c.drawPath(p, stroke=1, fill=0)
     for _, p in busy:
-        c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(PLAN_BUSY_W + PLAN_BUSY_EDGE)
+        c.setStrokeColorRGB(*_hex_rgb(PLAN_CASING)); c.setLineWidth(PLAN_BUSY_W + PLAN_BUSY_EDGE)
         c.drawPath(p, stroke=1, fill=0)
         c.setStrokeColorRGB(*_hex_rgb(rme.BUSY_ROAD)); c.setLineWidth(PLAN_BUSY_W)
         c.drawPath(p, stroke=1, fill=0)
@@ -1659,9 +1673,9 @@ def _plan_leg_swatch(c, kind, x, y):
         c.setStrokeColorRGB(*_hex_rgb(rme.DIVERSION_EDGE)); c.setStrokeAlpha(PLAN_DIV_HALO_ALPHA)
         c.setLineWidth(PLAN_DIV_HALO_W); c.line(x + 2, yy, x + 14, yy); c.setStrokeAlpha(1)
     w = PLAN_BUSY_W if kind == "busy" else PLAN_LEG_W
-    c.setStrokeColorRGB(*_hex_rgb("#1F2024")); c.setLineWidth(w + PLAN_LEG_EDGE + 0.4)    # a keyline so white reads
+    c.setStrokeColorRGB(*_hex_rgb(PLAN_KEYLINE)); c.setLineWidth(w + PLAN_LEG_EDGE + PLAN_KEYLINE_EXTRA)    # a keyline so white reads
     c.line(x + 1, yy, x + 15, yy)
-    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(w + PLAN_LEG_EDGE)
+    c.setStrokeColorRGB(*_hex_rgb(PLAN_CASING)); c.setLineWidth(w + PLAN_LEG_EDGE)
     c.line(x + 1, yy, x + 15, yy)
     c.setStrokeColorRGB(*_hex_rgb(_plan_leg_colour("laden" if kind == "diversion" else kind))); c.setLineWidth(w)
     c.line(x + 1, yy, x + 15, yy)
@@ -1694,18 +1708,18 @@ def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
         _draw_plan_legs(c, S["legs"], P)
     else:
         # W11: the casing under every route, then each route in its Volume colour at one width, quietest first
-        c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
+        c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(_RLS.get("month_line", "bulletin", "casing_width"))
         for r in S["map_routes"]:
             c.drawPath(line(r), stroke=1, fill=0)
-        c.setLineWidth(2.2)
+        c.setLineWidth(_RLS.get("month_line", "bulletin", "width"))
         for r in S["map_routes"]:
             c.setStrokeColorRGB(*_hex_rgb(r["color"]))
             c.drawPath(line(r), stroke=1, fill=0)
     # the shared sections on top, each casing then its summed colour (the map's road-load layer)
     for sct in S.get("map_sections") or []:
-        c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
+        c.setStrokeColorRGB(*_hex_rgb(_RLS.get("shared_section", "bulletin", "casing"))); c.setLineWidth(_RLS.get("shared_section", "bulletin", "casing_width"))
         c.drawPath(line(sct), stroke=1, fill=0)
-        c.setStrokeColorRGB(*_hex_rgb(sct["color"])); c.setLineWidth(2.2)
+        c.setStrokeColorRGB(*_hex_rgb(sct["color"])); c.setLineWidth(_RLS.get("shared_section", "bulletin", "width"))
         c.drawPath(line(sct), stroke=1, fill=0)
     pins = []
     for p in S["places"]:
@@ -3040,12 +3054,13 @@ def route_map_png(pdf_bytes, dpi=ROUTE_MAP_PNG_DPI):
 # mile beside "Arriving" / "Leaving" / "Lorry limits"; then the typed words (why this route,
 # the permitted diversions, the site rules at B and A) in two columns; the footer. The body text steps down a size
 # until the page fits, so the longest typed words (network.SHEET_TEXT_MAX each) still make ONE page.
-RS_LOADED = "#0051C4"            # 26 Nov 2026 (Q10, John: "Go with blue"): dark blue out (green #059669 since 23 Oct)
-RS_RETURN = "#72A7FF"            # …and light blue back, solid (amber #f59e0b since 23 Oct; slate, dashed, before)
-RS_CASING = "#ffffff"            # the white edge under each leg
-RS_W, RS_CASING_EXTRA = 2.8, 1.6  # pt: the leg and how much wider its edge is
-RS_HAUL_W, RS_HAUL_GAP = 1.7, 4.4 # pt: a haul-road stretch is dots (zero-length dashes, round caps), thinner, 4.4 pt apart
-RS_OFFSET = 1.8                  # pt: each leg sits this far left of its own travel, so a road used both ways shows both
+# 27 Nov 2026 (claude/route-line-spec): the Route sheet's lines are the route-line table's (route_line_styles, "route_sheet")
+RS_LOADED = _RLS.get("loaded_leg", "route_sheet", "color")    # 26 Nov 2026 (Q10, John: "Go with blue"): dark blue out (green #059669 since 23 Oct)
+RS_RETURN = _RLS.get("empty_leg", "route_sheet", "color")     # …and light blue back, solid (amber #f59e0b since 23 Oct; slate, dashed, before)
+RS_CASING = _RLS.get("loaded_leg", "route_sheet", "casing")   # the white edge under each leg
+RS_W, RS_CASING_EXTRA = _RLS.get("loaded_leg", "route_sheet", "width"), _RLS.get("loaded_leg", "route_sheet", "casing_extra")  # pt: the leg and how much wider its edge is
+RS_HAUL_W, RS_HAUL_GAP = _RLS.get("haul_stretch", "route_sheet", "width"), _RLS.get("haul_stretch", "route_sheet", "gap")  # pt: a haul-road stretch is dots (zero-length dashes, round caps), thinner
+RS_OFFSET = _RLS.get("loaded_leg", "route_sheet", "offset")   # pt: each leg sits this far left of its own travel, so a road used both ways shows both
 RS_IN, RS_OUT = "#15803D", "#B91C1C"      # the gate a lorry comes in by / leaves by (squares on the last mile)
 RS_BOTH = "#1F2024"              # one gate both ways (navy)
 RS_BODY_SIZES = (8.4, 7.8, 7.2)
@@ -3084,7 +3099,7 @@ def _rs_line(c, P, coords, colour, width, dots=False, offset=0.0, edge=None):
         p.lineTo(*q)
     c.saveState()
     c.setLineCap(1); c.setLineJoin(1)
-    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(width + (RS_CASING_EXTRA if edge is None else edge))
+    c.setStrokeColorRGB(*_hex_rgb(RS_CASING)); c.setLineWidth(width + (RS_CASING_EXTRA if edge is None else edge))
     c.drawPath(p, stroke=1, fill=0)
     c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(width)
     if dots:
@@ -3126,7 +3141,8 @@ def _rs_gate(c, x, y, colour):
 # 29 Oct 2026 (task 3c): the holding area's mark — a blue square with a white H (the lorry-park sign's look), and the
 # chevrons along the run from it to the gate ("called forward"); one ink, a white halo, no dots, no violet
 RS_HOLD = "#1D4ED8"
-RS_CHEVRON_EVERY_PT = 11.0
+RS_CHEVRON_EVERY_PT = _RLS.get("holding_chevrons", "route_sheet", "every")
+_RS_CHEV = _RLS.spec("holding_chevrons", "route_sheet")
 
 
 def _rs_hmark(c, x, y, s=5.2):
@@ -3155,7 +3171,7 @@ def _rs_chevrons(c, P, coords, every=RS_CHEVRON_EVERY_PT):
         while nxt <= run + seg:
             t = nxt - run
             px, py = ax + ux * t, ay + uy * t
-            for colour, wd in ((RS_CASING, 2.6), (RS_BOTH, 1.1)):
+            for colour, wd in ((_RS_CHEV["casing"], _RS_CHEV["casing_width"]), (_RS_CHEV["color"], _RS_CHEV["width"])):
                 c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(wd)
                 p = c.beginPath()
                 p.moveTo(px - ux * 2.4 - uy * 2.2, py - uy * 2.4 + ux * 2.2)
@@ -3575,13 +3591,13 @@ CE_INK = "#27272A"               # the collision symbol: one ink, size by severi
 # 22 Oct 2026 (evidence v3, the user: "highlight where a hgv was involved"): a collision with a goods vehicle over 3.5 t
 # is drawn as a square in its own ink — an identifying colour, not a status colour (no red / amber / green)
 CE_LORRY = "#6D28D9"
-CE_ALT = "#71717A"               # an alternative route: grey under the route (solid since 23 Oct 2026, as on the map)
+CE_ALT = _RLS.get("alternative", "collision_map", "color")   # an alternative route: grey under the route (solid since 23 Oct 2026, as on the map)
 # 26 Nov 2026 (notes/map-lines-prints-mockup-1125, Q7 and Q8): the collision map draws the route itself in two light
 # greys under the ink marks (its OWN pair, not RS_*: the marks are what the page is about), and the two charts keep the
 # route's green bars and line through their own constant, so a change to the route sheet's legs moves neither.
-CE_ROUTE_OUT = "#A9ABB0"         # the route out on the collision map (the public map's quiet grey)
-CE_ROUTE_BACK = "#C6C8CC"        # …and back, lighter
-CE_ROUTE_CHART = "#059669"       # the route's own series on the time-of-day and cycle-by-hour charts
+CE_ROUTE_OUT = _RLS.get("collision_route", "collision_map", "color")        # the route out on the collision map (the public map's quiet grey)
+CE_ROUTE_BACK = _RLS.get("collision_route", "collision_map", "color_back")  # …and back, lighter
+CE_ROUTE_CHART = _RLS.get("collision_route", "collision_map", "chart")     # the route's own series on the time-of-day and cycle-by-hour charts
 CE_BUSY = CE_INK                  # 28 Oct 2026 (0d): the busy hours' mark under the hour axis (no hue claims a meaning)
 CE_RADIUS = {1: 4.4, 2: 3.2, 3: 2.2}
 CE_MAP_H_MM = 92.0
@@ -3968,7 +3984,9 @@ def _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h):
 
 CE_QUICK_FILL = (0xDC / 255, 0xFC / 255, 0xE7 / 255)   # 29 Oct 2026 (0f-2, card 4): the quicker option's cell, with bold text
 CE_QUICK_TEXT = (0x06 / 255, 0x5F / 255, 0x46 / 255)
-CE_HOUR_ALT2 = "#7C3AED"                                  # a second alternative's line: violet, dotted (named on the chart)
+_CE_ROUTE = _RLS.spec("collision_route", "collision_map")
+_CE_ALT_W = _RLS.get("alternative", "collision_map", "width")
+CE_HOUR_ALT2 = _RLS.get("collision_route", "collision_map", "chart_alt2")   # a second alternative's line: violet, dotted (named on the chart)
 
 
 def _ce_cycle_by_hour(c, S, m, y, cw, R, B, para, new_page, footer_h):
@@ -4276,9 +4294,9 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
         for _n, cl_line in S.get("cycle_lines") or []:      # 22 Oct 2026 (v3): cycle routes, thin, under everything
             _rs_line(c, P, cl_line, _cm.KIND_BY_KEY["cycle"]["colour"], 1.1)
         for _lab, al in S.get("alt_lines") or []:            # ...the alternatives, grey (solid since 23 Oct 2026)
-            _rs_line(c, P, al, CE_ALT, 1.8)
-        _rs_line(c, P, S["loaded"], CE_ROUTE_OUT, 2.6)
-        _rs_line(c, P, S["return"], CE_ROUTE_BACK, 2.2, offset=3.0)  # light grey, solid, beside the out leg (26 Nov 2026)
+            _rs_line(c, P, al, CE_ALT, _CE_ALT_W)
+        _rs_line(c, P, S["loaded"], CE_ROUTE_OUT, _CE_ROUTE["width"])
+        _rs_line(c, P, S["return"], CE_ROUTE_BACK, _CE_ROUTE["width_back"], offset=_CE_ROUTE["offset_back"])  # light grey, solid, beside the out leg (26 Nov 2026)
         for sev in (3, 2, 1):            # slight first, so the KSI sit on top
             for r in drawn:
                 if r["severity"] == sev and not r["goods"]:
@@ -4358,8 +4376,8 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
                     c.drawImage(ImageReader(io.BytesIO(ipng)), ix, iy, width=iw, height=ihm)
                 else:
                     c.setFillColorRGB(0.975, 0.977, 0.98); c.rect(ix, iy, iw, ihm, stroke=0, fill=1)
-                _rs_line(c, Q, S["loaded"], CE_ROUTE_OUT, 3.2)
-                _rs_line(c, Q, S["return"], CE_ROUTE_BACK, 2.6, offset=3.6)
+                _rs_line(c, Q, S["loaded"], CE_ROUTE_OUT, _CE_ROUTE["inset_width"])
+                _rs_line(c, Q, S["return"], CE_ROUTE_BACK, _CE_ROUTE["inset_width_back"], offset=_CE_ROUTE["inset_offset_back"])
                 for sev in (3, 2, 1):
                     for r in in_on:
                         if r["severity"] == sev:
@@ -4406,7 +4424,7 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, word)
         lx += 12 + c.stringWidth(word, R, 7.6) + 12
     for colour, words in ((CE_ROUTE_OUT, "Loaded, A to B"), (CE_ROUTE_BACK, "Empty, back to A")):
-        c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(2.6)
+        c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(_CE_ROUTE["key_width"])
         c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
         c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 20, y - 6.6, words)
         lx += 20 + c.stringWidth(words, R, 7.6) + 12
@@ -4416,7 +4434,7 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
     c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.6); c.drawString(lx + 12, y - 6.6, "A goods vehicle over 3.5 t involved")
     lx += 12 + c.stringWidth("A goods vehicle over 3.5 t involved", R, 7.6) + 12
     if S.get("alt_lines"):
-        c.saveState(); c.setStrokeColorRGB(*_hex_rgb(CE_ALT)); c.setLineWidth(1.8); c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
+        c.saveState(); c.setStrokeColorRGB(*_hex_rgb(CE_ALT)); c.setLineWidth(_CE_ALT_W); c.line(lx, y - 4, lx + 16, y - 4); c.restoreState()
         c.setFillColorRGB(*NAVY_RGB); c.drawString(lx + 20, y - 6.6, "Alternative route")
         lx += 20 + c.stringWidth("Alternative route", R, 7.6) + 12
     if S.get("cycle_lines"):

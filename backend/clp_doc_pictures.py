@@ -285,8 +285,9 @@ def _site_month(data, site_id):
     return min(sm, key=lambda m: (-sm[m], m)) if sm else None
 
 
-NO_LINES_FILL = "#9CA3AF"       # a route with no approved line yet, on the regional plan
-NO_LINES_LABEL = "No approved lines yet"
+import route_line_styles as _RLS     # 27 Nov 2026 (claude/route-line-spec)
+NO_LINES_FILL = _RLS.get("month_line", "clp_regional", "no_lines")       # a route with no approved line yet, on the regional plan
+NO_LINES_LABEL = _RLS.get("month_line", "clp_regional", "no_lines_key")
 
 
 def _sites_word(data):
