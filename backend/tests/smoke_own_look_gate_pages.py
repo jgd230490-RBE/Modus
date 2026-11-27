@@ -7,7 +7,9 @@ warm greys, the 10 px box, the 999px pill); the new ones are there (Sora, IBM Pl
 a darker hover and white text at 4.5:1 or better, neutral greys, one 6 px corner, the 3 px DEMO tag, the 44 px eye);
 the fonts load from hosts the policy already allows; each page still builds with the words it had before.
 NOT proved here: how the pages look (pictures: notes/own-look-gate-mockup-1126/real/).
-Run:  .venv-smoke/Scripts/python backend/tests/own_look_gate_pages.py
+Named smoke_*: it imports the real app (FastAPI), so run_suite.py and CI run it with the smoke interpreter; under its
+first name (own_look_gate_pages.py) the runner's patterns (test_*.py, smoke_*.py) never picked it up.
+Run:  .venv-smoke/Scripts/python backend/tests/smoke_own_look_gate_pages.py
 """
 import os
 import re
