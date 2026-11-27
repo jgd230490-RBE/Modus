@@ -2495,6 +2495,29 @@
     const _setStyleRaw = map.setStyle.bind(map);
     map.setStyle = function (...a) { STYLE_READY.now = false; return _setStyleRaw(...a); };
     function styleReady() { return STYLE_READY.now; }
+    // 26 Nov 2026 (claude/map-switch-leftovers): ONE handler a layer, an event and a piece of code. About twenty places
+    // register a click / mouseenter / mouseleave on a layer from code that runs again at every style.load (a basemap
+    // switch): setupHoverEvents(), the abnormal loads, the traffic limits and others. Each switch added the same handlers
+    // again (24 / 23 / 23 at load, 79 / 93 / 93 after five switches), so one click on an abnormal load opened its popup six
+    // times. A second registration of the SAME code on the same layer and event now replaces the first (the newest is
+    // kept: it holds the state of the last style.load). A handler with other code, on another layer or for the whole map
+    // (no layer) is never touched, nor a bound or native function (no code to compare). A new place that
+    // registers on a layer needs nothing extra.
+    const _onRaw = map.on.bind(map), _offRaw = map.off.bind(map);
+    const LAYER_HANDLERS = new Map();
+    map.on = function (type, layers, fn) {
+        if (typeof fn === 'function' && (typeof layers === 'string' || Array.isArray(layers))) {
+            const code = Function.prototype.toString.call(fn);
+            if (!/\[native code\]/.test(code)) {
+                const key = type + '|' + [].concat(layers).join('+') + '|' + code;
+                const old = LAYER_HANDLERS.get(key);
+                if (old) { try { _offRaw(type, layers, old); } catch (e) {} }
+                LAYER_HANDLERS.set(key, fn);
+            }
+        }
+        return _onRaw.apply(null, arguments);
+    };
+    // (end of the layer-handler rule)
     // Standard's light preset (day / dawn / dusk / night): set on every style load while a Standard style shows; the row of
     // buttons under the Basemap list shows only then; the share link carries &light= (day, the default, writes nothing)
     function applyLightPreset() {
@@ -3107,6 +3130,11 @@
         DIM_LAYERS.forEach(l => { if (!map.getLayer(l)) return;
             try { map.setPaintProperty(l, 'line-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1); } catch (e) {} });
         if (map.getLayer('holding-chevrons')) { try { map.setPaintProperty('holding-chevrons', 'text-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1); } catch (e) {} }
+    }
+    // 26 Nov 2026 (claude/map-switch-leftovers): the dim on the other routes while one is picked, put back after a basemap
+    // switch makes the legs again (they come back at full strength, and applySolidColors() sets them to 1 again 500 ms later)
+    function reapplyRouteDim() {
+        try { if (selectedRouteId) setRouteDim(selectedRouteId); } catch (e) {}
     }
     function raiseMarks() {
         if (!map || !map.getStyle) return;
@@ -4680,6 +4708,7 @@
         });
 
         applyFilters();
+        reapplyRouteDim();      // 26 Nov 2026: a picked route keeps the others dimmed across a basemap switch
         setupHoverEvents();
         renderIptLegend();
         applyIptFilter();
@@ -6862,6 +6891,7 @@
                     if (typeof applyLegLook === 'function') applyLegLook();
                     if (map.getLayer('inbound-lines')) map.setPaintProperty('inbound-lines', 'line-opacity', 1.0);
                     if (map.getLayer('outbound-lines')) map.setPaintProperty('outbound-lines', 'line-opacity', 1.0);
+                    reapplyRouteDim();      // 26 Nov 2026: and a picked route keeps the others dimmed (the reset was the last write)
 
                     // Setup Universal Hover Glow Layer (Sits behind the routes)
                     if (!map.getLayer('global-route-hover')) {

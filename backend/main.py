@@ -220,35 +220,35 @@ app.add_middleware(
 # Wayscope theme (29 Sep 2026): ink background, white box, blue for the control, the
 # stacked logo above the box. Orange appears only in the logo itself.
 _GATE_CSS = """
-  /* 11 Oct 2026 — the finalised theme (the staff app's shell): ink page, white box, warm neutrals,
-     the orange action button with white text, 14 px labels above the inputs, an orange focus ring. */
+  /* 26 Nov 2026 — the own look (notes/design-language-1123.md): ink page, white box (one look, whatever the reader's theme),
+     Sora heading + IBM Plex Sans, neutral greys, the sign blue on the button, the link and the focus ring, one 6 px corner. */
   :root { color-scheme: light; }
   body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center;
          justify-content:center; gap:22px; background:#1F2024; color:#fff;
-         font:15px/1.5 Inter,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+         font:15px/1.5 'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
   .logo { width:min(60vw,150px); height:auto; display:block; }
-  .box { width:min(92vw,380px); box-sizing:border-box; background:#fff; color:#1F2024; border-radius:10px;
+  .box { width:min(92vw,380px); box-sizing:border-box; background:#fff; color:#1F2024; border-radius:6px;
          padding:28px 26px; box-shadow:0 10px 40px rgba(0,0,0,.45); }
-  h1 { margin:0 0 4px; font-size:20px; font-weight:600; color:#1F2024; }
-  p  { margin:0 0 20px; font-size:14px; color:#78716C; }
+  h1 { margin:0 0 4px; font-family:Sora,'IBM Plex Sans',system-ui,sans-serif; font-size:20px; font-weight:600; color:#1F2024; }
+  p  { margin:0 0 20px; font-size:14px; color:#62656B; }
   label { display:block; font-size:14px; font-weight:500; color:#1F2024; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px 12px; font:inherit; font-size:15px; color:#1F2024;
-          background:#fff; border:1px solid #D6D3D1; border-radius:6px; }
-  input:focus { outline:2px solid #C2410C; outline-offset:1px; border-color:#C2410C; }
+          background:#fff; border:1px solid #C6C8CC; border-radius:6px; }
+  input:focus { outline:2px solid #0B4EA2; outline-offset:1px; border-color:#0B4EA2; }
   button { margin-top:16px; width:100%; padding:11px; font:inherit; font-size:15px; font-weight:600;
-           color:#fff; background:#C2410C; border:0; border-radius:6px; cursor:pointer; }
-  button:hover { background:#9A3412; }
-  button:focus-visible { outline:2px solid #C2410C; outline-offset:2px; }
+           color:#fff; background:#0B4EA2; border:0; border-radius:6px; cursor:pointer; }
+  button:hover { background:#083C7D; }
+  button:focus-visible { outline:2px solid #0B4EA2; outline-offset:2px; }
   .pw-wrap { position:relative; }
   .pw-wrap input { padding-right:46px; }
   .pw-eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:38px; height:38px;
-            margin:0; padding:0; display:grid; place-items:center; color:#78716C; background:none; border-radius:6px; }
-  .pw-eye:hover { background:#F5F5F4; color:#1F2024; }
+            margin:0; padding:0; display:grid; place-items:center; color:#62656B; background:none; border-radius:6px; }
+  .pw-eye:hover { background:#F5F5F6; color:#1F2024; }
   .pw-eye::after { content:""; position:absolute; inset:-3px; }   /* 18 Oct 2026 (UI audit, the 44 px rule): the 38 px eye taps at 44 */
   .err { display:none; margin-top:12px; font-size:13px; color:#DC2626; }
-  .foot { margin-top:18px; font-size:13px; color:#78716C; }
-  a { color:#2563EB; }
-  .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:999px;
+  .foot { margin-top:18px; font-size:13px; color:#62656B; }
+  a { color:#0B4EA2; }
+  .demo-notice { max-width:92vw; box-sizing:border-box; padding:5px 12px; border-radius:6px;
                  background:#F1F5F9; color:#B91C1C; border:1px solid #DC2626; text-align:center;
                  font-size:14px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
   /* 22 Oct 2026 (UI fix 6, card 8): the notice pill at 14 px, the size of the app's demo bar (was 11 px) */
@@ -256,7 +256,9 @@ _GATE_CSS = """
   .demo-notice::before { content:"DEMO"; content:"DEMO" / ""; display:inline-block; margin-right:8px; padding:0 6px;
                          border-radius:3px; background:#B91C1C; color:#FFFFFF; letter-spacing:.08em; }
 """
-_GATE_HEAD = """<link rel="icon" href="/favicon.ico" sizes="32x32">
+_GATE_HEAD = """<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#1F2024">"""
@@ -2284,9 +2286,12 @@ def forecast_week_lorry_plan(bucket: str = "commit"):
 
 
 @app.get("/api/forecast-weeks/lorry-plan/download")
-def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit"):
+def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit",
+                                  yard: str = None, vehicle: str = None, lorry: int = None):
     """The day's driver sheets (one A4 page a lorry, PDF) or the day's trips (XLSX), for the chained or compressed view.
-    Made fresh on each download; the sheet carries who made it and when. Nothing is sent."""
+    Made fresh on each download; the sheet carries who made it and when. Nothing is sent. 25 Nov 2026 (the Look-ahead
+    rethink, card 4): optional `yard` (a load point's id), `vehicle` (its lorry type) and `lorry` (n) narrow it to one
+    load point's lorries or one lorry's page."""
     from fastapi.responses import Response       # not in the test stub; imported here
     import lorry_plan
     if format not in ("pdf", "xlsx"):
@@ -2294,15 +2299,15 @@ def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "ch
     data = _lorry_plan_data(bucket)
     try:
         if format == "pdf":
-            body, mime = lorry_plan.build_pdf(data, view, day), "application/pdf"
+            body, mime = lorry_plan.build_pdf(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry), "application/pdf"
         else:
-            body, mime = (lorry_plan.build_xlsx(data, view, day),
+            body, mime = (lorry_plan.build_xlsx(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry),
                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     except lorry_plan.PlanError as e:
         raise HTTPException(400, str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
-    name = f"{lorry_plan.file_stem(data, view, day)}.{format}"
+    name = f"{lorry_plan.file_stem(data, view, day, yard=yard, lorry=lorry)}.{format}"
     return Response(content=body, media_type=mime,
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
@@ -5775,6 +5780,94 @@ def _gate_arrivals_build(month, acc):
     out["busiest_loads"] = b.get("loads")
     out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
+
+
+@app.get("/api/forecast-weeks/lorry-plan/sheet")
+def forecast_week_lorry_plan_sheet(day: str, view: str = "chained", bucket: str = "commit", yard: str = None,
+                                   vehicle: str = None, lorry: int = None):
+    """
+    25 Nov 2026 (the Look-ahead rethink, card 4): the Driver sheet as data, the same pages, words and "Take care on this
+    route" blocks the PDF prints (lorry_plan.driver_pages, which build_pdf draws), so the screen can show a lorry's sheet
+    under its row. Scoped like the Lorry plan (any staff code or login; a team sees its own lines). Stored data only:
+    nothing is fetched or written. `yard`, `vehicle` and `lorry` narrow it as the download does.
+    """
+    import lorry_plan
+    data = _lorry_plan_data(bucket)
+    try:
+        return lorry_plan.driver_pages(data, view, day, yard=yard, vehicle=vehicle, lorry=lorry)
+    except lorry_plan.PlanError as e:
+        raise HTTPException(400, str(e))
+
+
+#: 27 Nov 2026 (claude/route-pieces; the route lines plan's Q6, Q8, Q12 and Q16, John's "Yes, all as recommended" of
+#: 26 Nov): where each stored option of a leg differs from the line in use, by ONE rule on the server (route_pieces.py),
+#: and what lies along the line in use as one list in metres from A. Nothing reads them yet: the pages keep their own
+#: rules until a visible task, with its own mockup, moves them on. The public read carries only what the public map is
+#: already sent (route_pieces.PUBLIC_WHATS); one kept copy a route and leg, until the next write.
+ROUTE_PIECES_PUBLIC = "public/route-pieces"
+ROUTE_LEGS = ("loaded", "return")
+
+
+def _pieces_day(day):
+    import datetime as _dt
+    if not day:
+        return _dt.date.today()
+    try:
+        return _dt.date.fromisoformat(str(day)[:10])
+    except ValueError:
+        raise HTTPException(400, "day must be YYYY-MM-DD")
+
+
+@app.get("/api/routes/{route_id}/along")
+def route_along(route_id: str, leg: str = "loaded", profile: Optional[str] = None, day: Optional[str] = None):
+    """
+    27 Nov 2026 (claude/route-pieces). One route, one leg (`loaded` | `return`), one lorry type (`profile`; default the
+    public map's own choice): the line in use on `day` (YYYY-MM-DD, default today) and, as ONE list in metres from A,
+    the limits the lorry is at or over, the schools, hospitals and health centres beside it, the cycle-route crossings,
+    the collision evidence's numbered stretches, the haul-road stretches, and where each dated diversion and busy-hours
+    road leaves and rejoins it; with every stored option's pieces against it (route_pieces.along). Any staff login or
+    code; a team sees its own team's routes only (another's is a 404). Stored data only, kept until the next write.
+    """
+    import collisions
+    import route_pieces
+    acc = _require_access()
+    if leg not in ROUTE_LEGS:
+        raise HTTPException(400, "leg must be loaded or return")
+    d = _pieces_day(day)
+    try:
+        collisions._route_row(route_id, acc)
+    except collisions.EvidenceError:
+        raise HTTPException(404, "no such route")
+    prof = route_pieces.lorry_for(route_id, profile)
+    if not prof:
+        raise HTTPException(404, "no line of this route for that lorry type")
+    return _staff_json("routes/along", {"route": route_id, "leg": leg, "profile": prof, "day": d.isoformat()},
+                       lambda: route_pieces.along(route_id, prof, leg, d), acc)
+
+
+@app.get("/api/public/route-pieces")
+def public_route_pieces(route: str, leg: str = "loaded", profile: Optional[str] = None):
+    """
+    27 Nov 2026 (claude/route-pieces). The public map's share of one leg (route_pieces.public): every stored option
+    against option 0 with where it leaves and rejoins and the stretches that differ in metres along both lines (a
+    diversion with its dates, a busy-hours road with its hours), the haul-road stretches, and the limits the public
+    map's own collection already lists for this route. Behind the map gate like the rest of /api/public/; one kept copy
+    a route, leg and lorry type until the next write.
+    """
+    import route_pieces
+    if leg not in ROUTE_LEGS:
+        raise HTTPException(400, "leg must be loaded or return")
+    if not db.query("SELECT id FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route)):
+        raise HTTPException(404, "no such route")
+    prof = route_pieces.lorry_for(route, profile)
+    if not prof:
+        raise HTTPException(404, "no line of this route for that lorry type")
+
+    def build():
+        with _heavy("route-pieces"):
+            return _json_body(route_pieces.public(route, leg, prof))
+    body = read_cache.cached(f"{ROUTE_PIECES_PUBLIC}|{route}|{leg}|{prof}", (MONTH_COUNT,), build)
+    return Response(content=body, media_type="application/json")
 
 
 #: 17 Nov 2026 (John: "Yes, add it"): the rule's table reads nothing of the caller (route_best.table takes a day only), so

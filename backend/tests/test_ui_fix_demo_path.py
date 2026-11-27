@@ -228,9 +228,12 @@ ok("F7: ⭐ 200 made-up days packed: before every break, driving ≤ 4½ h and w
 ok("F7: ...and the lorries, their trips, the end of the day and the free time are what they were (only the order moves)",
    not moved, str(moved[:5]))
 lps = read("backend", "lorry_plan.py")
-ok("F7: the sheet's line says 'before 4½ h of driving or 6 h of work pass' and keeps 'about here' and 15 + 30 (Q2)",
-   "about here: the rules require it before " in lps and "4½ h of driving or 6 h of work pass; it may be taken as 15 + 30." in lps
-   and "require it after" not in lps)
+# 26 Nov 2026 (the Look-ahead rethink, card 4, `claude/driver-sheet-points`): NARROWED. The sheet's break row is card 4's
+# "Break, 45 min, about here. It may be taken as 15 + 30." (lorry_plan.break_words); the rule's words "before 4½ h of
+# driving or 6 h of work pass" left the sheet with it. Still pinned: "about here", 15 + 30 (Q2), never "require it after".
+ok("F7: the sheet's break row keeps 'about here' and 15 + 30 (Q2), card 4's words, never 'require it after'",
+   'f"Break, {m} min, about here."' in lps and '" It may be taken as 15 + 30."' in lps
+   and "require it after" not in lps and lp.break_words(45) == "Break, 45 min, about here. It may be taken as 15 + 30.")
 ok("F7: the limits come from drivers_hours (no number copied into the row builder)",
    "dh.DRIVING_BEFORE_BREAK_MIN" in lps and "dh.WORK_SHORT_BREAK_AFTER_MIN" in lps
    and not re.search(r"n_dr > 270|n_wk > 360", lps))
