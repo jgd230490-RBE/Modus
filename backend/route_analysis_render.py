@@ -50,7 +50,7 @@ SUMMARY_ROWS = [
     ("closures", "Planned road closures on the route"),
     ("schools_health", "Schools · health within 250 m"),
     ("collisions", "Injury collisions on the route (killed or seriously injured)"),
-    ("cycle", "Beside a cycle route ({du}) · left turns"),
+    ("cycle", "Beside a cycle route ({du}) · left-hand turns"),
     ("busy", "Busy-hours road in use (weekdays)"),
     ("diversions", "Dated diversions"),
 ]
@@ -700,7 +700,7 @@ def page_cycle(doc, R):
     D, Q = doc.D, R["cycle"]
     c = doc.c
     credits = [Q.get("credit")]
-    title = "Cycle routes and left turns"
+    title = "Cycle routes and left-hand turns"
     doc.landscape_page(credits)
     doc._cont = False
     doc.header("D", title, R)
@@ -733,11 +733,11 @@ def page_cycle(doc, R):
     c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 9.5); c.drawString(px, y - 9.5, "This route and its alternatives"); y -= 14
     cols = Q["columns"][:4]
     if not Q["shown"]:
-        y = doc.para("No cycle routes: the community places have not been fetched (Config → Map and bulletin). The left "
+        y = doc.para("No cycle routes: the community places have not been fetched (Config → Map and bulletin). The left-hand "
                      "turns are counted from the road route.", px, y, pw, 7.2) - 4
     rows_ = [(f"Beside a cycle route ({D['unit']}, within {Q['beside_m']} m)", "beside"),
              (f"Places a cycle route meets it (within {Q['meets_m']} m)", "meets"),
-             (f"Left turns of {Q['turn_min']}° or more", "turns"),
+             (f"Left-hand turns of {Q['turn_min']}° or more", "turns"),
              (f"…of those, within {Q['turn_cycle_m']} m of a cycle route", "turns_cycle"),
              ("Cyclists hurt on the route (killed or seriously injured)", "cyc")]
     lab_w = pw - 44 * len(cols)
@@ -756,7 +756,7 @@ def page_cycle(doc, R):
             c.drawRightString(px + lab_w + (j + 1) * 44 - 3, y - 7.2, "—" if v is None else str(v))
         y -= max(10, len(lines_) * 7.6 + 2.4)
     y -= 6
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 8.4); c.drawString(px, y - 8.4, "Left turns, A to B"); y -= 12
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 8.4); c.drawString(px, y - 8.4, "Left-hand turns, A to B"); y -= 12
     if not Q["turns"]:
         y = doc.para("None of 45° or more on the road route.", px, y, pw, 7.2) - 4
 
@@ -773,7 +773,7 @@ def page_cycle(doc, R):
         return h
     y = _rows(doc, Q["turns"], px, y, pw, row, title, R, "D", credits)
     x, w = (doc.m, doc.cw) if doc._cont else (px, pw)
-    notes = [f"Left turns come from the stored road route (the heading over the next {Q['turn_window_m']} m against the "
+    notes = [f"Left-hand turns come from the stored road route (the heading over the next {Q['turn_window_m']} m against the "
              "last), so a roundabout's gentle entry may not count. Cycle routes are mapped by volunteers: one can be missing. "
              "Nothing is scored."]
     if Q["meets"]:
@@ -1133,7 +1133,7 @@ SUM_STEPS = [("1 · Rule out", "An option that adds a lorry limit below this lor
 SUM_HGV = "Involving an HGV"
 SUM_READ = [("Collisions", "Injury collisions the police recorded on the road. Counts only: never a percentage or a "
                            "rate. A count beside a road is not a risk."),
-            ("Cycle, places", "What a lorry passes on a round trip, with each option's change against the route in use."),
+            ("Cycle, community", "What a lorry passes on a round trip, with each option's change against the route in use."),
             ("Time, carbon", "One round trip, a planning figure. A small gap reads \"same\"."),
             ("Sections A to F", "The counts behind this page, unchanged. Section C keeps its own rules.")]
 #: why the summary's collision count can differ from section C's (John, 17 Nov 2026: "Yes, add it"): the rule counts the
@@ -1152,7 +1152,7 @@ def _n(x, d=1):
 
 
 def _pct_words(p, less=False):
-    """An option's change against the route in use (cycle routes, left turns and places only: never collisions)."""
+    """An option's change against the route in use (cycle routes, left-hand turns and community only: never collisions)."""
     if p is None:
         return ""
     if p == 0:
@@ -1905,8 +1905,8 @@ def build_xlsx(D):
             for m_ in Q["meets"]:
                 rows.append([R["id"], "This route", "cycle route meets", None, None, None, None, None, None,
                              m_.get("words"), m_.get("name")])
-        sheet("D Cycle and left turns", ["Route", "Option", "Row", f"Beside a cycle route ({du})", "Cycle routes meet it",
-                                         "Left turns", "Left turns near a cycle route", "Cyclists hurt", "Cyclists KSI",
+        sheet("D Cycle and left-hand turns", ["Route", "Option", "Row", f"Beside a cycle route ({du})", "Cycle routes meet it",
+                                         "Left-hand turns", "Left-hand turns near a cycle route", "Cyclists hurt", "Cyclists KSI",
                                          "Where (from A)", "Cycle route"], rows)
     if "hours" in D["sections"]:
         rows = []

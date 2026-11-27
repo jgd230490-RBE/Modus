@@ -664,7 +664,7 @@ SHEET_HEAD = ("Route", "Choice", "Lorry types", "Made", "By", "Ended", "Why ende
               "CO2e a trip before (kg)", "CO2e a trip after (kg)", "Round trip before (min)", "Round trip after (min)",
               "Distance before ({du})", "Distance after ({du})", "CO2e planned (t)", "CO2e so far (t)",
               "Lorry time planned (h)", "Distance planned ({du})", "Fair cost (model) planned ({cur})",
-              "Fair cost (model) so far ({cur})", "Left turns planned", "Cycle routes met planned", "Places planned",
+              "Fair cost (model) so far ({cur})", "Left-hand turns planned", "Cycle routes met planned", "Community planned",
               "Collisions, road before", "Collisions, road after")
 
 
@@ -740,7 +740,7 @@ def build_xlsx(R):
              ("A trip", "The figures saved on the day of the choice, before and after."),
              ("Fair cost (model)", "The model's fuel, time and running cost at each month's diesel price, not the rate "
                                    "agreed with a haulier."),
-             ("Places", "Schools, hospitals and health centres within 250 m. Both legs of a trip."),
+             ("Community", "Schools, hospitals and health centres within 250 m. Both legs of a trip."),
              ("Collisions", "Injury collisions the police recorded on each road. A record of the road, never multiplied "
                             "by loads."),
              ("Dated diversions now", R.get("diversions", 0))]
