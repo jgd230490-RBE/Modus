@@ -350,7 +350,7 @@ def _run(sql, params, fetch):
                 return [dict(r) for r in cur.fetchall()]
             conn.commit()
             note_write(sql)
-            return None
+            return cur.rowcount     # 26 Nov 2026: execute()'s answer, the rows the write changed
         except Exception as e:
             if attempt == 0 and _is_conn_error(e) and isinstance(conn, _PooledConn):
                 conn.discard()
@@ -451,8 +451,13 @@ def query(sql, params=()):
 
 
 def execute(sql, params=()):
-    """Run an INSERT/UPDATE/DELETE and commit."""
-    _run(sql, params, fetch=False)
+    """Run an INSERT/UPDATE/DELETE and commit.
+
+    26 Nov 2026 (the Look-ahead's weeks fill race): returns how many rows the statement changed (the driver's
+    rowcount: 0 when an INSERT ... ON CONFLICT DO NOTHING met an existing row, or an UPDATE matched none). Callers
+    that ignored the old None are unchanged. The data version moves as before, even when nothing changed: a rebuild
+    too many, never a stale figure."""
+    return _run(sql, params, fetch=False)
 
 
 def execute_atomic(steps):
