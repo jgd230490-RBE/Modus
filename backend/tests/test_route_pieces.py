@@ -543,8 +543,14 @@ ok("⭐ 6. nothing a person sees: no page names the new reads", "route_pieces" n
    and "/along" not in _fe + _map and "route-pieces" not in _fe + _map)
 ok("6. the pages keep their own rules for now (a later visible task reverses these two pins when it moves them): the "
    "public map's divOffPieces at 25 m, the Routes page's olOffPieces at 30 m and 150 m",
-   "near_m: 25" in _map and "function divOffPieces(divCoords, mainCoords)" in _map
-   and "near: 30, minRun: 150" in _fe and "function olOffPieces(A, B)" in _fe)
+   # NARROWED 27 Nov 2026 (claude/route-line-spec): the three distances left the pages for the route-line table
+   # (way_round: public_map near_m, routes_map near_m and min_run_m), which each page reads from its generated copy;
+   # the functions stay in the pages and the values stay 25, 30 and 150
+   "near_m: RLSP.way_round.near_m" in _map and "function divOffPieces(divCoords, mainCoords)" in _map
+   and "near: W.near_m, minRun: W.min_run_m }))(RLS_R.way_round" in _fe and "function olOffPieces(A, B)" in _fe
+   and __import__("route_line_styles").get("way_round", "public_map", "near_m") == 25
+   and __import__("route_line_styles").get("way_round", "routes_map", "near_m") == 30
+   and __import__("route_line_styles").get("way_round", "routes_map", "min_run_m") == 150)
 
 remove_scratch_db(db, TMP)
 print(f"\ntest_route_pieces: {PASS} passed, {len(FAIL)} failed")

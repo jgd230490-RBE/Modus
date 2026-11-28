@@ -191,8 +191,11 @@ ok("⭐ no empty line after 'A Wolds Link Batching Plant': B follows at once in 
 import re  # noqa: E402
 NEW = ["#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B"]
 MAP_HTML = open(os.path.join(os.path.dirname(BACKEND), "map", "index.html"), encoding="utf-8").read()
-_m = re.search(r"const CARBON_RAMP = \[([^\]]+)\];", MAP_HTML)
-MAP_RAMP = [x.strip().strip("'") for x in _m.group(1).split(",")] if _m else []
+# NARROWED 27 Nov 2026 (claude/route-line-spec): the map's CARBON_RAMP reads the route-line table's copy (RLSP.month_line.bands)
+import json as _json  # noqa: E402
+_m = re.search(r"const CARBON_RAMP = RLSP\.month_line\.bands;", MAP_HTML)
+_c = re.search(r"var ROUTE_LINE_STYLES = (\{.*\});\r?\n", MAP_HTML)
+MAP_RAMP = _json.loads(_c.group(1))["public_map"]["month_line"]["bands"] if (_m and _c) else []
 ok("⭐ A-F2b: the bulletin's five blues are the card's (was #94BBF9 #5A96F6 #2071F3 #0B55CB #073888)",
    list(bulletin_doc.VOLUME_RAMP) == NEW, str(bulletin_doc.VOLUME_RAMP))
 ok("⭐ A-F2b: the public map's heat-map blues are the same five (screens and paper together)", MAP_RAMP == NEW, str(MAP_RAMP))

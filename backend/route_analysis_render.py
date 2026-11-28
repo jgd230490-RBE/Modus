@@ -35,10 +35,12 @@ RED = "#B91C1C"
 # 26 Nov 2026 (the printed maps' route lines, card 3b; John, Q10 "Go with blue"): the legs are band blues now, so the
 # busy-hours road leaves the blues for ink, as route_map_export.BUSY_ROAD did (it was the stock blue #2563EB, which sat
 # beside the dark blue legs as a second near-identical blue). The name is kept: one constant, read in two places.
-BUSY_BLUE = "#3A3C41"
+import route_line_styles as _RLS      # 27 Nov 2026 (claude/route-line-spec): the route lines' colours and widths
+BUSY_BLUE = _RLS.get("peak_hours_road", "route_analysis", "color")
 ZONE_RED = "#DC2626"
 CYCLE_BLUE = "#0369A1"
-USUAL_GREY = "#71717A"
+USUAL_GREY = _RLS.get("usual_road", "route_analysis", "color")
+_RA_OUT, _RA_BACK, _RA_BUSY = (_RLS.spec(r, "route_analysis") for r in ("loaded_leg", "empty_leg", "peak_hours_road"))
 LIMIT_RED = "#C81E1E"
 CLAUSES = {"limits": "4.3a iv, 5.6a, 5.6d", "community": "4.3a ii · CLP template §2.4", "collisions": "4.1a, 5.1a, 5.6a",
            "cycle": "5.6a · §2.7", "hours": "5.5a iii", "diversions": "5.6d, 5.6f", "assessor": "5.6a, 5.2c"}
@@ -253,15 +255,15 @@ def _jpeg(png):
         return png
 
 
-def _legs(doc, P, R, loaded=None, ret=None, out_colour=RS_LOADED, back_colour=RS_RETURN, w=2.4, dashed=False):
+def _legs(doc, P, R, loaded=None, ret=None, out_colour=RS_LOADED, back_colour=RS_RETURN, w=_RA_OUT["width"], dashed=False):
     c = doc.c
     lo = R["loaded"] if loaded is None else loaded
     rt = R["return"] if ret is None else ret
     if dashed:
         for coords in (lo, rt):
-            _dash_line(c, P, coords, USUAL_GREY, 1.8)
+            _dash_line(c, P, coords, USUAL_GREY, _RLS.get("usual_road", "route_analysis", "width"))
         return
-    X._rs_line(c, lambda lon, lat: P(lon, lat), rt, back_colour, w - 0.3, offset=3.0)
+    X._rs_line(c, lambda lon, lat: P(lon, lat), rt, back_colour, w - _RA_BACK["thinner"], offset=_RA_BACK["offset"])
     X._rs_line(c, lambda lon, lat: P(lon, lat), lo, out_colour, w)
 
 
@@ -354,7 +356,7 @@ def _key(doc, x, y, rows, w):
     return y - 2
 
 
-def _k_line(colour, w=2.4, dash=None):
+def _k_line(colour, w=_RA_OUT["width"], dash=None):
     def f(c, x, y):
         c.saveState(); c.setLineCap(1); c.setStrokeColorRGB(*_rgb(colour)); c.setLineWidth(w)
         if dash:
@@ -520,8 +522,8 @@ def page_limits(doc, R):
         else:
             y = doc.para(text, x, y, w, size, rgb) - 4
     if not _on_cont(doc, px) and y - 50 > doc.bottom():
-        y = _key(doc, x, y - 4, [(lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "Out, loaded, A to B"),
-                                 (lambda cx, cy: _k_line(RS_RETURN)(c, cx, cy), "Back, empty, B to A"),
+        y = _key(doc, x, y - 4, [(lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), _RA_OUT["key"]),
+                                 (lambda cx, cy: _k_line(RS_RETURN)(c, cx, cy), _RA_BACK["key"]),
                                  (lambda cx, cy: _roundel_small(c, cx, cy), "A weight, height or width limit; red dot: "
                                   "where it is recorded")], w)
     doc.end_page()
@@ -830,8 +832,8 @@ def page_hours(doc, R):
     def draw(P):
         _legs(doc, P, R)
         if use:
-            X._rs_line(c, P, use["return"], BUSY_BLUE, 1.8, offset=-4.2)
-            X._rs_line(c, P, use["loaded"], BUSY_BLUE, 2.2, offset=-7.0)
+            X._rs_line(c, P, use["return"], BUSY_BLUE, _RA_BUSY["width_back"], offset=_RA_BUSY["offset_back"])
+            X._rs_line(c, P, use["loaded"], BUSY_BLUE, _RA_BUSY["width"], offset=_RA_BUSY["offset"])
         _ends(doc, P, R)
     frame = R["loaded"] + R["return"] + ((use["loaded"] + use["return"]) if use else [])
     _draw_map(doc, m, top, mw, mh, frame, draw)
@@ -951,8 +953,8 @@ def page_diversions(doc, R):
             for z in d["zones"]:
                 _zone(c, P, z["geometry"], ZONE_RED, 0.14)
             _legs(doc, P, R, dashed=True)
-            X._rs_line(c, P, d["return"], RS_RETURN, 2.1, offset=3.0)
-            X._rs_line(c, P, d["loaded"], RS_LOADED, 2.4)
+            X._rs_line(c, P, d["return"], RS_RETURN, _RA_BACK["width_section_f"], offset=_RA_BACK["offset"])
+            X._rs_line(c, P, d["loaded"], RS_LOADED, _RA_OUT["width_section_f"])
             _ends(doc, P, R)
         zpts = [p for z in d["zones"] for p in _geom_points(z["geometry"])]
         _draw_map(doc, mx, top, mw, mh, R["loaded"] + R["return"] + d["loaded"] + d["return"] + zpts, draw)
@@ -981,13 +983,13 @@ def page_diversions(doc, R):
                 for z in d["zones"]:
                     _zone(c, P, z["geometry"], ZONE_RED, 0.14)
                 _legs(doc, P, R, dashed=True)
-                X._rs_line(c, P, d["return"], RS_RETURN, 2.1, offset=3.0)
-                X._rs_line(c, P, d["loaded"], RS_LOADED, 2.4)
+                X._rs_line(c, P, d["return"], RS_RETURN, _RA_BACK["width_section_f"], offset=_RA_BACK["offset"])
+                X._rs_line(c, P, d["loaded"], RS_LOADED, _RA_OUT["width_section_f"])
             _draw_map(doc, px, y - 14, pw, 112, zp, drawz, pad=40, max_zoom=15.5, border=True, deco=False,
                       caption="Closer: the zone")
             y -= 132
         if y - 46 > doc.bottom():
-            _key(doc, px, y - 4, [(lambda cx, cy: _k_line(USUAL_GREY, 1.8, (4, 3))(c, cx, cy), "The usual road"),
+            _key(doc, px, y - 4, [(lambda cx, cy: _k_line(USUAL_GREY, _RLS.get("usual_road", "route_analysis", "width"), tuple(_RLS.get("usual_road", "route_analysis", "dash")))(c, cx, cy), _RLS.get("usual_road", "route_analysis", "key")),
                                   (lambda cx, cy: _k_line(RS_LOADED)(c, cx, cy), "The way taken out (back in light blue)"),
                                   (lambda cx, cy: _k_zone(c, cx, cy), "The zone")], pw)
         doc.end_page()

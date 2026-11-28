@@ -27,6 +27,7 @@ let pass = 0; const fail = [];
 const ok = (label, cond, extra) => { if (cond) pass++; else fail.push(label + (extra !== undefined ? "  → " + String(extra).slice(0, 500) : "")); };
 const TRY = (f) => { try { return f(); } catch (e) { return false; } };
 const J = JSON.stringify;
+const RR = require("./lib/route_line_styles").load("frontend").routes_map;   // 27 Nov 2026: the route-line table's copy
 
 const ROOT = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, "..", "..");
 const read = (...p) => { try { return fs.readFileSync(path.join(ROOT, ...p), "utf8").replace(/\r\n?/g, "\n"); } catch (e) { return ""; } };
@@ -37,29 +38,38 @@ const between = (a, b) => { const i = html.indexOf(a); const j = i < 0 ? -1 : ht
 const layerSrc = (id) => between(`m.addLayer({ id: "${id}"`, "});");
 
 // ---------------- source checks ----------------
+// NARROWED 27 Nov 2026 (claude/route-line-spec): the Routes map's values are the route-line table's (RLS_R, the page's copy
+// of backend/route_line_styles.py); each check below holds today's value as a literal and that the page reads it from the copy
 ok("⭐ SRC Q3: the legs are the public map's pair: out ink #3A3C41, back grey #8E9197; green #059669 and amber #F59E0B are gone from this map",
-   html.includes('const LEG_OUT = "#3A3C41", LEG_BACK = "#8E9197", SEL_HALO = "#0B4EA2";') && !html.includes('const LEG_OUT = "#059669"')
+   html.includes('const LEG_OUT = RLS_R.loaded_leg.color, LEG_BACK = RLS_R.empty_leg.color, SEL_HALO = RLS_R.pick.color;')
+   && RR.loaded_leg.color === "#3A3C41" && RR.empty_leg.color === "#8E9197" && RR.pick.color === "#0B4EA2" && !html.includes('const LEG_OUT = "#059669"')
    && !/LEG_OUT = "#059669"|LEG_BACK = "#F59E0B"|SEL_HALO = "#1D4ED8"/.test(html));
 ok("⭐ SRC Q3: a dark basemap takes the public map's pale pair on a dark casing (the values the public map's build set)",
-   html.includes('const LEG_OUT_DARK = "#D4D6DA", LEG_BACK_DARK = "#9A9DA3", LEG_CASE = "#ffffff", LEG_CASE_DARK = "#1F2024";')
-   && html.includes('const SEL_SIGN_DARK = "#8AB4F8";') && between("const legLook = (m) => {", "\n  };").includes("mapGroundDark(basemapShown.current || basemap)"));
+   html.includes('const LEG_OUT_DARK = RLS_R.loaded_leg.color_dark, LEG_BACK_DARK = RLS_R.empty_leg.color_dark, LEG_CASE = RLS_R.loaded_leg.casing, LEG_CASE_DARK = RLS_R.loaded_leg.casing_dark;')
+   && RR.loaded_leg.color_dark === "#D4D6DA" && RR.empty_leg.color_dark === "#9A9DA3" && RR.loaded_leg.casing === "#ffffff" && RR.loaded_leg.casing_dark === "#1F2024"
+   && html.includes('const SEL_SIGN_DARK = RLS_R.pick.color_dark;') && RR.pick.color_dark === "#8AB4F8" && between("const legLook = (m) => {", "\n  };").includes("mapGroundDark(basemapShown.current || basemap)"));
 ok("⭐ SRC: the dark look is applied after EVERY add of the layers (a basemap switch re-adds them on style.load)",
    between("const addNetworkLayers = (m) => {", "\n  };").includes("legLook(m);") && html.includes('m.on("style.load", () => { addNetworkLayers(m);'));
 ok("⭐ SRC: no slate grey and no stock blue left on this map's lines: the alternatives #8E9197 (was #94A3B8), the marked stretch #1F2024 (was #334155)",
-   html.includes('const ALT_COLOR = "#8E9197", ALT_COLOR_DARK = "#7D8087";') && html.includes('const OL_MARK = "#1F2024", OL_MARK_DARK = "#E6E7EA";')
+   html.includes('const ALT_COLOR = RLS_R.alternative.color, ALT_COLOR_DARK = RLS_R.alternative.color_dark;') && RR.alternative.color === "#8E9197" && RR.alternative.color_dark === "#7D8087"
+   && html.includes('const OL_MARK = RLS_R.ruled_out_stretch.color, OL_MARK_DARK = RLS_R.ruled_out_stretch.color_dark;') && RR.ruled_out_stretch.color === "#1F2024" && RR.ruled_out_stretch.color_dark === "#E6E7EA"
    && !html.includes('const ALT_COLOR = "#94A3B8"') && !html.includes('"rgba(29,78,216,.32)"'));
 ok("⭐ SRC Q4: the see-through band is gone: sel-line is a solid 3.4 px sign-blue line, opacity 1, on its own white casing, with arrows, over the line in use",
-   TRY(() => { const s = layerSrc("sel-line"); return s.includes('"line-color": SEL_HALO, "line-opacity": 1, "line-width": 3.4, "line-offset": LEG_OFFSET') && !s.includes("0.32") && !/\}, "route-casing"\)/.test(s + "})"); })
-   && layerSrc("sel-casing").includes('"line-color": LEG_CASE, "line-width": 6.4, "line-offset": LEG_OFFSET')
+   TRY(() => { const s = layerSrc("sel-line"); return s.includes('"line-color": SEL_HALO, "line-opacity": 1, "line-width": RLS_R.pick.width, "line-offset": LEG_OFFSET') && !s.includes("0.32") && !/\}, "route-casing"\)/.test(s + "})"); })
+   && layerSrc("sel-casing").includes('"line-color": RLS_R.pick.casing, "line-width": RLS_R.pick.casing_width, "line-offset": LEG_OFFSET')
+   && RR.pick.width === 3.4 && RR.pick.casing === "#ffffff" && RR.pick.casing_width === 6.4
    && layerSrc("sel-arrows").includes('"icon-halo-color": SEL_HALO')
    && TRY(() => { const i = (id) => html.indexOf(`m.addLayer({ id: "${id}"`); return i("ol-use-arrows") < i("sel-casing") && i("sel-casing") < i("sel-line") && i("sel-line") < i("sel-arrows") && i("alt-line") < i("ol-use-casing"); }));
 ok("⭐ SRC Q4: a route picked but not open: a soft sign-blue halo (0.3) under its legs, from its own source",
-   layerSrc("sel-halo").includes('source: "selhalo"') && layerSrc("sel-halo").includes('"line-color": SEL_HALO, "line-opacity": 0.3')
-   && html.includes('paint: { "line-color": SEL_HALO, "line-opacity": 0.3, "line-width": ["interpolate", ["linear"], ["zoom"], 9, 11, 14, 16],\n               "line-offset": LEG_OFFSET } }, "route-casing");'));
+   layerSrc("sel-halo").includes('source: "selhalo"') && layerSrc("sel-halo").includes('"line-color": RLS_R.pick.halo, "line-opacity": RLS_R.pick.halo_opacity')
+   && html.includes('paint: { "line-color": RLS_R.pick.halo, "line-opacity": RLS_R.pick.halo_opacity, "line-width": RLS_R.pick.halo_width,\n               "line-offset": LEG_OFFSET } }, "route-casing");')
+   && RR.pick.halo === "#0B4EA2" && RR.pick.halo_opacity === 0.3 && J(RR.pick.halo_width) === J(["interpolate", ["linear"], ["zoom"], 9, 11, 14, 16]));
 ok("⭐ SRC card 1: the line in use 3.2 px on a 6 px white casing, opacity 1; alternatives 2.4 px on a 5.4 px white casing, no offset",
-   layerSrc("ol-use-line").includes('"line-width": 3.2') && layerSrc("ol-use-casing").includes('"line-width": 6, "line-opacity": 1')
-   && layerSrc("alt-line").includes('"line-color": ALT_COLOR, "line-width": 2.4, "line-opacity": 1') && !layerSrc("alt-line").includes("line-offset")
-   && layerSrc("alt-casing").includes('"line-color": LEG_CASE, "line-width": 5.4'));
+   layerSrc("ol-use-line").includes('"line-width": RLS_R.in_use.width') && layerSrc("ol-use-casing").includes('"line-color": RLS_R.in_use.casing, "line-width": RLS_R.in_use.casing_width, "line-opacity": RLS_R.in_use.casing_opacity')
+   && RR.in_use.width === 3.2 && RR.in_use.casing === "#ffffff" && RR.in_use.casing_width === 6 && RR.in_use.casing_opacity === 1
+   && layerSrc("alt-line").includes('"line-color": ALT_COLOR, "line-width": RLS_R.alternative.width, "line-opacity": RLS_R.alternative.opacity') && !layerSrc("alt-line").includes("line-offset")
+   && layerSrc("alt-casing").includes('"line-color": RLS_R.alternative.casing, "line-width": RLS_R.alternative.casing_width')
+   && RR.alternative.width === 2.4 && RR.alternative.opacity === 1 && RR.alternative.casing === "#ffffff" && RR.alternative.casing_width === 5.4);
 ok("⭐ SRC: a click on an open route's line is looked for in a wider box (8 px a side), the lines are not widened for it",
    html.includes("const OL_HIT_PX = 8;") && between("cbRef.current.olClick = (e) => {", "\n  };").includes("[[e.point.x - OL_HIT_PX, e.point.y - OL_HIT_PX], [e.point.x + OL_HIT_PX, e.point.y + OL_HIT_PX]]"));
 ok("⭐ SRC Q2: the 30 % fade only while a route is picked and NOT open (applyEmphasis reads the open route)",
@@ -72,7 +82,9 @@ ok("⭐ SRC Q2: an open route's two ends come from its own row (status), the dra
 // NARROWED 26 Nov 2026 (lines-prints Q1): the week maps took the same pair in their own branch (CM_OUT / CM_BACK = LEG_OUT /
 // LEG_BACK's values); this branch's own constants are still the only ones on the Routes map
 ok("⭐ SRC: the Routes map's pair is its own (LEG_OUT / LEG_BACK); the week maps keep their own constants, now the same ink and grey (lines-prints Q1)",
-   html.includes('const CM_OUT = "#3A3C41", CM_BACK = "#8E9197"') && html.includes('const LEG_OUT = "#3A3C41", LEG_BACK = "#8E9197"'));
+   // NARROWED 27 Nov 2026: each map reads its own surface of the table (commit_map, routes_map), the same ink and grey
+   html.includes('const CM_OUT = RLS_C.loaded_leg.color, CM_BACK = RLS_C.empty_leg.color') && html.includes('const LEG_OUT = RLS_R.loaded_leg.color, LEG_BACK = RLS_R.empty_leg.color')
+   && TRY(() => { const C = require("./lib/route_line_styles").load("frontend").commit_map; return C.loaded_leg.color === RR.loaded_leg.color && C.empty_leg.color === RR.empty_leg.color; }));
 
 // ---------------- the app in a DOM, over a stand-in map ----------------
 const dom = new JSDOM(`<!doctype html><html><head></head><body><div id="root"></div></body></html>`,

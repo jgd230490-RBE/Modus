@@ -74,14 +74,19 @@ ok("⭐ SRC: the busy-hours and in-use limit lines are margin lines (bo-cl), no 
 
 // =========================== source checks: the map ===========================
 {
-  const ol = (html.match(/const OL_DIV = \{[\s\S]*?\};/) || [""])[0];
+  const ol = (html.match(/const OL_DIV = [\s\S]*?\(RLS_R\.way_round, RLS_R\.usual_road\);/) || [""])[0];   // NARROWED 27 Nov 2026: built from the table
   const du = (pubMap.match(/const DIV_USUAL = \{[\s\S]*?\};/) || [""])[0];
   const v = (s, k) => (s.match(new RegExp("\\b" + k + ": ?['\"]?([^,'\"\\s}]+)")) || [])[1];
+  // NARROWED 27 Nov 2026 (claude/route-line-spec): OL_DIV and the public map's DIV_USUAL are built from the route-line table
+  // (RLS_R / RLSP, each page's copy); today's values are pinned against the copies, and "kept in step" compares the two surfaces
+  const RLS = require("./lib/route_line_styles"), RW = RLS.load("frontend").routes_map, PW = RLS.load("map").public_map;
   ok("⭐ MAP: the amber edge (#F59E0B, 10.5 px) and the usual road's values (#B4B6BA 2.6 px on a 5 px casing, × #6B6E74)",
-     v(ol, "edge") === "#F59E0B" && v(ol, "edgeW") === "10.5" && v(ol, "core") === "#B4B6BA" && v(ol, "coreW") === "2.6"
-     && v(ol, "casingW") === "5" && v(ol, "x") === "#6B6E74" && +v(ol, "xEvery") >= 64 && +v(ol, "xEvery") <= 70, ol);
+     /\}\)\)\(RLS_R\.way_round, RLS_R\.usual_road\);/.test(ol) && /edge: W\.color, edgeW: W\.width, core: U\.color,/.test(ol)
+     && RW.way_round.color === "#F59E0B" && RW.way_round.width === 10.5 && RW.usual_road.color === "#B4B6BA" && RW.usual_road.width === 2.6
+     && RW.usual_road.casing_width === 5 && RW.usual_road.x === "#6B6E74" && RW.usual_road.x_every >= 64 && RW.usual_road.x_every <= 70, ol);
   ok("MAP: where the public map carries DIV_USUAL its colours are the same as these (kept in step)",
-     !du || ["core", "x", "coreDark", "casingDark", "xDark", "coreW", "casingW"].every(k => v(du, k) === v(ol, k)), du);
+     /const DIV_USUAL = \{ core: RLSP\.usual_road\.color,/.test(du)
+     && ["color", "x", "color_dark", "casing_dark", "x_dark", "width", "casing_width"].every(k => PW.usual_road[k] === RW.usual_road[k]), du);
 }
 {
   const anl = (() => { const a = html.indexOf("const addNetworkLayers = (m) => {"); return html.slice(a, html.indexOf("\n  };\n", a)); })();

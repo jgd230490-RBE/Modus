@@ -1417,6 +1417,25 @@ async function walkEmpty(browser) {
   finally { await server.stop(); }
 }
 
+// 27 Nov 2026 (claude/route-line-spec): the route-line specimen sheet (backend/tools/route_line_specimen.py: every role on
+// every surface, from the one table, colour and black and white) is built into the run folder and photographed at the desk
+// width in the first look, so a run before and a run after a route-line change can be laid side by side. It is a file, not
+// a page the app serves: nothing links to it.
+async function walkSpecimen(browser) {
+  try {
+    const out = path.join(RUN_DIR, "route-line-specimen");
+    execFileSync(findPython(), [path.join(BACKEND, "tools", "route_line_specimen.py"), "--out", out], { encoding: "utf8", env: { ...process.env, PYTHONUTF8: "1" } });
+    const look = LOOKS[0], w = DESK_W;
+    const ctx = await newContext(browser, look, w);
+    const page = await ctx.newPage(); const store = newStore(); watch(page, store);
+    for (const [name, file] of [["route-line-specimen", "route-line-specimen.html"], ["route-line-specimen-bw", "route-line-specimen-bw.html"]]) {
+      await page.goto("file:///" + path.join(out, file).replace(/\\/g, "/"), { waitUntil: "load" });
+      await audit(page, store, { name, width: w, height: HEIGHT[w] || 800, look, base: "file://" });
+    }
+    await ctx.close();
+  } catch (e) { note("route-line specimen not photographed: " + String(e.message || e).split("\n")[0].slice(0, 160)); }
+}
+
 async function walkUnsigned(browser, base) {
   // a visitor without any cookie: the map's password page
   const look = LOOKS[0];
@@ -1740,6 +1759,7 @@ async function selfTestRules(browser) {
       else note("login-user and empty-tenant walks need the harness's own server (not --base)");
     }
     await walkUnsigned(browser, server.base);
+    if (!OPT.pages) await walkSpecimen(browser);
     // FR1: a pinned long block no stop showed is gone from the app — named, so the pin comes out (the list may only shrink)
     if (!OPT.pages && OPT.deep) for (const p of RULES.LONG_PROSE_PINNED) if (!PINS_SEEN.has(p.starts))
       note(`long-prose pin not seen in this run: "${p.starts}" (${p.where}) — take it out of LONG_PROSE_PINNED in backend/tests/lib/ui_rules.js and lower the pinned count in ui_audit_rules.js`);

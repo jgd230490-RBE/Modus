@@ -192,17 +192,19 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
 # against the recommendation of ink and grey): every exported map draws the laden leg in a dark band blue and the empty
 # return in a light band blue (two of VOLUME_RAMP's five), while the public map and Data → Routes draw ink and grey. The
 # amber edge round a closure is the ONLY amber left on paper; the busy-hours road goes to ink (Q6), out of the blues.
-LEG_LADEN = "#0051C4"            # dark blue out (was the public map's "Laden (out)" green #059669)
-LEG_EMPTY = "#72A7FF"            # light blue back (was its "Empty (return)" amber #f59e0b)
-BUSY_ROAD = "#3A3C41"            # the busy-hours road in ink (was the plan blue #3B82F6)
-DIVERSION_EDGE = "#F59E0B"       # the map's soft amber edge round a diverted stretch (DIV_EDGE.colour)
+# 27 Nov 2026 (claude/route-line-spec): the colours and the key words are the route-line table's (route_line_styles)
+import route_line_styles as _RLS
+LEG_LADEN = _RLS.get("loaded_leg", "plan", "color")          # dark blue out (was the public map's "Laden (out)" green #059669)
+LEG_EMPTY = _RLS.get("empty_leg", "plan", "color")           # light blue back (was its "Empty (return)" amber #f59e0b)
+BUSY_ROAD = _RLS.get("peak_hours_road", "plan", "color")     # the busy-hours road in ink (was the plan blue #3B82F6)
+DIVERSION_EDGE = _RLS.get("way_round", "plan", "color")      # the map's soft amber edge round a diverted stretch (DIV_EDGE.colour)
 NO_MONTH_WORDS = "approved routes, no month"
 ALTERNATIVES_MAX = 12            # the key lists this many alternatives, then "and N more"
 LEG_LEGEND = [
-    {"kind": "laden", "label": "Laden (out)"},
-    {"kind": "empty", "label": "Empty (return)"},
-    {"kind": "busy", "label": "Busy-hours road"},
-    {"kind": "diversion", "label": "Way round a closure"},
+    {"kind": "laden", "label": _RLS.get("loaded_leg", "plan", "key")},
+    {"kind": "empty", "label": _RLS.get("empty_leg", "plan", "key")},
+    {"kind": "busy", "label": _RLS.get("peak_hours_road", "plan", "key")},
+    {"kind": "diversion", "label": _RLS.get("way_round", "plan", "key")},
 ]
 
 

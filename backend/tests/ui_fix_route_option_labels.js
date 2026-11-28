@@ -72,14 +72,18 @@ ok("⭐ SRC: Q6: a route opened from the map leaves the page at the map (no move
 ok("⭐ SRC: the map rules hold: the marked stretch is SOLID and dark (no dash, not the limit layer's red), the labels carry no red",
    TRY(() => { const mk = between('m.addLayer({ id: "ol-mark"', "});"); return mk.includes('"line-color": olMarkInk') && !/dasharray|RL_LIMIT_RED|#DC2626|#C8102E/.test(mk); })
    // NARROWED 24 Nov 2026 (Routes rethink): the mark a neutral near-black, no longer the slate #334155 / #E2E8F0
-   && html.includes('const OL_MARK = "#1F2024", OL_MARK_DARK = "#E6E7EA";') && css.length > 200 && !/#DC2626|#C8102E|var\(--red\)|var\(--bad/.test(css));
+   // NARROWED 27 Nov 2026 (claude/route-line-spec): the mark's ink is the route-line table's (RLS_R), today's pinned here
+   && html.includes('const OL_MARK = RLS_R.ruled_out_stretch.color, OL_MARK_DARK = RLS_R.ruled_out_stretch.color_dark;')
+   && TRY(() => { const R = require("./lib/route_line_styles").load("frontend").routes_map.ruled_out_stretch; return R.color === "#1F2024" && R.color_dark === "#E6E7EA" && R.cap === "butt" && R.width === 7; })
+   && css.length > 200 && !/#DC2626|#C8102E|var\(--red\)|var\(--bad/.test(css));
 ok("⭐ SRC: the sign is the one the Lorry limits layer draws (rlSignImage), on its own layer, shown without ticking that box",
    html.includes('m.addLayer({ id: "ol-sign", type: "symbol", source: "olsigns"')
    && (html.match(/"icon-image": \["concat", "rl-sign-", \["get", "sign"\]\]/g) || []).length === 2 && html.includes("rlSignImage(t), { pixelRatio: 2 }")
    && block.includes('rlRead("limits").then('));
 ok("⭐ SRC: the open route's line in use is drawn in the leg colours (a dated diversion is not option 0), and the route layers give that route up meanwhile",
    // NARROWED 24 Nov 2026 (Routes rethink, card 1): 3.2 px on a 6 px casing, and the route layers also keep to the open route
-   html.includes('m.addLayer({ id: "ol-use-line", type: "line", source: "oluse"') && between('id: "ol-use-line"', "});").includes('"line-color": LEG_COLOR_EXPR, "line-width": 3.2, "line-offset": LEG_OFFSET')
+   html.includes('m.addLayer({ id: "ol-use-line", type: "line", source: "oluse"') && between('id: "ol-use-line"', "});").includes('"line-color": LEG_COLOR_EXPR, "line-width": RLS_R.in_use.width, "line-offset": LEG_OFFSET')
+   && TRY(() => require("./lib/route_line_styles").load("frontend").routes_map.in_use.width === 3.2)   // NARROWED 27 Nov 2026: the table's copy
    && html.includes('const f = ["all", base, ...(hide ? [["!=", ["get", "route_id"], hide]] : []), ...(only ? [only] : [])];'));
 ok("⭐ SRC: the label's look: 12 px (the app's floor), the app's surface and ink, a 44 px tap area on a tablet or a touch screen, a Dark edge",
    css.includes("font-size:12px") && css.includes("background:var(--surface);color:var(--ink)") && css.includes(".ol-lab.ol-out{color:var(--muted);}")

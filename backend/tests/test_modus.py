@@ -1089,8 +1089,12 @@ ok("the map's brand ink is #1F2024 and overlay.js reserves it (no band may reuse
    'brandDark:         "#1F2024"' in read("map/config.js") and "'#1F2024'," in ov_src and "#0F172A" not in ov_src)
 # NARROWED 25 Nov 2026 (the route lines rethink): still blue, now the sign blue and the five band blues, never orange
 ok("the map's forecast routes stay BLUE (decision 29 Sep: orange would blur with amber warnings; the sign blue and the five band blues since 25 Nov)",
-   'brand:             "#0B4EA2"' in read("map/config.js") and 'forecast:          "#0B4EA2"' in read("map/config.js")
-   and "const CARBON_RAMP = ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B'];" in read("map/index.html")
+   # NARROWED 27 Nov 2026 (claude/route-line-spec): the forecast colour and the ramp left the config and the page for the
+   # route-line table (month_line, public_map), which the page reads from its generated copy
+   'brand:             "#0B4EA2"' in read("map/config.js") and "forecast:" not in read("map/config.js")
+   and "const CARBON_RAMP = RLSP.month_line.bands;" in read("map/index.html")
+   and __import__("route_line_styles").get("month_line", "public_map", "color") == "#0B4EA2"
+   and __import__("route_line_styles").get("month_line", "public_map", "bands") == ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B']
    and "#FF8C14" not in read("map/config.js") and "#2563EB" not in read("map/config.js").upper())
 _help = read("frontend/help/index.html")
 # NARROWED (29 Sep): the nav names the product as TEXT until the brand SVG is in the repo
